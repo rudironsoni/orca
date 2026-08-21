@@ -5,19 +5,18 @@ import { encodeHerdrPtyId } from './herdr-pty-types'
 import type {
   HerdrPane,
   HerdrPaneLayoutSnapshot,
+  HerdrHostTransport,
   HerdrSessionSnapshot,
   HerdrTab
 } from './herdr-runtime-contract'
 import {
   ORCA_BINDING_TOKEN,
-  ORCA_METADATA_SOURCE,
+  claimOrcaPaneBinding,
   collectLeafIds,
   orcaPaneBinding,
   orcaWorkspaceBinding,
   paneBindingMapKey
 } from './herdr-binding-metadata'
-import type { HerdrHostTransport } from './herdr-runtime-contract'
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
 
 export type HerdrImportedSurface = {
   worktreeId: string
@@ -74,7 +73,10 @@ function collectUnboundTabSurfaces(
   paneIdsBySessionAndBinding: Map<string, string>
 ): HerdrImportedSurface[] {
   const panes = snapshot.panes.filter((pane) => pane.tab_id === tab.tab_id)
-  const unbound = panes.filter((pane) => !pane.tokens?.[ORCA_BINDING_TOKEN])
+  const claimedPaneIds = new Set(paneIdsBySessionAndBinding.values())
+  const unbound = panes.filter(
+    (pane) => !pane.tokens?.[ORCA_BINDING_TOKEN] && !claimedPaneIds.has(pane.pane_id)
+  )
   const owner = findOrcaOwnerForHerdrTab(
     sessionName,
     graph,
@@ -91,10 +93,10 @@ function collectUnboundTabSurfaces(
     }
   }
   if (!owner) {
-    const root = unbound[0] ?? panes[0]
-    if (!root) {
+    if (unbound.length !== 1 || panes.length !== 1) {
       return []
     }
+    const root = unbound[0]
     const leafId = randomUUID()
     const tabId = randomUUID()
     return [
@@ -102,6 +104,9 @@ function collectUnboundTabSurfaces(
     ]
   }
   if (unbound.length === 0) {
+    return []
+  }
+  if (unbound.length > 1) {
     return []
   }
   return unbound.map((pane) => {
@@ -165,7 +170,7 @@ function surfaceFor(
 ): HerdrImportedSurface {
   const ptyId = encodeHerdrPtyId({
     version: 2,
-    hostId: 'local',
+    hostId: graph.hostId ?? 'local',
     projectId: graph.project.id,
     worktreeId,
     tabId,
@@ -212,16 +217,13 @@ export async function claimAndPresentHerdrSurfaces(
 ): Promise<void> {
   for (const surface of surfaces) {
     const binding = orcaPaneBinding(projectId, surface.leafId)
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.report_metadata', {
-        pane_id: surface.paneId,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: binding }
-      })
-    )
     const pane = snapshot.panes.find((candidate) => candidate.pane_id === surface.paneId)
-    if (pane) {
-      pane.tokens = { ...pane.tokens, [ORCA_BINDING_TOKEN]: binding }
+    if (!pane) {
+      continue
+    }
+    await claimOrcaPaneBinding(transport, sessionName, projectId, surface.leafId, pane, snapshot)
+    if (pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
+      continue
     }
     persist(surface)
     present?.(surface)
@@ -365,6 +367,9 @@ export function herdrLayoutToOrcaLayout(
     .map((pane) => identities.get(pane.pane_id)?.leafId)
     .filter((leafId): leafId is string => Boolean(leafId))
   if (leaves.length === 0) {
+    return null
+  }
+  if (leaves.length > 2) {
     return null
   }
   if (leaves.length === 1 || !layout.splits?.[0]) {

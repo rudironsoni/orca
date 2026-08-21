@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import type { SshTarget } from '../../../../shared/ssh-types'
@@ -16,6 +16,7 @@ export type HerdrRemoteSshLaunch = {
   joinControlPath: string | null
   sshArgs: string[]
   sshBinary: string
+  cleanup: () => void
 }
 
 export function herdrRemoteDest(target: SshTarget): string {
@@ -72,9 +73,11 @@ export function writeHerdrRemoteSshLaunch(args: {
     throw new Error('System ssh is not available for herdr --remote')
   }
   const { dest, joinControlPath, sshArgs } = herdrRemoteSshArgs(args.target, args.resolvedConfig)
-  const dir = join(tmpdir(), 'orca-herdr-remote', sanitizeDirName(args.target.id || dest))
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'config.toml'), '[remote]\nmanage_ssh_config = false\n')
+  const root = join(tmpdir(), `orca-herdr-remote-${process.getuid?.() ?? 'user'}`)
+  mkdirSync(root, { recursive: true, mode: 0o700 })
+  const dir = mkdtempSync(join(root, `${sanitizeDirName(args.target.id || dest)}-`))
+  chmodSync(dir, 0o700)
+  writeFileSync(join(dir, 'config.toml'), '[remote]\nmanage_ssh_config = false\n', { mode: 0o600 })
   writeSshShim(dir, sshBinary, sshArgs)
   return {
     dest,
@@ -84,8 +87,48 @@ export function writeHerdrRemoteSshLaunch(args: {
     },
     joinControlPath,
     sshArgs,
-    sshBinary
+    sshBinary,
+    cleanup: createRetryingCleanup(() => {
+      rmSync(dir, { recursive: true, force: true })
+    })
   }
+}
+
+export function createRetryingCleanup(remove: () => void): () => void {
+  let cleaned = false
+  return () => {
+    if (cleaned) {
+      return
+    }
+    removeWithRetry(remove)
+    cleaned = true
+  }
+}
+
+function removeWithRetry(remove: () => void): void {
+  const maxAttempts = 3
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      remove()
+      return
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'EPERM' || code === 'EBUSY') {
+        waitMs(25 * attempt)
+      }
+    }
+  }
+}
+
+function waitMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+function sanitizeDirName(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 80) || 'host'
 }
 
 export function herdrRemoteCommandEnv(
@@ -102,26 +145,30 @@ export function herdrRemoteCommandEnv(
 
 function writeSshShim(dir: string, sshBinary: string, sshArgs: string[]): void {
   if (process.platform === 'win32') {
-    const lines = [
-      '@echo off',
-      `set "ORCA_HERDR_SSH=${escapeCmd(sshBinary)}"`,
-      `"%ORCA_HERDR_SSH%" ${sshArgs.map(escapeCmd).join(' ')} %*`
-    ]
-    writeFileSync(join(dir, 'ssh.cmd'), `${lines.join('\r\n')}\r\n`)
+    writeFileSync(join(dir, 'ssh.cmd'), herdrWindowsSshShim(sshBinary, sshArgs), { mode: 0o700 })
     return
   }
   const quoted = [sshBinary, ...sshArgs].map(posixShellQuote).join(' ')
-  writeFileSync(join(dir, 'ssh'), `#!/bin/sh\nexec ${quoted} "$@"\n`, { mode: 0o755 })
+  writeFileSync(join(dir, 'ssh'), `#!/bin/sh\nexec ${quoted} "$@"\n`, { mode: 0o700 })
 }
 
-function sanitizeDirName(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 80) || 'host'
+export function herdrWindowsSshShim(sshBinary: string, sshArgs: string[]): string {
+  const lines = [
+    '@echo off',
+    `set "ORCA_HERDR_SSH=${escapeCmdValue(sshBinary)}"`,
+    `"%ORCA_HERDR_SSH%" ${sshArgs.map(quoteCmdArgument).join(' ')} %*`
+  ]
+  return `${lines.join('\r\n')}\r\n`
 }
 
 function posixShellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`
 }
 
-function escapeCmd(value: string): string {
-  return `"${value.replaceAll('"', '""')}"`
+function escapeCmdValue(value: string): string {
+  return value.replaceAll('%', '%%').replaceAll('"', '""')
+}
+
+function quoteCmdArgument(value: string): string {
+  return `"${escapeCmdValue(value)}"`
 }

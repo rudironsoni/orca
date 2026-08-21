@@ -251,6 +251,163 @@ describe('registerPtyHandlers', () => {
       })
     ).toBe(false)
   })
+  it('accepts one matching logical key including F5-F12 and rejects ambiguous key metadata', async () => {
+    const writeLogical = vi.fn()
+    setLocalPtyProvider({
+      spawn: vi.fn(async () => ({ id: 'herdr:pane' })),
+      hasPty: () => true,
+      write: vi.fn(),
+      writeLogical,
+      resize: vi.fn(),
+      kill: vi.fn(),
+      shutdown: vi.fn(),
+      onData: vi.fn(() => vi.fn()),
+      onExit: vi.fn(() => vi.fn()),
+      listProcesses: vi.fn(async () => []),
+      getForegroundProcess: vi.fn(async () => null)
+    } as never)
+    registerPtyHandlers(mainWindow as never)
+    await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
+    const writeAccepted = handlers.get('pty:writeAccepted')!
+
+    expect(
+      writeAccepted(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: '\x1b[15~',
+        keys: ['f5']
+      })
+    ).toBe(true)
+    expect(
+      writeAccepted(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: '\x1b[24~',
+        keys: ['f12']
+      })
+    ).toBe(true)
+    expect(
+      writeAccepted(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: '\x03',
+        keys: ['ctrl+c', 'ctrl+d']
+      })
+    ).toBe(false)
+    expect(
+      writeAccepted(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: 'pasted data',
+        keys: ['ctrl+c']
+      })
+    ).toBe(false)
+    expect(
+      writeAccepted(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: '\x03',
+        keys: ['not-a-terminal-key']
+      })
+    ).toBe(false)
+    expect(writeLogical.mock.calls).toEqual([
+      ['herdr:pane', { kind: 'key', name: 'f5' }],
+      ['herdr:pane', { kind: 'key', name: 'f12' }]
+    ])
+  })
+
+  it('reports a rejected logical key write as not accepted', async () => {
+    const writeLogical = vi.fn(() => false)
+    setLocalPtyProvider({
+      spawn: vi.fn(async () => ({ id: 'herdr:pane' })),
+      hasPty: () => true,
+      write: vi.fn(),
+      writeLogical,
+      resize: vi.fn(),
+      kill: vi.fn(),
+      shutdown: vi.fn(),
+      onData: vi.fn(() => vi.fn()),
+      onExit: vi.fn(() => vi.fn()),
+      listProcesses: vi.fn(async () => []),
+      getForegroundProcess: vi.fn(async () => null)
+    } as never)
+    registerPtyHandlers(mainWindow as never)
+    await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
+
+    expect(
+      handlers.get('pty:writeAccepted')!(mainWindowIpcEvent, {
+        id: 'herdr:pane',
+        data: '\x03',
+        keys: ['ctrl+c']
+      })
+    ).toBe(false)
+  })
+
+  it('rejects malformed and over-complex terminal layouts before spawning', async () => {
+    registerPtyHandlers(mainWindow as never)
+    const leaf = (index: number): { type: 'leaf'; leafId: string } => ({
+      type: 'leaf',
+      leafId: `00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`
+    })
+    let tooDeep: unknown = leaf(1)
+    for (let index = 2; index <= 34; index += 1) {
+      tooDeep = {
+        type: 'split',
+        direction: 'vertical',
+        first: leaf(index),
+        second: tooDeep,
+        ratio: 0.5
+      }
+    }
+    let tooManyLeafNodes: unknown[] = Array.from({ length: 65 }, (_, index) => leaf(index + 100))
+    while (tooManyLeafNodes.length > 1) {
+      const next: unknown[] = []
+      for (let index = 0; index < tooManyLeafNodes.length; index += 2) {
+        next.push(
+          tooManyLeafNodes[index + 1] === undefined
+            ? tooManyLeafNodes[index]
+            : {
+                type: 'split',
+                direction: 'horizontal',
+                first: tooManyLeafNodes[index],
+                second: tooManyLeafNodes[index + 1]
+              }
+        )
+      }
+      tooManyLeafNodes = next
+    }
+    const tooManyLeaves = tooManyLeafNodes[0]
+    const malformedLayouts = [
+      {
+        root: { type: 'split', direction: 'diagonal', first: leaf(1), second: leaf(2) },
+        activeLeafId: leaf(1).leafId,
+        expandedLeafId: null
+      },
+      {
+        root: { type: 'split', direction: 'vertical', first: leaf(1), second: leaf(2), ratio: 2 },
+        activeLeafId: leaf(1).leafId,
+        expandedLeafId: null
+      },
+      {
+        root: tooDeep,
+        activeLeafId: leaf(1).leafId,
+        expandedLeafId: null
+      },
+      {
+        root: tooManyLeaves,
+        activeLeafId: leaf(100).leafId,
+        expandedLeafId: null
+      },
+      {
+        root: leaf(1),
+        activeLeafId: leaf(1).leafId,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { [leaf(2).leafId]: 'unexpected-pty' }
+      }
+    ]
+
+    for (const terminalLayout of malformedLayouts) {
+      await expect(
+        handlers.get('pty:spawn')!(null, { cols: 80, rows: 24, terminalLayout })
+      ).rejects.toThrow('pty_spawn_invalid_terminal_layout')
+    }
+    expect(spawnMock).not.toHaveBeenCalled()
+  })
 
   it('synchronizes runtime output sequencing from a provider reattach snapshot', async () => {
     setLocalPtyProvider({

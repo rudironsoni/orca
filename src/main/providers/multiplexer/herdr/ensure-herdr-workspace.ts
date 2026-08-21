@@ -5,13 +5,13 @@ import type {
   TerminalTab
 } from '../../../../shared/terminal-tab-types'
 import type { Project } from '../../../../shared/project-types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { basename, normalize } from 'node:path'
 import {
+  claimOrcaPaneBinding,
   findUniqueHerdrMatch,
   ORCA_BINDING_TOKEN,
-  ORCA_METADATA_SOURCE,
-  orcaPaneBinding,
   orcaWorkspaceBinding,
   reportOrcaWorkspaceBinding
 } from './herdr-binding-metadata'
@@ -32,11 +32,18 @@ export type HerdrWorktreeDescriptor = Pick<
 }
 
 export type HerdrProjectHostGraph = {
+  hostId?: ExecutionHostId
   project: Project
   worktrees: HerdrWorktreeDescriptor[]
   tabsByWorktreeId: Record<string, TerminalTab[]>
   layoutsByTabId: Record<string, TerminalLayoutSnapshot>
   persistedPaneIdsByLeafId?: Record<string, string>
+  persistPaneId?: (binding: {
+    worktreeId: string
+    tabId: string
+    leafId: string
+    paneId: string
+  }) => void
 }
 
 export function isLinkedHerdrWorktree(worktree: HerdrWorktreeDescriptor): boolean {
@@ -60,7 +67,8 @@ export async function ensureStockHerdrWorkspace(
   worktree: HerdrWorktreeDescriptor,
   firstTab: TerminalTab | undefined,
   firstRoot: TerminalPaneLayoutNode | null,
-  snapshot: HerdrSessionSnapshot
+  snapshot: HerdrSessionSnapshot,
+  liveBindings: ReadonlySet<string> = new Set()
 ): Promise<HerdrWorkspace> {
   const binding = orcaWorkspaceBinding(projectId, worktree)
   const bound = findUniqueHerdrMatch(
@@ -72,7 +80,7 @@ export async function ensureStockHerdrWorkspace(
     return bound
   }
 
-  const adoptable = findAdoptableWorkspace(snapshot.workspaces, worktree)
+  const adoptable = findAdoptableWorkspace(snapshot.workspaces, worktree, liveBindings)
   if (adoptable) {
     await reportOrcaWorkspaceBinding(transport, sessionName, adoptable.workspace_id, binding)
     adoptable.tokens = { ...adoptable.tokens, [ORCA_BINDING_TOKEN]: binding }
@@ -116,18 +124,14 @@ export async function ensureStockHerdrWorkspace(
 
   const firstLeafId = firstTerminalLeafId(firstRoot)
   if (firstTab && firstLeafId) {
-    // Claim binding for the first pane
-    const binding = orcaPaneBinding(projectId, firstLeafId)
-    if (created.root_pane.tokens?.[ORCA_BINDING_TOKEN] === binding) {
-      // already bound
-    } else {
-      await transport.request(sessionName, 'pane.report_metadata', {
-        pane_id: created.root_pane.pane_id,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: binding }
-      })
-      created.root_pane.tokens = { ...created.root_pane.tokens, [ORCA_BINDING_TOKEN]: binding }
-    }
+    await claimOrcaPaneBinding(
+      transport,
+      sessionName,
+      projectId,
+      firstLeafId,
+      created.root_pane,
+      snapshot
+    )
   }
   return created.workspace
 }
@@ -170,17 +174,7 @@ async function openStockWorktree(
 
   const firstLeafId = firstTerminalLeafId(firstRoot)
   if (firstTab && firstLeafId) {
-    const binding = orcaPaneBinding(projectId, firstLeafId)
-    if (rootPane.tokens?.[ORCA_BINDING_TOKEN] === binding) {
-      // already bound
-    } else {
-      await transport.request(sessionName, 'pane.report_metadata', {
-        pane_id: rootPane.pane_id,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: binding }
-      })
-      rootPane.tokens = { ...rootPane.tokens, [ORCA_BINDING_TOKEN]: binding }
-    }
+    await claimOrcaPaneBinding(transport, sessionName, projectId, firstLeafId, rootPane, snapshot)
   }
   return workspace
 }
@@ -226,11 +220,16 @@ export function findHerdrWorkspaceForWorktree(
 
 function findAdoptableWorkspace(
   workspaces: HerdrWorkspace[],
-  worktree: { path: string; displayName?: string }
+  worktree: { path: string; displayName?: string },
+  liveBindings: ReadonlySet<string> = new Set()
 ): HerdrWorkspace | null {
+  const unbound = workspaces.filter((workspace) => {
+    const token = workspace.tokens?.[ORCA_BINDING_TOKEN]
+    return !token || !liveBindings.has(token)
+  })
   if (worktree.path) {
     const byCheckout = findUniqueHerdrMatch(
-      workspaces,
+      unbound,
       (workspace) => workspaceMatchesCheckout(workspace, worktree.path),
       `workspace checkout ${worktree.path}`
     )
@@ -239,7 +238,6 @@ function findAdoptableWorkspace(
     }
   }
   const expectedLabel = worktree.displayName || basename(worktree.path)
-  const unbound = workspaces.filter((workspace) => !workspace.tokens?.[ORCA_BINDING_TOKEN])
   if (unbound.length === 1 && unbound[0].label === expectedLabel) {
     return unbound[0]
   }

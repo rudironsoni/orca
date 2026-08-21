@@ -41,7 +41,8 @@ describe('HerdrSshSessionManager', () => {
     const promise = manager.run(['api', 'snapshot', '--json'])
     await new Promise((resolve) => setImmediate(resolve))
     channel.emit('data', Buffer.from('{"protocol":19}'))
-    channel.emit('close', 0)
+    channel.emit('exit', 0)
+    channel.emit('close')
     await expect(promise).resolves.toContain('"protocol":19')
   })
 
@@ -56,8 +57,60 @@ describe('HerdrSshSessionManager', () => {
     await new Promise((resolve) => setImmediate(resolve))
     channel.emit('data', Buffer.from(''))
     channel.stderr.emit('data', Buffer.from('boom'))
-    channel.emit('close', 1)
+    channel.emit('exit', 1)
+    channel.emit('close')
     await expect(promise).rejects.toThrow('boom')
+  })
+
+  it('flushes split UTF-8 output after a successful exit', async () => {
+    const { conn, exec } = createConnection()
+    const manager = new HerdrSshSessionManager(conn, 2000, resolveHerdr)
+    const channel = createChannel()
+    exec.mockResolvedValue(channel)
+
+    const promise = manager.run(['api', 'snapshot', '--json'])
+    await new Promise((resolve) => setImmediate(resolve))
+    const output = Buffer.from('ok 😀')
+    channel.emit('data', output.subarray(0, -1))
+    channel.emit('data', output.subarray(-1))
+    channel.emit('exit', 0)
+    channel.emit('close')
+    await expect(promise).resolves.toBe('ok 😀')
+  })
+
+  it('flushes an incomplete trailing UTF-8 sequence on close', async () => {
+    const { conn, exec } = createConnection()
+    const manager = new HerdrSshSessionManager(conn, 2000, resolveHerdr)
+    const channel = createChannel()
+    exec.mockResolvedValue(channel)
+
+    const promise = manager.run(['api', 'snapshot', '--json'])
+    await new Promise((resolve) => setImmediate(resolve))
+    channel.emit('data', Buffer.from([0xf0, 0x9f, 0x98]))
+    channel.emit('exit', 0)
+    channel.emit('close')
+    await expect(promise).resolves.toBe('�')
+  })
+
+  it('reports signal exits and missing exit status from the exit event', async () => {
+    const { conn, exec } = createConnection()
+    const manager = new HerdrSshSessionManager(conn, 2000, resolveHerdr)
+    const signaled = createChannel()
+    exec.mockResolvedValueOnce(signaled)
+
+    const signalPromise = manager.run(['session', 'list'])
+    await new Promise((resolve) => setImmediate(resolve))
+    signaled.emit('exit', null, 'TERM', '', 'terminated')
+    signaled.emit('close')
+    await expect(signalPromise).rejects.toThrow('signal TERM: terminated')
+
+    const missing = createChannel()
+    exec.mockResolvedValueOnce(missing)
+    const missingPromise = manager.run(['session', 'list'])
+    await new Promise((resolve) => setImmediate(resolve))
+    missing.emit('exit', null)
+    missing.emit('close')
+    await expect(missingPromise).rejects.toThrow('without reporting exit status')
   })
 
   it('starts a PowerShell Herdr server with separate ArgumentList items', async () => {

@@ -18,7 +18,7 @@ export function normalizeHerdrSessionName(value: unknown): string | undefined {
     return undefined
   }
   const trimmed = value.trim()
-  if (!trimmed || trimmed.length > HERDR_SESSION_NAME_MAX_LENGTH) {
+  if (!trimmed || new TextEncoder().encode(trimmed).byteLength > HERDR_SESSION_NAME_MAX_LENGTH) {
     return undefined
   }
   return trimmed

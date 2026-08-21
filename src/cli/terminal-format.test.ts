@@ -84,4 +84,27 @@ describe('formatTerminalShow', () => {
 
     expect(output).toContain('backend: herdr')
   })
+
+  it('prints an unknown backend for older hosts', () => {
+    const output = formatTerminalShow({
+      terminal: {
+        handle: 'term_legacy',
+        ptyId: 'pty-1',
+        worktreeId: 'wt-1',
+        worktreePath: '/repo',
+        branch: 'main',
+        tabId: 'tab-1',
+        leafId: 'leaf-1',
+        title: null,
+        connected: true,
+        writable: true,
+        lastOutputAt: null,
+        preview: '',
+        paneRuntimeId: 1,
+        rendererGraphEpoch: 1
+      }
+    })
+
+    expect(output).toContain('backend: unknown')
+  })
 })

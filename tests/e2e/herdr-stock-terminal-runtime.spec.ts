@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { expect, test } from './helpers/orca-app'
 import {
+  assertLiveHerdrTerminal,
   createStockHerdrXdgHome,
   openHerdrProjectTerminal,
   removeStockHerdrXdgHome,
@@ -9,8 +10,6 @@ import {
   stockHerdrLaunchEnv
 } from './helpers/herdr-terminal-runtime'
 import { waitForSessionReady } from './helpers/store'
-import { SORTABLE_TAB } from './helpers/terminal-tab-menu'
-import { waitForActivePanePtyId } from './helpers/terminal'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -62,7 +61,9 @@ test('settings selects stock Herdr and opens a bound herdr terminal', async ({
     binaryPath: stockBinary ?? undefined
   })
   await openHerdrProjectTerminal(orcaPage, testRepoPath)
-  await expect(orcaPage.locator(SORTABLE_TAB).first()).toBeVisible({ timeout: 30_000 })
-  const ptyId = await waitForActivePanePtyId(orcaPage, 30_000)
-  expect(ptyId.startsWith('herdr:')).toBe(true)
+  const marker = { prefix: `STOCK_E2E_${process.pid}_`, suffix: 'LIVE' }
+  await assertLiveHerdrTerminal(orcaPage, marker)
+  await expect(orcaPage.locator('.xterm-rows').first()).toContainText(
+    `${marker.prefix}${marker.suffix}`
+  )
 })

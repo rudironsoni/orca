@@ -1,5 +1,5 @@
 import { createConnection, type Socket } from 'node:net'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 import type {
   HerdrSocketEvent,
@@ -103,6 +103,13 @@ export type HerdrSocketConnectionOptions = HerdrSocketTransportOptions & {
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 5000
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000
+
+export class HerdrSocketRequestTimeoutError extends Error {
+  constructor(readonly method: string) {
+    super(`Request ${method} timed out`)
+    this.name = 'HerdrSocketRequestTimeoutError'
+  }
+}
 
 // One request per connection. The herdr server closes a non-subscribed
 // connection after a single response, so each request uses a fresh socket.
@@ -211,7 +218,7 @@ export class HerdrSocketConnection {
           connectTimer = null
         }
         requestTimer = setTimeout(() => {
-          finish(new Error(`Request ${request.method} timed out`))
+          finish(new HerdrSocketRequestTimeoutError(request.method))
         }, timeoutMs)
         socket!.write(encodeSocketMessage(request), (error) => {
           if (error) {
@@ -244,9 +251,14 @@ export class HerdrSocketConnection {
   }
 }
 
-export function defaultHerdrSocketPath(sessionName: string): string {
-  const xdgConfig = process.env.XDG_CONFIG_HOME?.trim()
-  const configRoot =
-    xdgConfig || join(process.env.HOME ?? process.env.USERPROFILE ?? '/tmp', '.config')
-  return join(configRoot, 'herdr', 'sessions', sessionName, 'herdr.sock')
+export function defaultHerdrSocketPath(
+  sessionName: string,
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const xdgConfig = env.XDG_CONFIG_HOME?.trim()
+  const joinPath = platform === 'win32' ? win32.join : join
+  const configRoot = xdgConfig || joinPath(env.HOME ?? env.USERPROFILE ?? '/tmp', '.config')
+  const markerPath = joinPath(configRoot, 'herdr', 'sessions', sessionName, 'herdr.sock')
+  return platform === 'win32' ? `\\\\.\\pipe\\${markerPath}` : markerPath
 }

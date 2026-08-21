@@ -76,6 +76,34 @@ describe('daemon-init: runRestartDaemon (7-step sequence)', () => {
     )
   })
 
+  it('disposes the replaced Herdr provider after a settings-driven swap', async () => {
+    const mod = await importFresh()
+    let settingsChanged!: (updates: Record<string, unknown>) => void
+    const store = {
+      onSettingsChanged: vi.fn((listener: typeof settingsChanged) => {
+        settingsChanged = listener
+      }),
+      getSettings: vi.fn(() => ({ herdrSessionName: 'orca' })),
+      getProjects: vi.fn(() => []),
+      getProjectHostSetups: vi.fn(() => []),
+      getRepos: vi.fn(() => []),
+      persistPtyBinding: vi.fn()
+    }
+
+    await mod.initDaemonPtyProvider(undefined, {}, store as never)
+    const firstProvider = setLocalPtyProviderMock.mock.calls[0][0] as { dispose: () => void }
+    const dispose = vi.spyOn(firstProvider, 'dispose')
+
+    settingsChanged({ herdrSessionName: 'next' })
+
+    expect(setLocalPtyProviderMock).toHaveBeenCalledTimes(2)
+    expect(setLocalPtyProviderMock.mock.calls[1][0]).not.toBe(firstProvider)
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(dispose.mock.invocationCallOrder[0]).toBeGreaterThan(
+      rebindLocalProviderListenersMock.mock.invocationCallOrder.at(-1) as number
+    )
+  })
+
   it('passes the packaged app version to runtime stale-bundle retirement', async () => {
     const mod = await importFresh()
     isPackagedMock.mockReturnValue(true)

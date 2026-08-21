@@ -1,13 +1,24 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+const electronMocks = vi.hoisted(() => ({
+  getAllWindows: vi.fn(() => []),
+  getFocusedWindow: vi.fn(() => null)
+}))
+vi.mock('electron', () => ({ BrowserWindow: electronMocks }))
+
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { Store } from '../../../persistence'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
 import { HerdrCliHostTransport } from './herdr-cli-session'
 import { HerdrSocketTransport } from './herdr-socket-transport'
 import { HerdrSshHostTransport } from './herdr-ssh-session'
-import { createLocalHerdrPtyProvider, createSshHerdrPtyProvider } from './herdr-provider-factory'
+import {
+  createLocalHerdrPtyProvider,
+  createSshHerdrPtyProvider,
+  presentHerdrImportedSurface,
+  presentHerdrSurfaceAction
+} from './herdr-provider-factory'
 import type { SshConnection } from '../../../ssh/ssh-connection'
 
 function makeStore(settings: ReturnType<typeof getDefaultSettings>): Store {
@@ -20,15 +31,20 @@ function localTransport(settings: TestSettings): HerdrHostTransport {
   const provider = createLocalHerdrPtyProvider(undefined, makeStore(settings))
   const transportForTarget = (
     provider as unknown as {
-      transportForTarget(target: { identity: { hostId: string } }): HerdrHostTransport
+      transportForTarget(target: {
+        identity: { hostId: string }
+        project: { id: string }
+      }): HerdrHostTransport
     }
   ).transportForTarget
-  return transportForTarget({ identity: { hostId: 'local' } })
+  return transportForTarget({ identity: { hostId: 'local' }, project: { id: 'project-1' } })
 }
 
 describe('createLocalHerdrPtyProvider stock routing', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
+    electronMocks.getAllWindows.mockReturnValue([])
+    electronMocks.getFocusedWindow.mockReturnValue(null)
     delete process.env.HERDR_TEST_LEAK
   })
 
@@ -75,6 +91,60 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
     const settings: TestSettings = { ...getDefaultSettings('/tmp') }
     expect(localTransport(settings)).toBeInstanceOf(HerdrSocketTransport)
   })
+
+  it('keys cached transports by host, resolved session, and binary source', () => {
+    const settings: TestSettings = { ...getDefaultSettings('/tmp'), herdrSessionName: 'one' }
+    const provider = createLocalHerdrPtyProvider(undefined, makeStore(settings))
+    const transportForTarget = (
+      provider as unknown as {
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string; herdrSessionName?: string }
+        }): HerdrHostTransport
+      }
+    ).transportForTarget
+    const target = { identity: { hostId: 'local' }, project: { id: 'project-1' } }
+    const first = transportForTarget(target)
+    expect(transportForTarget(target)).toBe(first)
+    settings.herdrSessionName = 'two'
+    const second = transportForTarget(target)
+    expect(second).not.toBe(first)
+    const projectTransport = transportForTarget({
+      identity: { hostId: 'local' },
+      project: { id: 'project-1', herdrSessionName: 'project-session' }
+    }) as HerdrSocketTransport
+    expect(
+      (
+        projectTransport as unknown as {
+          options: { sessionName: string }
+        }
+      ).options.sessionName
+    ).toBe('project-session')
+    settings.herdrBinarySource = { kind: 'custom', path: '/opt/herdr' }
+    expect(transportForTarget(target)).not.toBe(second)
+  })
+
+  it('disconnects cached transports even when they have no live bindings', () => {
+    const settings: TestSettings = { ...getDefaultSettings('/tmp'), herdrSessionName: 'one' }
+    const provider = createLocalHerdrPtyProvider(undefined, makeStore(settings))
+    const transportForTarget = (
+      provider as unknown as {
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string }
+        }): HerdrHostTransport
+      }
+    ).transportForTarget
+    const transport = transportForTarget({
+      identity: { hostId: 'local' },
+      project: { id: 'project-1' }
+    })
+    const disconnect = vi.spyOn(transport, 'disconnect').mockResolvedValue()
+
+    provider.dispose()
+
+    expect(disconnect).toHaveBeenCalledOnce()
+  })
 })
 
 describe('createSshHerdrPtyProvider', () => {
@@ -99,9 +169,15 @@ describe('createSshHerdrPtyProvider', () => {
     const provider = createSshHerdrPtyProvider(undefined, makeStore(settings), connection, 'box')
     const transport = (
       provider as unknown as {
-        transportForTarget(): HerdrHostTransport
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string }
+        }): HerdrHostTransport
       }
-    ).transportForTarget()
+    ).transportForTarget({
+      identity: { hostId: 'ssh:box' },
+      project: { id: 'project-1' }
+    })
     expect(transport).toBeInstanceOf(HerdrCliHostTransport)
     const options = (
       transport as unknown as {
@@ -136,6 +212,8 @@ describe('createSshHerdrPtyProvider', () => {
       'orca',
       'server'
     ])
+    provider.dispose()
+    expect(existsSync(shimDir ?? '')).toBe(false)
   })
 
   it('execs over the live connection when the host is ssh2-only', () => {
@@ -154,8 +232,60 @@ describe('createSshHerdrPtyProvider', () => {
     } as unknown as SshConnection
     const provider = createSshHerdrPtyProvider(undefined, makeStore(settings), connection, 'box')
     const transport = (
-      provider as unknown as { transportForTarget(): HerdrHostTransport }
-    ).transportForTarget()
+      provider as unknown as {
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string }
+        }): HerdrHostTransport
+      }
+    ).transportForTarget({
+      identity: { hostId: 'ssh:box' },
+      project: { id: 'project-1' }
+    })
     expect(transport).toBeInstanceOf(HerdrSshHostTransport)
+  })
+
+  it('installs imported-surface presentation callbacks for SSH', () => {
+    const settings: TestSettings = { ...getDefaultSettings('/tmp') }
+    const connection = {
+      getTarget: () => targetConnection,
+      usesSystemSshTransport: () => false
+    } as unknown as SshConnection
+    const provider = createSshHerdrPtyProvider(undefined, makeStore(settings), connection, 'box')
+    const sync = (provider as unknown as { surfaceSync: Record<string, unknown> }).surfaceSync
+    expect(sync.present).toBe(presentHerdrImportedSurface)
+    expect(sync.presentAction).toBe(presentHerdrSurfaceAction)
+  })
+})
+
+const targetConnection = {
+  id: 'box',
+  label: 'box',
+  host: 'box.example',
+  port: 22,
+  username: 'ada',
+  source: 'manual' as const
+}
+
+describe('Herdr imported surface window ownership', () => {
+  it('presents a surface once and routes actions to the same window', () => {
+    const first = { isDestroyed: () => false, webContents: { send: vi.fn() } }
+    const second = { isDestroyed: () => false, webContents: { send: vi.fn() } }
+    electronMocks.getFocusedWindow.mockReturnValue(first as never)
+    electronMocks.getAllWindows.mockReturnValue([first, second] as never)
+    const surface = {
+      worktreeId: 'wt-window-owner',
+      tabId: 'tab-window-owner',
+      leafId: 'leaf-window-owner',
+      paneId: 'pane-window-owner',
+      ptyId: 'pty-window-owner'
+    }
+
+    presentHerdrImportedSurface(surface)
+    presentHerdrImportedSurface(surface)
+    presentHerdrSurfaceAction({ kind: 'rename', tabId: surface.tabId, title: 'Renamed' })
+
+    expect(first.webContents.send).toHaveBeenCalledTimes(2)
+    expect(second.webContents.send).not.toHaveBeenCalled()
   })
 })

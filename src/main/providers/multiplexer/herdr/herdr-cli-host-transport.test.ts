@@ -12,7 +12,7 @@ beforeEach(() => {
 type MockChild = EventEmitter & {
   stdin: EventEmitter & { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> }
   stdout: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> }
-  stderr: EventEmitter
+  stderr: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> }
   kill: ReturnType<typeof vi.fn>
 }
 
@@ -26,7 +26,7 @@ function createChild(): MockChild {
     stdout: Object.assign(new EventEmitter(), {
       setEncoding: vi.fn()
     }),
-    stderr: new EventEmitter(),
+    stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
     kill: vi.fn()
   })
   return child as unknown as MockChild

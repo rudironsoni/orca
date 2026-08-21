@@ -17,15 +17,10 @@ function resolveHerdrBinary() {
   if (process.env.ORCA_HERDR_TEST_BINARY) {
     return process.env.ORCA_HERDR_TEST_BINARY
   }
-  try {
-    const which = process.platform === 'win32' ? 'where' : 'which'
-    return execFileSync(which, ['herdr'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0]
-  } catch {
-    return execFileSync(process.execPath, [join(scriptDir, 'download-herdr-release.mjs')], {
-      cwd: repoRoot,
-      encoding: 'utf8'
-    }).trim()
-  }
+  return execFileSync(process.execPath, [join(scriptDir, 'download-herdr-release.mjs')], {
+    cwd: repoRoot,
+    encoding: 'utf8'
+  }).trim()
 }
 
 const herdrBinary = resolveHerdrBinary()

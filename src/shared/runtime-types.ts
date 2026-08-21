@@ -634,7 +634,8 @@ export type RuntimeTerminalInteractiveWait = {
 export type RuntimeTerminalShow = RuntimeTerminalSummary & {
   paneRuntimeId: number
   ptyId: string | null
-  backend: 'orca' | 'herdr'
+  /** Absent on hosts that predate terminal backend reporting. */
+  backend?: 'orca' | 'herdr'
   rendererGraphEpoch: number
   /** Null when nothing proves an interactive wait. Absent on hosts that predate the field. */
   agentWait?: RuntimeTerminalInteractiveWait | null

@@ -160,7 +160,9 @@ export function bytesFromTerminalLogicalKey(name: string): string | null {
 
 export function terminalLogicalInputFromBytes(data: string): TerminalLogicalInput {
   const key = logicalKeyNameFromBytes(data)
-  return key ? { kind: 'key', name: key } : { kind: 'bytes', data }
+  return key && bytesFromTerminalLogicalKey(key) !== null
+    ? { kind: 'key', name: key }
+    : { kind: 'bytes', data }
 }
 
 function herdrKey(base: string, modifier: number): string {

@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import type { Project } from '../../../../shared/project-types'
+import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
 import type { IPtyProvider, PtyProcessInfo } from '../../types'
 import type { HerdrProjectHostGraph } from './ensure-herdr-workspace'
 import {
@@ -36,6 +37,23 @@ export function decodeHerdrPtyId(id: string): HerdrPtyIdentity | null {
   } catch {
     return null
   }
+}
+
+export function persistedHerdrPaneIdsFromLayouts(
+  layouts: Iterable<TerminalLayoutSnapshot>,
+  projectId: string,
+  hostId: string
+): Record<string, string> {
+  const paneIds: Record<string, string> = {}
+  for (const layout of layouts) {
+    for (const [leafId, ptyId] of Object.entries(layout.ptyIdsByLeafId ?? {})) {
+      const identity = decodeHerdrPtyId(ptyId)
+      if (identity?.projectId === projectId && identity.hostId === hostId && identity.paneId) {
+        paneIds[leafId] = identity.paneId
+      }
+    }
+  }
+  return paneIds
 }
 
 export type HerdrPtyIdentity = {

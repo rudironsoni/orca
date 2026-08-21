@@ -370,6 +370,20 @@ describe('registerPtyHandlers', () => {
 
     expect(result).toEqual([{ id: 'local-pty', authoritative: false }])
   })
+  it('keeps an installed local provider listing failure unverifiable', async () => {
+    installDaemonTestProvider({
+      listProcesses: vi.fn(async () => {
+        throw new Error('local provider unavailable')
+      })
+    })
+    const runtime = { setPtyController: vi.fn() }
+    registerPtyHandlers(mainWindow as never, runtime as never)
+    const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+      listProcesses: (connectionId: string | null) => Promise<unknown>
+    }
+
+    await expect(controller.listProcesses(null)).rejects.toThrow('local provider unavailable')
+  })
   it('checks single-PTY liveness without listing every session', async () => {
     const hasPty = vi.fn((id: string) => id === 'live-pty')
     const listProcesses = vi.fn(async () => {

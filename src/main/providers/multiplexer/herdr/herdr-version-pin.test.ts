@@ -12,10 +12,21 @@ describe('herdr release version pin', () => {
   it('matches the protocol and schema the runtime contract expects', () => {
     const pin = JSON.parse(
       readFileSync(join(process.cwd(), 'config', 'herdr-version.json'), 'utf8')
-    ) as { version: string; protocol: number; schemaVersion: number }
+    ) as {
+      version: string
+      protocol: number
+      schemaVersion: number
+      sha256: Record<string, string>
+    }
 
     expect(pin.version).toMatch(/^\d+\.\d+\.\d+$/)
     expect(pin.protocol).toBe(HERDR_PROTOCOL_VERSION)
     expect(pin.schemaVersion).toBe(HERDR_SCHEMA_VERSION)
+    expect(pin.sha256).toEqual({
+      'herdr-linux-aarch64': expect.stringMatching(/^[a-f0-9]{64}$/),
+      'herdr-linux-x86_64': expect.stringMatching(/^[a-f0-9]{64}$/),
+      'herdr-macos-aarch64': expect.stringMatching(/^[a-f0-9]{64}$/),
+      'herdr-macos-x86_64': expect.stringMatching(/^[a-f0-9]{64}$/)
+    })
   })
 })

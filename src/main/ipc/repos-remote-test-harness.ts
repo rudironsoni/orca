@@ -18,6 +18,7 @@ export type ReposIpcMocks = {
     | 'removeProject'
     | 'getRepo'
     | 'getProjects'
+    | 'updateProject'
     | 'getProjectHostSetups'
     | 'updateProjectHostSetup'
     | 'getProjectGroups'
@@ -55,6 +56,7 @@ export function createReposIpcMocks(): ReposIpcMocks {
       getRepo: vi.fn(),
       updateRepo: vi.fn(),
       getProjects: vi.fn().mockReturnValue([]),
+      updateProject: vi.fn(),
       getProjectHostSetups: vi.fn().mockReturnValue([]),
       updateProjectHostSetup: vi.fn(),
       getProjectGroups: vi.fn().mockReturnValue([]),

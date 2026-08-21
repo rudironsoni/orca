@@ -1,9 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { SshTarget } from '../../../../shared/ssh-types'
-import { herdrRemoteDest, herdrRemoteSshArgs, writeHerdrRemoteSshLaunch } from './herdr-remote-ssh'
+import {
+  createRetryingCleanup,
+  herdrRemoteDest,
+  herdrRemoteSshArgs,
+  herdrWindowsSshShim,
+  writeHerdrRemoteSshLaunch
+} from './herdr-remote-ssh'
 
 const dirs: string[] = []
 
@@ -81,6 +87,35 @@ describe('writeHerdrRemoteSshLaunch', () => {
     const shimDir = pathValue.split(process.platform === 'win32' ? ';' : ':')[0]
     const shim = readFileSync(join(shimDir ?? '', shimName), 'utf8')
     expect(shim).toContain('/keys/id_ed25519')
+    if (process.platform !== 'win32') {
+      expect(statSync(shimDir ?? '').mode & 0o777).toBe(0o700)
+    }
     expect(launch.dest).toBe('ada@box.example')
+    launch.cleanup()
+    launch.cleanup()
+    expect(existsSync(shimDir ?? '')).toBe(false)
+  })
+
+  it('retries a failed first removal and only marks cleanup done after success', () => {
+    let attempts = 0
+    const cleanup = createRetryingCleanup(() => {
+      attempts += 1
+      if (attempts === 1) {
+        throw new Error('transient removal failure')
+      }
+    })
+    cleanup()
+    cleanup()
+    expect(attempts).toBe(2)
+  })
+
+  it('quotes Windows paths and escapes percent expansion in the batch shim', () => {
+    expect(
+      herdrWindowsSshShim('C:\\Program Files\\OpenSSH\\ssh%2.exe', ['-i', 'C:\\key%name'])
+    ).toBe(
+      '@echo off\r\n' +
+        'set "ORCA_HERDR_SSH=C:\\Program Files\\OpenSSH\\ssh%%2.exe"\r\n' +
+        '"%ORCA_HERDR_SSH%" "-i" "C:\\key%%name" %*\r\n'
+    )
   })
 })

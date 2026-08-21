@@ -609,6 +609,29 @@ describe('stock Herdr CLI request adapter', () => {
     ).toThrow('must not start with a dash')
   })
 
+  it('requires a numeric tab insertion index and clears an omitted pane title', () => {
+    expect(
+      herdrStockCliInvocation('orca-app', 'tab.move', { tab_id: 't1', insert_index: 2 }).args
+    ).toEqual(['--session', 'orca-app', 'tab', 'move', 't1', '--insert-index', '2'])
+    expect(() =>
+      herdrStockCliInvocation('orca-app', 'tab.move', { tab_id: 't1', insert_index: '2' })
+    ).toThrow('numeric request parameter')
+    expect(herdrStockCliInvocation('orca-app', 'pane.rename', { pane_id: 'p1' }).args).toEqual([
+      '--session',
+      'orca-app',
+      'pane',
+      'rename',
+      'p1',
+      '--clear'
+    ])
+  })
+
+  it('rejects a notification title that starts with a dash', () => {
+    expect(() =>
+      herdrStockCliInvocation('orca-app', 'notification.show', { title: '--help' })
+    ).toThrow('must not start with a dash')
+  })
+
   it('rejects pane.send_keys values that start with a dash to prevent argument injection', () => {
     expect(() =>
       herdrStockCliInvocation('orca-app', 'pane.send_keys', {

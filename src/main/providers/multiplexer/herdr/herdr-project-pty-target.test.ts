@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { homedir } from 'node:os'
 import type { Project } from '../../../../shared/project-types'
 import type { Store } from '../../../persistence'
 import {
   createHerdrPtyTargetResolver,
   createLocalHerdrPtyTargetResolver
 } from './herdr-project-pty-target'
+import { decodeHerdrPtyId, encodeHerdrPtyId } from './herdr-pty-types'
 
 const leafId = '22222222-2222-4222-8222-222222222222'
 
@@ -51,6 +53,52 @@ describe('Herdr PTY target resolution', () => {
       tabId: 'floating-tab',
       leafId
     })
+  })
+
+  it('restores and persists durable Herdr pane ids through PTY bindings', async () => {
+    const persistPtyBinding = vi.fn()
+    const ptyId = encodeHerdrPtyId({
+      version: 2,
+      hostId: 'local',
+      projectId: 'orca-global',
+      worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+      tabId: 'floating-tab',
+      leafId,
+      paneId: 'workspace:pane-1'
+    })
+    const store = {
+      getSettings: () => ({ terminalBackendDefault: 'herdr' }),
+      getProjects: () => [],
+      getRepo: () => undefined,
+      getWorkspaceSession: () => ({
+        tabsByWorktree: {},
+        terminalLayoutsByTabId: {
+          'floating-tab': {
+            root: { type: 'leaf' as const, leafId },
+            activeLeafId: leafId,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [leafId]: ptyId }
+          }
+        }
+      }),
+      persistPtyBinding
+    } as unknown as Store
+
+    const target = await createLocalHerdrPtyTargetResolver(store)(floatingSpawnOptions(), null)
+
+    expect(target?.graph.persistedPaneIdsByLeafId).toEqual({ [leafId]: 'workspace:pane-1' })
+    target?.graph.persistPaneId?.({
+      worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+      tabId: 'floating-tab',
+      leafId,
+      paneId: 'workspace:pane-2'
+    })
+    const persisted = persistPtyBinding.mock.calls[0]?.[0]
+    expect(decodeHerdrPtyId(persisted.ptyId)).toMatchObject({ paneId: 'workspace:pane-2' })
+    expect(persistPtyBinding).toHaveBeenCalledWith(
+      expect.objectContaining({ worktreeId: FLOATING_TERMINAL_WORKTREE_ID, leafId }),
+      'local'
+    )
   })
 
   it('uses the renderer layout when main persistence has not observed a new split yet', async () => {
@@ -261,6 +309,22 @@ describe('Herdr PTY target resolution', () => {
     })
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID]).toHaveLength(1)
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID][0].id).toBe('floating-tab')
+  })
+
+  it('uses the host home directory when a floating terminal has no cwd', async () => {
+    const store = {
+      getSettings: () => ({ terminalBackendDefault: 'herdr' }),
+      getProjects: () => [],
+      getRepo: () => undefined,
+      getWorkspaceSession: () => ({ tabsByWorktree: {}, terminalLayoutsByTabId: {} })
+    } as unknown as Store
+
+    const target = await createLocalHerdrPtyTargetResolver(store)(
+      { ...floatingSpawnOptions(), cwd: '' },
+      null
+    )
+
+    expect(target?.graph.worktrees[0]?.path).toBe(homedir())
   })
 
   it('resolves spawn identity from the persisted identity when opts carry none', async () => {

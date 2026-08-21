@@ -1,8 +1,16 @@
 import { EventEmitter } from 'node:events'
 import type { Socket } from 'node:net'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HerdrSocketConnection } from './herdr-socket-connection'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
+
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', '/tmp/orca-herdr-socket-connection-test')
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 type SocketHandle = EventEmitter & {
   write: ReturnType<typeof vi.fn>
@@ -43,7 +51,7 @@ describe('HerdrSocketConnection', () => {
     const { connection } = options()
     const state = connection.getState()
     expect(state.sessionName).toBe('test-session')
-    expect(state.socketPath).toContain('.config/herdr/sessions/test-session/herdr.sock')
+    expect(state.socketPath).toContain('herdr/sessions/test-session/herdr.sock')
   })
 
   it('resolves a matched response by request id', async () => {

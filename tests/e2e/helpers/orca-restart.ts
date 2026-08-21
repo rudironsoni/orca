@@ -100,16 +100,22 @@ function shouldLaunchHeadful(testInfo: TestInfo): boolean {
   return testInfo.project.metadata.orcaHeadful === true
 }
 
+export function restartSafeEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      (entry): entry is [string, string] =>
+        entry[0].toUpperCase() !== 'ELECTRON_RUN_AS_NODE' && entry[1] !== undefined
+    )
+  )
+}
+
 function createRestartLaunchIsolation(
   userDataDir: string,
   headful: boolean,
   extraEnv: NodeJS.ProcessEnv = {}
 ): ElectronHomeIsolation {
-  const { ELECTRON_RUN_AS_NODE: _unused, ...cleanEnv } = process.env
-  void _unused
-  const definedExtraEnv = Object.fromEntries(
-    Object.entries(extraEnv).filter((entry): entry is [string, string] => entry[1] !== undefined)
-  )
+  const cleanEnv = restartSafeEnvironment(process.env)
+  const definedExtraEnv = restartSafeEnvironment(extraEnv)
   return createElectronHomeIsolation({
     inheritedEnv: cleanEnv,
     launchEnv: {
@@ -120,12 +126,11 @@ function createRestartLaunchIsolation(
       !cleanEnv.ORCA_RELAY_PATH
         ? { ORCA_RELAY_PATH: path.join(process.cwd(), 'out', 'relay') }
         : {}),
-      ...extraEnv,
+      ...definedExtraEnv,
       ...(headful ? { ORCA_E2E_HEADFUL: '1' } : { ORCA_E2E_HEADLESS: '1' })
     },
     extraEnv: definedExtraEnv,
-    userDataDir,
-    codexRealHomeEnabled: false
+    userDataDir
   })
 }
 
@@ -178,11 +183,12 @@ export function createRestartSession(
 
   const launch = async (options?: LaunchOptions): Promise<LaunchedOrca> => {
     runtimeWsPort ??= await reserveRestartRuntimeWsPort()
+    const launchExtraEnv = restartSafeEnvironment(options?.extraEnv ?? {})
     const app = await electron.launch({
       args: getOrcaElectronLaunchArgs(mainPath, headful),
       env: {
         ...homeIsolation.env,
-        ...options?.extraEnv,
+        ...launchExtraEnv,
         ORCA_E2E_RUNTIME_WS_PORT: String(runtimeWsPort)
       }
     })

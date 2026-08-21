@@ -42,6 +42,7 @@ import { TaskSourceContextSchema } from '../../shared/task-source-context-schema
 import { WorkspaceLinkedItemSchema } from '../../shared/workspace-linked-item-schema'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../../shared/workspace-linked-item-source-context'
 import { DiffCommentSchema } from '../../shared/diff-comment-schema'
+import { normalizeHerdrSessionName } from '../../shared/terminal-backend'
 import { invalidateAuthorizedRootsCache } from './registered-worktree-roots-cache'
 import type { ChildProcess } from 'node:child_process'
 import { access, mkdir, readdir, rm } from 'node:fs/promises'
@@ -864,17 +865,41 @@ const TerminalBackendActivationIpcArgs = z.discriminatedUnion('state', [
     phase: z.enum(['preparing', 'committing'])
   })
 ])
+const TerminalBackendByHostIpcArgs = z
+  .record(z.string(), TerminalBackendActivationIpcArgs)
+  .transform((entries, ctx) => {
+    const normalizedEntries: Record<string, z.infer<typeof TerminalBackendActivationIpcArgs>> = {}
+    for (const [rawHostId, activation] of Object.entries(entries)) {
+      const hostId = normalizeExecutionHostId(rawHostId)
+      if (!hostId) {
+        ctx.addIssue({ code: 'custom', message: `Invalid execution host ID: ${rawHostId}` })
+        continue
+      }
+      if (Object.hasOwn(normalizedEntries, hostId)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate execution host ID: ${hostId}` })
+        continue
+      }
+      normalizedEntries[hostId] = activation
+    }
+    return normalizedEntries
+  })
 
 const ProjectUpdateIpcArgs = z.object({
   projectId: z.string().min(1),
   updates: z.object({
     localWindowsRuntimePreference: LocalWindowsRuntimePreferenceIpcArgs.optional(),
-    herdrSessionName: z.string().trim().min(1).max(64).nullable().optional(),
-    terminalBackendPreference: TerminalBackendPreferenceIpcArgs.nullable().optional(),
-    terminalBackendByHost: z
-      .record(z.string(), TerminalBackendActivationIpcArgs)
+    herdrSessionName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .refine((value) => normalizeHerdrSessionName(value) !== undefined, {
+        message: 'Herdr session name must not exceed 64 UTF-8 bytes'
+      })
       .nullable()
-      .optional()
+      .optional(),
+    terminalBackendPreference: TerminalBackendPreferenceIpcArgs.nullable().optional(),
+    terminalBackendByHost: TerminalBackendByHostIpcArgs.nullable().optional()
   })
 })
 

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
 import type { Socket } from 'node:net'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   HerdrSocketConnection,
   HerdrSocketMessageParser,
@@ -13,13 +13,30 @@ import {
   isSocketResponse
 } from './herdr-socket-connection'
 import { HerdrSocketReconnection } from './herdr-socket-events'
-import { HerdrSocketTransport } from './herdr-socket-transport'
+import { HerdrSocketTransport, isHerdrProcessGone } from './herdr-socket-transport'
 import type { HerdrSocketSessionManager } from './herdr-socket-session'
+
+const TEST_CONFIG_HOME = '/tmp/orca-herdr-socket-transport-test'
+
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', TEST_CONFIG_HOME)
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
+describe('isHerdrProcessGone', () => {
+  it('does not replay a request when the socket closes before its response', () => {
+    expect(isHerdrProcessGone(new Error('Herdr socket closed before response'))).toBe(false)
+    expect(isHerdrProcessGone(new Error('Herdr request timed out'))).toBe(false)
+  })
+})
 
 describe('defaultHerdrSocketPath', () => {
   it('derives the session socket path under the herdr config dir', () => {
-    expect(defaultHerdrSocketPath('test-session')).toContain(
-      '.config/herdr/sessions/test-session/herdr.sock'
+    expect(defaultHerdrSocketPath('test-session')).toBe(
+      join(TEST_CONFIG_HOME, 'herdr', 'sessions', 'test-session', 'herdr.sock')
     )
   })
 
@@ -28,7 +45,14 @@ describe('defaultHerdrSocketPath', () => {
     expect(defaultHerdrSocketPath('orca')).toBe(
       join('/tmp/orca-h-xdg', 'herdr', 'sessions', 'orca', 'herdr.sock')
     )
-    vi.unstubAllEnvs()
+  })
+
+  it('uses the stock named-pipe form on Windows', () => {
+    expect(
+      defaultHerdrSocketPath('orca', 'win32', {
+        USERPROFILE: 'C:\\Users\\orca'
+      })
+    ).toBe('\\\\.\\pipe\\C:\\Users\\orca\\.config\\herdr\\sessions\\orca\\herdr.sock')
   })
 })
 
@@ -37,7 +61,7 @@ describe('HerdrSocketConnection', () => {
     const connection = new HerdrSocketConnection({ sessionName: 'test-session' })
     const state = connection.getState()
     expect(state.sessionName).toBe('test-session')
-    expect(state.socketPath).toContain('.config/herdr/sessions/test-session/herdr.sock')
+    expect(state.socketPath).toContain('herdr/sessions/test-session/herdr.sock')
   })
 
   it('rejects a request when no server is listening', async () => {
@@ -223,11 +247,14 @@ describe('HerdrSocketTransport', () => {
   // tests can tell which session answered.
   function createSocketServer() {
     const sockets: ServerSocket[] = []
+    const requests: string[] = []
     let responder: (
       socketPath: string,
       method: string,
       params: unknown
-    ) => { result?: unknown; error?: { code: string; message: string } } = () => ({ result: {} })
+    ) => { result?: unknown; error?: { code: string; message: string } } | null = () => ({
+      result: {}
+    })
     const factory = (socketPath: string): Socket => {
       const socket = Object.assign(new EventEmitter(), {
         write: vi.fn(() => true),
@@ -241,7 +268,11 @@ describe('HerdrSocketTransport', () => {
             return
           }
           const request = JSON.parse(written) as { id: string; method: string; params: unknown }
+          requests.push(request.method)
           const body = responder(socketPath, request.method, request.params)
+          if (!body) {
+            return
+          }
           socket.emit('data', Buffer.from(`${JSON.stringify({ id: request.id, ...body })}\n`))
         })
       })
@@ -250,6 +281,7 @@ describe('HerdrSocketTransport', () => {
     }
     return {
       sockets,
+      requests,
       factory,
       setResponder(
         next: (
@@ -259,7 +291,7 @@ describe('HerdrSocketTransport', () => {
         ) => {
           result?: unknown
           error?: { code: string; message: string }
-        }
+        } | null
       ): void {
         responder = next
       }
@@ -284,7 +316,7 @@ describe('HerdrSocketTransport', () => {
       socketPath: string,
       method: string,
       params: unknown
-    ) => { result?: unknown; error?: { code: string; message: string } }
+    ) => { result?: unknown; error?: { code: string; message: string } } | null
   ) {
     return (socketPath: string, method: string, params: unknown) => {
       if (method === 'session.snapshot') {
@@ -394,5 +426,103 @@ describe('HerdrSocketTransport', () => {
     const response = await transport.request('alpha', 'ping', {})
     expect(response).toMatchObject({ result: { type: 'pong' } })
     expect(restarts).toBeGreaterThan(1)
+  })
+
+  it('does not cache a connection whose initial setup failed', async () => {
+    const server = createSocketServer()
+    server.setResponder(sessionSnapshotResponder(() => ({ result: { type: 'pong' } })))
+    let first = true
+    const factory = (socketPath: string): Socket => {
+      if (first) {
+        first = false
+        const socket = Object.assign(new EventEmitter(), {
+          write: vi.fn(),
+          destroy: vi.fn()
+        })
+        setImmediate(() =>
+          socket.emit('error', Object.assign(new Error('not ready'), { code: 'ECONNREFUSED' }))
+        )
+        return socket as unknown as Socket
+      }
+      return server.factory(socketPath)
+    }
+    const transport = new HerdrSocketTransport(
+      {
+        sessionName: 'shared',
+        timeoutMs: 100,
+        socketFactory: factory,
+        reconnection: disabledReconnection
+      },
+      sessionManager
+    )
+
+    await expect(transport.ensureSession('alpha')).rejects.toThrow('not ready')
+    await expect(transport.ensureSession('alpha')).resolves.toBeUndefined()
+    await expect(transport.request('alpha', 'ping', {})).resolves.toMatchObject({
+      result: { type: 'pong' }
+    })
+  })
+
+  it('retries event subscription setup after a failed attempt', async () => {
+    const server = createSocketServer()
+    let subscriptionAttempts = 0
+    server.setResponder(
+      sessionSnapshotResponder((_socketPath, method) => {
+        if (method === 'events.subscribe') {
+          subscriptionAttempts += 1
+          return subscriptionAttempts === 1
+            ? { error: { code: 'not_ready', message: 'not ready' } }
+            : { result: { type: 'subscription_started' } }
+        }
+        return { result: {} }
+      })
+    )
+    const transport = new HerdrSocketTransport(
+      {
+        sessionName: 'shared',
+        timeoutMs: 100,
+        socketFactory: server.factory,
+        reconnection: disabledReconnection
+      },
+      sessionManager
+    )
+    await transport.ensureSession('alpha')
+    await vi.waitFor(() => expect(subscriptionAttempts).toBe(1))
+
+    await transport.ensureSession('alpha')
+
+    await vi.waitFor(() => expect(subscriptionAttempts).toBe(2))
+  })
+
+  it('never retries a non-idempotent request after its response times out', async () => {
+    const server = createSocketServer()
+    const ensureSession = vi.fn(async () => undefined)
+    const manager = {
+      ensureSession,
+      schemaProtocol: async () => 19
+    } as unknown as HerdrSocketSessionManager
+    server.setResponder(
+      sessionSnapshotResponder((_socketPath, method) =>
+        method === 'workspace.create' ? null : { result: {} }
+      )
+    )
+    const transport = new HerdrSocketTransport(
+      {
+        sessionName: 'shared',
+        timeoutMs: 30,
+        socketFactory: server.factory,
+        reconnection: disabledReconnection
+      },
+      manager
+    )
+    await transport.ensureSession('alpha')
+
+    const response = await transport.request('alpha', 'workspace.create', { cwd: '/tmp' })
+
+    expect(response).toMatchObject({
+      error: { message: 'Request workspace.create timed out' }
+    })
+    expect(server.requests.filter((method) => method === 'workspace.create')).toHaveLength(1)
+    expect(ensureSession).toHaveBeenCalledTimes(1)
   })
 })

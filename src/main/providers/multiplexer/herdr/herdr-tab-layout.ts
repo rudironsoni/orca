@@ -118,17 +118,12 @@ export async function ensureTabLayout(
     // holder drops the key.
     const tabPane = snapshot.panes.find((pane) => pane.tab_id === herdrTab?.tab_id)
     if (tabPane) {
-      await transport.request(sessionName, 'pane.report_metadata', {
-        pane_id: tabPane.pane_id,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: rootBinding }
-      })
-      for (const pane of snapshot.panes) {
-        if (pane.pane_id !== tabPane.pane_id && pane.tokens?.[ORCA_BINDING_TOKEN]) {
-          delete pane.tokens[ORCA_BINDING_TOKEN]
-        }
-      }
-      tabPane.tokens = { ...tabPane.tokens, [ORCA_BINDING_TOKEN]: rootBinding }
+      await clearPaneBindings(
+        transport,
+        sessionName,
+        snapshot.panes.filter((pane) => pane.tab_id === herdrTab?.tab_id)
+      )
+      await claimOrcaPaneBinding(transport, sessionName, projectId, rootLeafId, tabPane, snapshot)
       rootPane = tabPane
     }
   }
@@ -185,7 +180,9 @@ export async function ensureTabLayout(
     root,
     snapshot
   )
-  if (!applied) {
+  if (applied) {
+    Object.assign(persistedPaneIds, Object.fromEntries(applied))
+  } else {
     await ensureTabSplits(transport, sessionName, projectId, root, rootPane.pane_id, snapshot)
   }
 }
@@ -247,6 +244,17 @@ export async function applyTabLayout(
   if (leafIds.length !== paneIds.length) {
     return null
   }
+  const returnedPaneIds = new Set(paneIds)
+  const targetBindings = new Set(leafIds.map((leafId) => orcaPaneBinding(projectId, leafId)))
+  await clearPaneBindings(
+    transport,
+    sessionName,
+    snapshot.panes.filter(
+      (pane) =>
+        !returnedPaneIds.has(pane.pane_id) &&
+        targetBindings.has(pane.tokens?.[ORCA_BINDING_TOKEN] ?? '')
+    )
+  )
   const tabId = layout?.tab_id ?? ''
   const bindings = new Map<string, string>()
   for (let i = 0; i < leafIds.length; i++) {
@@ -262,6 +270,26 @@ export async function applyTabLayout(
     }
   }
   return bindings
+}
+
+async function clearPaneBindings(
+  transport: HerdrHostTransport,
+  sessionName: string,
+  panes: HerdrPane[]
+): Promise<void> {
+  for (const pane of panes) {
+    if (!pane.tokens?.[ORCA_BINDING_TOKEN]) {
+      continue
+    }
+    unwrapHerdrResponse(
+      await transport.request(sessionName, 'pane.report_metadata', {
+        pane_id: pane.pane_id,
+        source: ORCA_METADATA_SOURCE,
+        tokens: { [ORCA_BINDING_TOKEN]: null }
+      })
+    )
+    delete pane.tokens[ORCA_BINDING_TOKEN]
+  }
 }
 
 export async function ensureTabSplits(

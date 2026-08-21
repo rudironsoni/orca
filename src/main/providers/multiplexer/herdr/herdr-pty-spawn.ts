@@ -105,7 +105,9 @@ export async function spawnHerdrPtyPane(args: {
     request: async (name, method, params) =>
       unwrapHerdrResponse(await runtime.transport.request(name, method, params)),
     writeCommand: (text) => {
-      void writeSharedHerdrInput(binding, text)
+      void writeSharedHerdrInput(binding, text).catch((error: unknown) => {
+        console.warn(`[herdr] Failed to write startup command to pane ${resolvedPaneId}:`, error)
+      })
     }
   })
   return {

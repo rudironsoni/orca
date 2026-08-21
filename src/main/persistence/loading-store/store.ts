@@ -1302,7 +1302,10 @@ export class Store {
             herdrBinarySource: normalizeHerdrBinarySource(parsed.settings?.herdrBinarySource),
             herdrSessionName:
               normalizeHerdrSessionName(parsed.settings?.herdrSessionName) ??
-              DEFAULT_HERDR_SESSION_NAME,
+              (parsed.settings?.herdrSessionName === undefined &&
+              parsed.settings?.terminalBackendActivationDefaultedToOrca === true
+                ? undefined
+                : DEFAULT_HERDR_SESSION_NAME),
             terminalBackendActivationDefaultedToOrca: true
           },
           // Why: legacy 'recent' meant the smart sort; migrate once on the raw value so a fresh 'recent' default isn't remigrated.

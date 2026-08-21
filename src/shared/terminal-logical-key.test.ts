@@ -43,6 +43,10 @@ describe('terminalLogicalInputFromBytes', () => {
       kind: 'bytes',
       data: '\x1b[27;1;3u'
     })
+    expect(terminalLogicalInputFromBytes('\x1b[57352;2u')).toEqual({
+      kind: 'bytes',
+      data: '\x1b[57352;2u'
+    })
   })
 
   it.each([

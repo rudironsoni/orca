@@ -114,7 +114,6 @@ import {
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
-import { createLocalHerdrPtyProvider } from '../providers/multiplexer/herdr/herdr-provider-factory'
 import {
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
@@ -258,33 +257,101 @@ import { HerdrPtyProvider } from '../providers/multiplexer/herdr/herdr-pty-provi
 // ─── Provider Registry ──────────────────────────────────────────────
 // Routes PTY operations - Herdr is the universal multiplexer for all PTYs.
 
+const TERMINAL_LAYOUT_MAX_LEAVES = 64
+const TERMINAL_LAYOUT_MAX_DEPTH = 32
+const TERMINAL_FUNCTION_KEY_BYTES: Readonly<Record<string, string>> = {
+  f5: '\x1b[15~',
+  f6: '\x1b[17~',
+  f7: '\x1b[18~',
+  f8: '\x1b[19~',
+  f9: '\x1b[20~',
+  f10: '\x1b[21~',
+  f11: '\x1b[23~',
+  f12: '\x1b[24~'
+}
+
+function isTerminalLayoutSnapshot(value: unknown): value is TerminalLayoutSnapshot {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const layout = value as Record<string, unknown>
+  const leafIds = new Set<string>()
+  const visit = (node: unknown, depth: number): boolean => {
+    if (depth > TERMINAL_LAYOUT_MAX_DEPTH || typeof node !== 'object' || node === null) {
+      return false
+    }
+    const candidate = node as Record<string, unknown>
+    if (candidate.type === 'leaf') {
+      if (
+        typeof candidate.leafId !== 'string' ||
+        !isTerminalLeafId(candidate.leafId) ||
+        leafIds.has(candidate.leafId) ||
+        leafIds.size >= TERMINAL_LAYOUT_MAX_LEAVES
+      ) {
+        return false
+      }
+      leafIds.add(candidate.leafId)
+      return true
+    }
+    return (
+      candidate.type === 'split' &&
+      (candidate.direction === 'horizontal' || candidate.direction === 'vertical') &&
+      (candidate.ratio === undefined ||
+        (typeof candidate.ratio === 'number' &&
+          Number.isFinite(candidate.ratio) &&
+          candidate.ratio >= 0 &&
+          candidate.ratio <= 1)) &&
+      visit(candidate.first, depth + 1) &&
+      visit(candidate.second, depth + 1)
+    )
+  }
+  if (layout.root !== null && !visit(layout.root, 1)) {
+    return false
+  }
+  const validSelectedLeaf = (leafId: unknown): boolean =>
+    leafId === null || (typeof leafId === 'string' && leafIds.has(leafId))
+  if (!validSelectedLeaf(layout.activeLeafId) || !validSelectedLeaf(layout.expandedLeafId)) {
+    return false
+  }
+  const validLeafMap = (map: unknown, requireNonemptyValue: boolean): boolean => {
+    if (map === undefined) {
+      return true
+    }
+    return (
+      typeof map === 'object' &&
+      map !== null &&
+      !Array.isArray(map) &&
+      Object.entries(map).every(
+        ([leafId, entry]) =>
+          leafIds.has(leafId) &&
+          typeof entry === 'string' &&
+          (!requireNonemptyValue || entry.length > 0)
+      )
+    )
+  }
+  return (
+    validLeafMap(layout.ptyIdsByLeafId, true) &&
+    validLeafMap(layout.buffersByLeafId, false) &&
+    validLeafMap(layout.scrollbackRefsByLeafId, true) &&
+    validLeafMap(layout.titlesByLeafId, false)
+  )
+}
+
 // Why: herdr is opt-in. The local provider is the orca daemon adapter by
 // default; daemon init swaps in the herdr provider only when the user selected
 // the herdr terminal backend.
 let localProvider: IPtyProvider = new LocalPtyProvider()
 
 // Herdr is the multiplexer only when the user selects it (local, SSH, remote)
-let herdrProvider: HerdrPtyProvider | null = null
-let herdrStore: Store | null = null
-
-export function setHerdrStore(store: Store): void {
-  herdrStore = store
-  // Reset the provider so it gets recreated with the new store
-  herdrProvider = null
+export function setHerdrStore(_store: Store): void {
+  // Provider construction and disposal are owned by daemon-init.
 }
 
 export function getHerdrProvider(): HerdrPtyProvider {
   if (localProvider instanceof HerdrPtyProvider) {
-    herdrProvider = localProvider
     return localProvider
   }
-  if (!herdrProvider) {
-    if (!herdrStore) {
-      throw new Error('Herdr store not initialized. Call setHerdrStore() first.')
-    }
-    herdrProvider = createLocalHerdrPtyProvider(localProvider, herdrStore)
-  }
-  return herdrProvider
+  throw new Error('Herdr provider is not installed')
 }
 
 const sshProviders = new Map<string, IPtyProvider>()
@@ -5922,14 +5989,7 @@ export function registerPtyHandlers(
     },
     listProcesses: async (connectionId, opts) => {
       if (connectionId === null) {
-        // Why: legacy worker recovery can race the provider install at
-        // startup; an empty inventory is the truthful state then, not a
-        // liveness failure.
-        try {
-          return await getLocalPtyProvider().listProcesses(opts)
-        } catch {
-          return []
-        }
+        return getLocalPtyProvider().listProcesses(opts)
       }
       if (connectionId !== undefined) {
         try {
@@ -6108,6 +6168,9 @@ export function registerPtyHandlers(
         }
       }
     ) => {
+      if (args.terminalLayout !== undefined && !isTerminalLayoutSnapshot(args.terminalLayout)) {
+        throw new Error('pty_spawn_invalid_terminal_layout')
+      }
       const codexHomeLaunchStartedAt = !args.connectionId ? new Date() : undefined
       const codexHomeLaunchStartedSequence = !args.connectionId ? ++ptyLifecycleSequence : undefined
       const initialLeafId =
@@ -7321,8 +7384,7 @@ export function registerPtyHandlers(
       : terminalLogicalInputFromBytes(args.data)
     if (classified.kind === 'key') {
       if (provider.writeLogical) {
-        provider.writeLogical(args.id, classified)
-        return true
+        return provider.writeLogical(args.id, classified) !== false
       }
       const bytes = bytesFromTerminalLogicalKey(classified.name) ?? args.data
       return writePtyProviderInput(provider, args.id, bytes)
@@ -7391,8 +7453,17 @@ export function registerPtyHandlers(
       return false
     }
     const keys = (value as { keys?: unknown }).keys
+    if (keys === undefined) {
+      return true
+    }
+    if (!Array.isArray(keys) || keys.length !== 1 || typeof keys[0] !== 'string') {
+      return false
+    }
+    const data = (value as { data: string }).data
+    const classified = terminalLogicalInputFromBytes(data)
     return (
-      keys === undefined || (Array.isArray(keys) && keys.every((key) => typeof key === 'string'))
+      (classified.kind === 'key' && classified.name === keys[0]) ||
+      TERMINAL_FUNCTION_KEY_BYTES[keys[0]] === data
     )
   }
 

@@ -18,6 +18,7 @@ import {
   paneBindingMapKey,
   rememberOrcaPaneBindings,
   orcaPaneBinding,
+  orcaWorkspaceBinding,
   collectLeafIds
 } from './herdr-binding-metadata'
 import { ensureTabLayout } from './herdr-tab-layout'
@@ -118,6 +119,22 @@ export class HerdrRuntimeManager {
     return hints
   }
 
+  private liveWorkspaceBindings(sessionName: string, adoptingWorktreeId: string): Set<string> {
+    const live = new Set<string>()
+    for (const [key, tracked] of this.graphsByKey) {
+      if (!key.startsWith(`${sessionName}\n`)) {
+        continue
+      }
+      for (const worktree of tracked.worktrees) {
+        if (worktree.id === adoptingWorktreeId) {
+          continue
+        }
+        live.add(orcaWorkspaceBinding(tracked.project.id, worktree))
+      }
+    }
+    return live
+  }
+
   getPaneId(sessionName: string, projectId: string, leafId: string): string | null {
     return (
       this.paneIdsBySessionAndBinding.get(
@@ -148,11 +165,17 @@ export class HerdrRuntimeManager {
           worktree,
           firstTab,
           firstTab ? (graph.layoutsByTabId[firstTab.id]?.root ?? null) : null,
-          snapshot
+          snapshot,
+          this.liveWorkspaceBindings(sessionName, worktree.id)
         )
         for (const tab of tabs) {
           const root = graph.layoutsByTabId[tab.id]?.root
           if (root) {
+            graph.persistedPaneIdsByLeafId ??= {}
+            Object.assign(
+              graph.persistedPaneIdsByLeafId,
+              this.paneHintsForRoot(sessionName, graph.project.id, root)
+            )
             await ensureTabLayout(
               this.transport,
               sessionName,
@@ -161,11 +184,14 @@ export class HerdrRuntimeManager {
               tab,
               root,
               snapshot,
-              {
-                ...graph.persistedPaneIdsByLeafId,
-                ...this.paneHintsForRoot(sessionName, graph.project.id, root)
-              }
+              graph.persistedPaneIdsByLeafId
             )
+            for (const leafId of collectLeafIds(root)) {
+              const paneId = graph.persistedPaneIdsByLeafId[leafId]
+              if (paneId) {
+                graph.persistPaneId?.({ worktreeId: worktree.id, tabId: tab.id, leafId, paneId })
+              }
+            }
           }
         }
       }

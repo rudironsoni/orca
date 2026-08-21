@@ -6,7 +6,11 @@ import type {
   HerdrTerminalControlOptions
 } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
-import { HerdrSocketConnection, type HerdrSocketConnectionOptions } from './herdr-socket-connection'
+import {
+  HerdrSocketConnection,
+  HerdrSocketRequestTimeoutError,
+  type HerdrSocketConnectionOptions
+} from './herdr-socket-connection'
 import { HerdrSocketEventConnection } from './herdr-socket-events'
 import {
   createHerdrSessionControlController,
@@ -33,6 +37,8 @@ export class HerdrSocketTransport implements HerdrHostTransport {
   private readonly eventConnectionsBySession = new Map<string, HerdrSocketEventConnection>()
   private readonly eventListeners = new Set<(event: HerdrSocketEvent) => void>()
   private readonly recoveries = new Map<string, Promise<void>>()
+  private readonly setups = new Map<string, Promise<void>>()
+  private readonly eventSetups = new Map<string, Promise<void>>()
   private readonly sessionManager: HerdrSocketSessionManager
 
   constructor(options: HerdrSocketConnectionOptions, sessionManager?: HerdrSocketSessionManager) {
@@ -41,15 +47,42 @@ export class HerdrSocketTransport implements HerdrHostTransport {
   }
 
   async ensureSession(sessionName: string): Promise<void> {
-    await this.sessionManager.ensureSession(sessionName)
-    let connection = this.connectionsBySession.get(sessionName)
-    if (!connection) {
-      connection = new HerdrSocketConnection({ ...this.options, sessionName })
-      this.connectionsBySession.set(sessionName, connection)
-      await connection.connect()
-      await this.assertServerProtocolMatches(connection)
+    const existing = this.setups.get(sessionName)
+    if (existing) {
+      return await existing
     }
-    this.ensureEventSubscription(sessionName)
+    const pending = this.ensureSessionConnection(sessionName)
+    this.setups.set(sessionName, pending)
+    try {
+      await pending
+    } finally {
+      if (this.setups.get(sessionName) === pending) {
+        this.setups.delete(sessionName)
+      }
+    }
+  }
+
+  private async ensureSessionConnection(sessionName: string): Promise<void> {
+    await this.sessionManager.ensureSession(sessionName)
+    if (!this.connectionsBySession.has(sessionName)) {
+      const connection = new HerdrSocketConnection({ ...this.options, sessionName })
+      this.connectionsBySession.set(sessionName, connection)
+      try {
+        await connection.connect()
+        await this.assertServerProtocolMatches(connection)
+      } catch (error) {
+        if (this.connectionsBySession.get(sessionName) === connection) {
+          this.connectionsBySession.delete(sessionName)
+        }
+        throw error
+      }
+    }
+    void this.ensureEventSubscription(sessionName).catch((error: unknown) => {
+      console.error(
+        '[herdr] Event connection failed:',
+        error instanceof Error ? error.message : error
+      )
+    })
   }
 
   private async assertServerProtocolMatches(connection: HerdrSocketConnection): Promise<void> {
@@ -128,27 +161,44 @@ export class HerdrSocketTransport implements HerdrHostTransport {
     return () => this.eventListeners.delete(listener)
   }
 
-  private ensureEventSubscription(sessionName: string): void {
-    if (this.eventConnectionsBySession.has(sessionName)) {
-      return
+  private async ensureEventSubscription(sessionName: string): Promise<void> {
+    const existingSetup = this.eventSetups.get(sessionName)
+    if (existingSetup) {
+      return await existingSetup
     }
-    const connection = new HerdrSocketEventConnection({
-      ...this.options,
-      sessionName
-    })
-    this.eventConnectionsBySession.set(sessionName, connection)
-    connection.onEvent((event) => {
-      const tagged = { ...event, sessionName }
-      for (const listener of this.eventListeners) {
-        listener(tagged)
+    const pending = (async () => {
+      let connection = this.eventConnectionsBySession.get(sessionName)
+      if (!connection) {
+        connection = new HerdrSocketEventConnection({
+          ...this.options,
+          sessionName
+        })
+        this.eventConnectionsBySession.set(sessionName, connection)
+        connection.onEvent((event) => {
+          const tagged = { ...event, sessionName }
+          for (const listener of this.eventListeners) {
+            listener(tagged)
+          }
+        })
       }
-    })
-    void connection.connect().catch((error) => {
-      console.error(
-        '[herdr] Event connection failed:',
-        error instanceof Error ? error.message : error
-      )
-    })
+      try {
+        await connection.connect()
+      } catch (error) {
+        if (this.eventConnectionsBySession.get(sessionName) === connection) {
+          this.eventConnectionsBySession.delete(sessionName)
+        }
+        await connection.disconnect()
+        throw error
+      }
+    })()
+    this.eventSetups.set(sessionName, pending)
+    try {
+      await pending
+    } finally {
+      if (this.eventSetups.get(sessionName) === pending) {
+        this.eventSetups.delete(sessionName)
+      }
+    }
   }
 
   async isConnected(): Promise<boolean> {
@@ -165,11 +215,7 @@ export class HerdrSocketTransport implements HerdrHostTransport {
   }
 
   async eventsSubscribe(subscriptions: Subscription[]): Promise<void> {
-    this.ensureEventSubscription(this.options.sessionName)
-    const connection = this.eventConnectionsBySession.get(this.options.sessionName)
-    if (connection) {
-      await connection.connect()
-    }
+    await this.ensureEventSubscription(this.options.sessionName)
     void subscriptions
   }
 
@@ -238,6 +284,9 @@ export class HerdrSocketTransport implements HerdrHostTransport {
 }
 
 export function isHerdrProcessGone(error: unknown): boolean {
+  if (error instanceof HerdrSocketRequestTimeoutError) {
+    return false
+  }
   if (error instanceof HerdrRuntimeError) {
     return error.code === 'herdr_unavailable'
   }
@@ -246,5 +295,8 @@ export function isHerdrProcessGone(error: unknown): boolean {
     return true
   }
   const message = error instanceof Error ? error.message : String(error)
-  return /timed out|closed before response|not initialized|ECONNREFUSED|ENOENT/i.test(message)
+  return (
+    /^Connection to .* timed out$/i.test(message) ||
+    /not initialized|ECONNREFUSED|ENOENT/i.test(message)
+  )
 }

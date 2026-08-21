@@ -92,7 +92,7 @@ describe('stock Herdr metadata bindings', () => {
     expect(recovered).toBeNull()
   })
 
-  it('recovers pane identities from valid nested split geometry', () => {
+  it('refuses nested split geometry rather than flattening it along the root axis', () => {
     const recovered = recoverPaneIdsFromStockLayout(
       {
         type: 'split',
@@ -117,10 +117,7 @@ describe('stock Herdr metadata bindings', () => {
         ]
       }
     )
-    expect(recovered).not.toBeNull()
-    const map = Object.fromEntries(recovered ?? [])
-    expect(map.right).toBe('w1:p3')
-    expect(['w1:p1', 'w1:p2'].sort()).toEqual([map.tl, map.bl].sort())
+    expect(recovered).toBeNull()
   })
 
   it('keeps persisted pane IDs when geometry recovery fails instead of dropping all bindings', async () => {

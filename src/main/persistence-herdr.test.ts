@@ -153,6 +153,10 @@ describe('Store', () => {
 
     const cleared = store.updateSettings({ herdrSessionName: '   ' })
     expect(cleared.herdrSessionName).toBeUndefined()
+    store.flush()
+
+    const reloaded = await createStore()
+    expect(reloaded.getSettings().herdrSessionName).toBeUndefined()
   })
 
   it('falls back to the default when a persisted shared session name is malformed', async () => {

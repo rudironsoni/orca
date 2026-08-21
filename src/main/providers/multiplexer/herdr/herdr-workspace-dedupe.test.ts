@@ -92,6 +92,18 @@ function stockTransport() {
         }
         return { id: 'pane-metadata', result: { type: 'ok' } }
       }
+      if (method === 'layout.apply') {
+        const pane = { pane_id: 'w1:p2', tab_id: 'w1:t2', workspace_id: 'w1' }
+        snapshot.panes.push(pane)
+        return {
+          id: 'layout',
+          result: {
+            layout: { root: { type: 'pane', pane_id: pane.pane_id } },
+            workspace_id: 'w1',
+            tab_id: 'w1:t2'
+          }
+        }
+      }
       throw new Error(`Unexpected stock method ${method}`)
     }
   )
@@ -142,7 +154,7 @@ describe('Herdr workspace dedupe', () => {
     expect(host.snapshot.workspaces).toHaveLength(1)
   })
 
-  it('reuses the existing workspace pane instead of layout.apply after bindings are forgotten', async () => {
+  it('does not reuse the sole workspace pane when it is still claimed', async () => {
     const host = stockTransport()
     const manager = new HerdrRuntimeManager(host.transport)
     await manager.reconcileProjectHost(singleLeafGraph())
@@ -159,10 +171,10 @@ describe('Herdr workspace dedupe', () => {
       displayName: 'repo'
     })
 
-    expect(paneId).toBe('w1:p1')
+    expect(paneId).toBe('w1:p2')
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'layout.apply')
-    ).toHaveLength(0)
+    ).toHaveLength(1)
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'workspace.create')
     ).toHaveLength(1)

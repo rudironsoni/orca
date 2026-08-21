@@ -124,6 +124,13 @@ export function requiredString(value: unknown, name: string): string {
   return result
 }
 
+export function requiredNumber(value: unknown, name: string): string {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Invalid Herdr numeric request parameter: ${name}`)
+  }
+  return String(value)
+}
+
 export function requiredStrings(value: unknown, name: string): string[] {
   if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
     throw new Error(`Missing Herdr request parameter: ${name}`)

@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer, type Server, type Socket } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { HerdrSocketEventConnection } from './herdr-socket-events'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { HerdrSocketEventConnection, HerdrSocketReconnection } from './herdr-socket-events'
 import type { HerdrSocketEvent } from './herdr-socket-types'
 
 type Harness = {
@@ -12,6 +12,7 @@ type Harness = {
   server: Server
   connection: Socket | null
   push(frame: unknown): void
+  pushRaw(data: string): void
   drop(): void
 }
 
@@ -43,6 +44,9 @@ function startHarness(): Harness {
     },
     push(frame: unknown) {
       connection?.write(`${JSON.stringify(frame)}\n`)
+    },
+    pushRaw(data: string) {
+      connection?.write(data)
     },
     drop() {
       connection?.destroy()
@@ -109,6 +113,7 @@ describe('HerdrSocketEventConnection', () => {
     await connection.connect()
     expect(connection.isConnected()).toBe(true)
 
+    harness.pushRaw('{"event":"stale","data":')
     harness.drop()
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(connection.isConnected()).toBe(true)
@@ -116,6 +121,25 @@ describe('HerdrSocketEventConnection', () => {
     harness.push({ event: 'layout_updated', data: { type: 'layout_updated' } })
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(events.some((event) => event.event === 'layout_updated')).toBe(true)
+    expect(events.some((event) => event.event === 'stale')).toBe(false)
     await connection.disconnect()
+  })
+
+  it('invalidates an in-flight reconnect when reset runs during backoff', async () => {
+    vi.useFakeTimers()
+    const connectFn = vi.fn(async () => undefined)
+    const reconnection = new HerdrSocketReconnection(connectFn, {
+      enabled: true,
+      initialDelayMs: 1000,
+      maxDelayMs: 1000,
+      maxAttempts: 5,
+      factor: 1
+    })
+    const pending = reconnection.attemptReconnection()
+    reconnection.reset()
+    await vi.advanceTimersByTimeAsync(1000)
+    await pending
+    expect(connectFn).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })

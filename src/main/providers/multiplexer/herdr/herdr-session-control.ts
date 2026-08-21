@@ -6,6 +6,7 @@ import type {
   HerdrTerminalControlOptions,
   HerdrTerminalFrame
 } from './herdr-runtime-contract'
+import { pushPendingHerdrFrame } from './herdr-session-pending-frames'
 
 export type HerdrSessionControlCommand = {
   file: string
@@ -61,6 +62,7 @@ export function herdrSessionControlStreamFromChannel(
   channel: HerdrSessionControlChannel
 ): HerdrSessionControlStream {
   const decoder = new StringDecoder('utf8')
+  let dataListener: ((chunk: string) => void) | null = null
   channel.stderr?.on('data', () => undefined)
   return {
     get writable() {
@@ -74,13 +76,20 @@ export function herdrSessionControlStreamFromChannel(
     end: () => channel.end(),
     close: () => channel.close(),
     onData: (listener) => {
+      dataListener = listener
       channel.on('data', (chunk) => listener(decoder.write(chunk)))
     },
     onError: (listener) => {
       channel.once('error', listener)
     },
     onClose: (listener) => {
-      channel.once('close', (code) => listener(code ?? null))
+      channel.once('close', (code) => {
+        const trailing = decoder.end()
+        if (trailing) {
+          dataListener?.(trailing)
+        }
+        listener(code ?? null)
+      })
     }
   }
 }
@@ -135,10 +144,7 @@ function consumeLine(state: SessionControlState, line: string, onInvalid: () => 
     const event = JSON.parse(line) as HerdrTerminalFrame | HerdrTerminalClosed
     if (event.type === 'terminal.frame') {
       if (state.frameListeners.size === 0) {
-        state.pendingFrames.push(event)
-        if (state.pendingFrames.length > 512) {
-          state.pendingFrames.shift()
-        }
+        pushPendingHerdrFrame(state.pendingFrames, event)
       } else {
         for (const listener of state.frameListeners) {
           listener(event)
@@ -269,9 +275,10 @@ export function createHerdrSessionControlController(
     ...(command.env ? { env: command.env } : {})
   })
   child.stdout.setEncoding('utf8')
+  child.stderr.setEncoding('utf8')
   const state = createSessionControlState()
   child.stderr.on('data', (chunk: Buffer | string) => {
-    state.stderr += chunk.toString()
+    state.stderr += typeof chunk === 'string' ? chunk : chunk.toString()
   })
   attachSessionControlStream(state, {
     get writable() {
@@ -289,6 +296,9 @@ export function createHerdrSessionControlController(
     },
     onError: (listener) => {
       child.once('error', listener)
+      child.stdin.once('error', listener)
+      child.stdout.once('error', listener)
+      child.stderr.once('error', listener)
     },
     onClose: (listener) => {
       child.once('close', (code) => listener(code ?? null))

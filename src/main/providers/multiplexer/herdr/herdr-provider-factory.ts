@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import { herdrSessionNameForProject } from '../../../../shared/herdr-session-identity'
 import type { Store } from '../../../persistence'
 import type { IPtyProvider } from '../../types'
 import {
@@ -7,6 +8,7 @@ import {
   localHerdrCommand
 } from './herdr-cli-session'
 import { HerdrPtyProvider } from './herdr-pty-provider'
+import type { HerdrPtyTarget } from './herdr-pty-types'
 import {
   createHerdrPtyTargetResolver,
   createLocalHerdrPtyTargetResolver
@@ -16,7 +18,6 @@ import type { RemoteHostPlatform } from '../../../ssh/ssh-remote-platform'
 import { toSshExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
-  DEFAULT_HERDR_SESSION_NAME,
   normalizeHerdrBinarySource,
   type HerdrBinarySource
 } from '../../../../shared/terminal-backend'
@@ -35,11 +36,14 @@ export function createLocalHerdrPtyProvider(
   return new HerdrPtyProvider(
     (target) => {
       const hostId = target.identity.hostId
-      let transport = transports.get(hostId)
+      const settings = store.getSettings()
+      const source = resolveHerdrBinarySource(settings, hostId as ExecutionHostId)
+      const sessionName = herdrSessionNameForProject(target.project, settings.herdrSessionName)
+      const key = herdrTransportKey(target, settings.herdrSessionName, source)
+      let transport = transports.get(key)
       if (transport) {
         return transport
       }
-      const source = resolveHerdrBinarySource(store.getSettings(), 'local')
       const wslDistro = parseWslHostId(hostId)
       if (wslDistro) {
         const executable = resolveHerdrExecutable(source, 'linux')
@@ -69,7 +73,7 @@ export function createLocalHerdrPtyProvider(
       } else {
         const executable = resolveHerdrExecutable(source)
         transport = new HerdrSocketTransport({
-          sessionName: store.getSettings().herdrSessionName ?? DEFAULT_HERDR_SESSION_NAME,
+          sessionName,
           commandFor: localHerdrCommand(executable),
           serverCommandFor: (sessionName) => ({
             file: executable,
@@ -80,25 +84,14 @@ export function createLocalHerdrPtyProvider(
           })
         })
       }
-      transports.set(hostId, transport)
+      transports.set(key, transport)
       return transport
     },
     createLocalHerdrPtyTargetResolver(store),
     () => store.getSettings().herdrSessionName,
-    {
-      persist: (surface: HerdrImportedSurface) => {
-        store.persistPtyBinding({
-          worktreeId: surface.worktreeId,
-          tabId: surface.tabId,
-          leafId: surface.leafId,
-          ptyId: surface.ptyId,
-          ...(surface.cwd ? { startupCwd: surface.cwd } : {})
-        })
-      },
-      present: presentHerdrImportedSurface,
-      presentAction: presentHerdrSurfaceAction
-    },
-    fallback
+    herdrSurfaceSync(store),
+    fallback,
+    () => disconnectHerdrTransports(transports)
   )
 }
 
@@ -110,26 +103,33 @@ export function createSshHerdrPtyProvider(
   hostPlatform?: RemoteHostPlatform
 ): HerdrPtyProvider {
   const hostId = toSshExecutionHostId(targetId)
-  const source = resolveHerdrBinarySource(store.getSettings(), hostId)
-  const transport = createSshHerdrHostTransport(connection, source, hostPlatform)
+  const transports = new Map<string, HerdrHostTransport>()
 
   return new HerdrPtyProvider(
-    () => transport,
+    (target) => {
+      const settings = store.getSettings()
+      const source = resolveHerdrBinarySource(settings, hostId)
+      const key = herdrTransportKey(target, settings.herdrSessionName, source)
+      let transport = transports.get(key)
+      if (!transport) {
+        transport = createSshHerdrHostTransport(connection, source, hostPlatform)
+        transports.set(key, transport)
+      }
+      return transport
+    },
     createHerdrPtyTargetResolver(store, hostId),
     () => store.getSettings().herdrSessionName,
-    {
-      persist: (surface: HerdrImportedSurface) => {
-        store.persistPtyBinding({
-          worktreeId: surface.worktreeId,
-          tabId: surface.tabId,
-          leafId: surface.leafId,
-          ptyId: surface.ptyId,
-          ...(surface.cwd ? { startupCwd: surface.cwd } : {})
-        })
-      }
-    },
-    fallback
+    herdrSurfaceSync(store),
+    fallback,
+    () => disconnectHerdrTransports(transports)
   )
+}
+
+function disconnectHerdrTransports(transports: Map<string, HerdrHostTransport>): void {
+  for (const transport of new Set(transports.values())) {
+    void Promise.resolve(transport.disconnect?.()).catch(() => undefined)
+  }
+  transports.clear()
 }
 
 function createSshHerdrHostTransport(
@@ -160,11 +160,22 @@ function createSshHerdrHostTransport(
       file: executable,
       args: ['--remote', launch.dest, '--handoff', '--session', sessionName, 'server'],
       env: herdrRemoteCommandEnv(launch, herdrServerEnvironment(undefined))
-    })
+    }),
+    onDisconnect: launch.cleanup
   })
 }
 
 type HerdrSettings = Pick<GlobalSettings, 'herdrBinarySource' | 'hostSettingOverrides'>
+
+function herdrTransportKey(
+  target: HerdrPtyTarget,
+  sharedName: string | undefined,
+  source: HerdrBinarySource
+): string {
+  const sessionName = herdrSessionNameForProject(target.project, sharedName)
+  const sourceKey = source.kind === 'custom' ? `custom:${source.path.trim()}` : source.kind
+  return `${target.identity.hostId}\n${sessionName}\n${sourceKey}`
+}
 
 export function resolveHerdrBinarySource(
   settings: HerdrSettings,
@@ -201,54 +212,99 @@ function parseWslHostId(hostId: string): string | null {
   }
 }
 
-function eachWindow(send: (contents: Electron.WebContents) => void): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      send(win.webContents)
-    }
+function herdrSurfaceSync(store: Store) {
+  return {
+    persist: (surface: HerdrImportedSurface) => {
+      store.persistPtyBinding({
+        worktreeId: surface.worktreeId,
+        tabId: surface.tabId,
+        leafId: surface.leafId,
+        ptyId: surface.ptyId,
+        ...(surface.cwd ? { startupCwd: surface.cwd } : {})
+      })
+    },
+    present: presentHerdrImportedSurface,
+    presentAction: presentHerdrSurfaceAction
   }
 }
 
+const importedSurfaceOwners = new Map<string, { owner: BrowserWindow; tabId: string }>()
+const importedTabOwners = new Map<string, BrowserWindow>()
+
+function liveOwner(owner: BrowserWindow | undefined): BrowserWindow | null {
+  return owner && !owner.isDestroyed() ? owner : null
+}
+
+function ownerForTab(tabId: string): BrowserWindow | null {
+  const existing = liveOwner(importedTabOwners.get(tabId))
+  if (existing) {
+    return existing
+  }
+  const owner =
+    liveOwner(BrowserWindow.getFocusedWindow() ?? undefined) ??
+    BrowserWindow.getAllWindows().find((candidate) => !candidate.isDestroyed()) ??
+    null
+  if (owner) {
+    importedTabOwners.set(tabId, owner)
+  }
+  return owner
+}
+
 export function presentHerdrImportedSurface(surface: HerdrImportedSurface): void {
-  eachWindow((contents) => {
-    contents.send('ui:createTerminal', {
-      worktreeId: surface.worktreeId,
-      ptyId: surface.ptyId,
-      tabId: surface.tabId,
-      leafId: surface.leafId,
-      title: surface.title,
-      ...(surface.cwd ? { cwd: surface.cwd } : {}),
-      activate: false,
-      focus: false,
-      presentation: 'background',
-      ...(surface.splitFromLeafId
-        ? {
-            splitFromLeafId: surface.splitFromLeafId,
-            splitDirection: surface.splitDirection ?? 'vertical'
-          }
-        : {})
-    })
+  const existing = importedSurfaceOwners.get(surface.ptyId)
+  if (liveOwner(existing?.owner)) {
+    return
+  }
+  const owner = ownerForTab(surface.tabId)
+  if (!owner) {
+    return
+  }
+  importedSurfaceOwners.set(surface.ptyId, { owner, tabId: surface.tabId })
+  owner.webContents.send('ui:createTerminal', {
+    worktreeId: surface.worktreeId,
+    ptyId: surface.ptyId,
+    tabId: surface.tabId,
+    leafId: surface.leafId,
+    title: surface.title,
+    ...(surface.cwd ? { cwd: surface.cwd } : {}),
+    activate: false,
+    focus: false,
+    presentation: 'background',
+    ...(surface.splitFromLeafId
+      ? {
+          splitFromLeafId: surface.splitFromLeafId,
+          splitDirection: surface.splitDirection ?? 'vertical'
+        }
+      : {})
   })
 }
 
 export function presentHerdrSurfaceAction(action: HerdrOrcaSurfaceAction): void {
-  eachWindow((contents) => {
-    if (action.kind === 'rename') {
-      contents.send('ui:renameTerminal', { tabId: action.tabId, title: action.title })
-      return
+  const contents = ownerForTab(action.tabId)?.webContents
+  if (!contents) {
+    return
+  }
+  if (action.kind === 'rename') {
+    contents.send('ui:renameTerminal', { tabId: action.tabId, title: action.title })
+    return
+  }
+  if (action.kind === 'focus') {
+    contents.send('ui:focusTerminal', {
+      tabId: action.tabId,
+      worktreeId: action.worktreeId,
+      leafId: action.leafId
+    })
+    return
+  }
+  if (action.kind === 'close') {
+    contents.send('ui:closeTerminal', { tabId: action.tabId })
+    importedTabOwners.delete(action.tabId)
+    for (const [ptyId, entry] of importedSurfaceOwners) {
+      if (entry.tabId === action.tabId) {
+        importedSurfaceOwners.delete(ptyId)
+      }
     }
-    if (action.kind === 'focus') {
-      contents.send('ui:focusTerminal', {
-        tabId: action.tabId,
-        worktreeId: action.worktreeId,
-        leafId: action.leafId
-      })
-      return
-    }
-    if (action.kind === 'close') {
-      contents.send('ui:closeTerminal', { tabId: action.tabId })
-      return
-    }
-    contents.send('ui:applyTerminalLayout', { tabId: action.tabId, layout: action.layout })
-  })
+    return
+  }
+  contents.send('ui:applyTerminalLayout', { tabId: action.tabId, layout: action.layout })
 }

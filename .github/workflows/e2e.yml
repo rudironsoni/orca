@@ -300,7 +300,7 @@ jobs:
           - name: macos-arm64
             runs-on: macos-14
           - name: macos-x86_64
-            runs-on: macos-13
+            runs-on: macos-15-intel
     runs-on: ${{ matrix.runs-on }}
 
     steps:

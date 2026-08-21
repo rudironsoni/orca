@@ -5,6 +5,7 @@ import type {
   TerminalTab
 } from '../../../../shared/terminal-tab-types'
 import { basename } from 'node:path'
+import { homedir } from 'node:os'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { Store } from '../../../persistence'
@@ -14,7 +15,12 @@ import {
   resolveSpawnHostId
 } from './herdr-project-backend'
 import type { HerdrPtyTargetResolver } from './herdr-pty-provider'
-import type { HerdrPtyIdentity, HerdrPtyTarget } from './herdr-pty-types'
+import {
+  encodeHerdrPtyId,
+  persistedHerdrPaneIdsFromLayouts,
+  type HerdrPtyIdentity,
+  type HerdrPtyTarget
+} from './herdr-pty-types'
 import { splitWorktreeIdForFilesystem } from '../../../../shared/worktree/id'
 import type { PtySpawnOptions } from '../../pty-provider-contract'
 import type { HerdrWorktreeDescriptor } from './ensure-herdr-workspace'
@@ -196,7 +202,8 @@ function projectHerdrActivation(
       return null
     }
 
-    const session = store.getWorkspaceSession()
+    const hostId = resolveSpawnHostId(requestedHostId, store.getWorktreeMeta?.(worktreeId)?.hostId)
+    const session = store.getWorkspaceSession(hostId)
     const isFloating = worktreeId === FLOATING_TERMINAL_WORKTREE_ID
 
     let project: Project
@@ -210,7 +217,7 @@ function projectHerdrActivation(
       worktrees = [
         {
           id: worktreeId,
-          path: opts.cwd ?? '/',
+          path: opts.cwd || homedir(),
           displayName: `Floating ${tabId}`
         }
       ]
@@ -252,10 +259,14 @@ function projectHerdrActivation(
       [worktreeId]: sessionTab ? existingTabs : [...existingTabs, syntheticTab]
     }
 
-    const hostId = resolveSpawnHostId(requestedHostId, store.getWorktreeMeta?.(worktreeId)?.hostId)
     if (!projectWantsHerdr(project, store.getSettings().terminalBackendDefault ?? 'orca', hostId)) {
       return null
     }
+    const persistedPaneIdsByLeafId = persistedHerdrPaneIdsFromLayouts(
+      Object.values(session.terminalLayoutsByTabId),
+      project.id,
+      hostId
+    )
 
     return {
       activateHerdr: () => {
@@ -264,12 +275,29 @@ function projectHerdrActivation(
       legacyMigrationWorktreeIds: worktrees.map((entry) => entry.id),
       project,
       graph: {
+        hostId,
         project,
         worktrees,
         tabsByWorktreeId,
         layoutsByTabId: {
           ...session.terminalLayoutsByTabId,
           [tabId]: resolvedLayout
+        },
+        persistedPaneIdsByLeafId,
+        persistPaneId: ({ paneId, ...binding }) => {
+          store.persistPtyBinding(
+            {
+              ...binding,
+              ptyId: encodeHerdrPtyId({
+                version: 2,
+                hostId,
+                projectId: project.id,
+                ...binding,
+                paneId
+              })
+            },
+            hostId
+          )
         }
       },
       identity: {

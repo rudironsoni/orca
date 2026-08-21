@@ -9,13 +9,12 @@ import type {
   HerdrTerminalFrame
 } from './herdr-runtime-contract'
 import { decodeHerdrPtyId, HerdrPtyProvider } from './herdr-pty-provider'
-import { encodeHerdrPtyId } from './herdr-pty-types'
-import { findLegacyMigrationBlockers } from './herdr-pty-types'
+import { encodeHerdrPtyId, findLegacyMigrationBlockers } from './herdr-pty-types'
 import type { Project } from '../../../../shared/project-types'
 import { orcaPaneBinding } from './herdr-binding-metadata'
 import type { HerdrProjectHostGraph } from './ensure-herdr-workspace'
 
-function transport(closeBeforeFrame = false) {
+function transport(closeBeforeFrame = false, failMethod?: string) {
   const frameListeners = new Set<(frame: HerdrTerminalFrame) => void>()
   const closedListeners = new Set<(event: HerdrTerminalClosed) => void>()
   const controller: HerdrTerminalController = {
@@ -37,6 +36,9 @@ function transport(closeBeforeFrame = false) {
       method: string,
       _params?: unknown
     ): Promise<HerdrResponse<unknown>> => {
+      if (method === failMethod) {
+        throw new Error(`${method} failed`)
+      }
       if (method === 'session.snapshot') {
         const bindingToken = orcaPaneBinding('project-1', 'leaf-1')
         return {
@@ -368,6 +370,52 @@ describe('HerdrPtyProvider', () => {
     expect(sendKeys.every((call) => (call[2] as { pane_id: string }).pane_id === 'p1')).toBe(true)
   })
 
+  it('serializes text writes so terminal input cannot reorder', async () => {
+    const host = transport()
+    const provider = new HerdrPtyProvider(
+      () => host.value,
+      async () => target(),
+      () => 'test-session'
+    )
+    const spawned = await provider.spawn({
+      cols: 80,
+      rows: 24,
+      cwd: '/repo',
+      worktreeId: 'repo-1::/repo',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:leaf-1'
+    })
+    const baseRequest = host.requestMock.getMockImplementation()!
+    let releaseFirst: () => void = () => {}
+    const firstPending = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    let sendCount = 0
+    host.requestMock.mockImplementation(async (session, method, params) => {
+      if (method === 'pane.send_text') {
+        sendCount += 1
+        if (sendCount === 1) {
+          await firstPending
+        }
+        return { id: method, result: { type: 'ok' } }
+      }
+      return await baseRequest(session, method, params)
+    })
+    host.requestMock.mockClear()
+
+    provider.write(spawned.id, 'first')
+    provider.write(spawned.id, 'second')
+
+    await vi.waitFor(() => expect(sendCount).toBe(1))
+    releaseFirst()
+    await vi.waitFor(() => expect(sendCount).toBe(2))
+    expect(
+      host.requestMock.mock.calls
+        .filter((call) => call[1] === 'pane.send_text')
+        .map((call) => (call[2] as { text: string }).text)
+    ).toEqual(['first', 'second'])
+  })
+
   it('reads cwd from pane.get with the Herdr pane id', async () => {
     const host = transport()
     const provider = new HerdrPtyProvider(
@@ -516,6 +564,34 @@ describe('HerdrPtyProvider', () => {
         { pane_id: 'p1', text: 'ls\r' }
       )
     })
+  })
+
+  it('logs a rejected startup command without rejecting the spawn', async () => {
+    const host = transport(false, 'pane.send_text')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const provider = new HerdrPtyProvider(
+      () => host.value,
+      async () => target()
+    )
+
+    await expect(
+      provider.spawn({
+        cols: 80,
+        rows: 24,
+        cwd: '/repo',
+        worktreeId: 'repo-1::/repo',
+        tabId: 'tab-1',
+        paneKey: 'tab-1:leaf-1',
+        command: 'ls'
+      })
+    ).resolves.toMatchObject({ id: expect.any(String) })
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to write startup command'),
+        expect.any(Error)
+      )
+    })
+    warn.mockRestore()
   })
 
   it('starts a stock Herdr agent instead of writing a shell command', async () => {
@@ -682,5 +758,67 @@ describe('HerdrPtyProvider', () => {
     })
     await expect(provider.shutdown(spawned.id, {})).rejects.toThrow('still attached')
     expect(provider.hasPty(spawned.id)).toBe(true)
+  })
+
+  it('notifies write-unavailable listeners for rejected text and named-key writes', async () => {
+    const host = transport()
+    const provider = new HerdrPtyProvider(
+      () => host.value,
+      async () => target()
+    )
+    const spawned = await provider.spawn({
+      cols: 80,
+      rows: 24,
+      cwd: '/repo',
+      worktreeId: 'repo-1::/repo',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:leaf-1'
+    })
+    host.requestMock.mockRejectedValue(new Error('transport gone'))
+    const unavailable = vi.fn()
+    provider.onWriteUnavailable(unavailable)
+
+    provider.write(spawned.id, 'hello')
+    provider.writeLogical(spawned.id, { kind: 'key', name: 'ctrl+c' })
+
+    await vi.waitFor(() => expect(unavailable).toHaveBeenCalledTimes(2))
+    expect(unavailable).toHaveBeenCalledWith({ id: spawned.id })
+  })
+
+  it('releases every binding during killAll and disconnects captured transports on dispose', async () => {
+    const host = transport()
+    const disconnect = vi.fn()
+    host.value.disconnect = disconnect
+    const provider = new HerdrPtyProvider(
+      () => host.value,
+      async () => target()
+    )
+    const spawned = await provider.spawn({
+      cols: 80,
+      rows: 24,
+      cwd: '/repo',
+      worktreeId: 'repo-1::/repo',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:leaf-1'
+    })
+    const controller = (host.value.controlTerminal as unknown as ReturnType<typeof vi.fn>).mock
+      .results[0]?.value as HerdrTerminalController
+
+    provider.killAll()
+    expect(provider.hasPty(spawned.id)).toBe(false)
+    expect(controller.release).toHaveBeenCalled()
+
+    const next = await provider.spawn({
+      cols: 80,
+      rows: 24,
+      cwd: '/repo',
+      worktreeId: 'repo-1::/repo',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:leaf-1'
+    })
+    expect(provider.hasPty(next.id)).toBe(true)
+    ;(provider as unknown as { managers: Map<string, unknown> }).managers.clear()
+    provider.dispose()
+    expect(disconnect).toHaveBeenCalledOnce()
   })
 })

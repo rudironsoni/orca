@@ -129,23 +129,14 @@ export function recoverPaneIdsFromStockLayout(
     panes: { pane_id: string; rect: { x: number; y: number; width: number; height: number } }[]
   }
 ): Map<string, string> | null {
-  const leafIds: string[] = []
-  function collectLeaves(node: TerminalPaneLayoutNode): void {
-    if (node.type === 'leaf') {
-      leafIds.push(node.leafId)
-    } else {
-      collectLeaves(node.first)
-      collectLeaves(node.second)
-    }
+  if (root.type === 'leaf') {
+    return snapshot.panes.length === 1 ? new Map([[root.leafId, snapshot.panes[0].pane_id]]) : null
   }
-  collectLeaves(root)
-
-  if (leafIds.length !== snapshot.panes.length) {
+  if (root.first.type !== 'leaf' || root.second.type !== 'leaf' || snapshot.panes.length !== 2) {
     return null
   }
 
-  const direction = root.type === 'split' ? root.direction : 'vertical'
-  const isVertical = direction === 'vertical'
+  const isVertical = root.direction === 'vertical'
 
   const sortedPanes = [...snapshot.panes].sort((a, b) =>
     isVertical ? a.rect.x - b.rect.x : a.rect.y - b.rect.y
@@ -159,9 +150,8 @@ export function recoverPaneIdsFromStockLayout(
   }
 
   const recovered = new Map<string, string>()
-  for (let i = 0; i < leafIds.length; i++) {
-    recovered.set(leafIds[i], sortedPanes[i].pane_id)
-  }
+  recovered.set(root.first.leafId, sortedPanes[0].pane_id)
+  recovered.set(root.second.leafId, sortedPanes[1].pane_id)
 
   return recovered
 }

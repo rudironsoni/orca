@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HERDR_PROTOCOL_VERSION,
   REQUIRED_HERDR_METHODS,
   assertHerdrSchemaCompatible,
   assertHerdrServerCompatible,
@@ -8,7 +9,7 @@ import {
 
 const requiredMethods = [...new Set(REQUIRED_HERDR_METHODS)]
 
-function schema(protocol = 19): HerdrApiSchema {
+function schema(protocol = HERDR_PROTOCOL_VERSION): HerdrApiSchema {
   return {
     protocol,
     schema_version: 1,
@@ -25,7 +26,7 @@ function schema(protocol = 19): HerdrApiSchema {
 describe('stock Herdr compatibility', () => {
   it('accepts the public schema surface and matching server protocol', () => {
     expect(() => assertHerdrSchemaCompatible(schema())).not.toThrow()
-    expect(() => assertHerdrServerCompatible(schema(), 19)).not.toThrow()
+    expect(() => assertHerdrServerCompatible(schema(), HERDR_PROTOCOL_VERSION)).not.toThrow()
   })
 
   it('rejects a fork-shaped or stale server without stopping it', () => {
@@ -38,4 +39,13 @@ describe('stock Herdr compatibility', () => {
       'does not match the running server protocol'
     )
   })
+
+  it.each([HERDR_PROTOCOL_VERSION - 1, HERDR_PROTOCOL_VERSION + 1, 0, 1.5])(
+    'rejects schema protocol %s instead of accepting a different protocol',
+    (protocol) => {
+      expect(() => assertHerdrSchemaCompatible(schema(protocol))).toThrow(
+        `requires Herdr protocol ${HERDR_PROTOCOL_VERSION}`
+      )
+    }
+  )
 })

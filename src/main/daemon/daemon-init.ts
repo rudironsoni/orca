@@ -105,6 +105,18 @@ let herdrProvider: HerdrPtyProvider | null = null
 // Why: coalesce concurrent restartDaemon() calls so two entries can't race the 7-step sequence against a half-spawned replacement.
 let restartInFlight: Promise<RestartDaemonResult> | null = null
 
+function installHerdrProvider(fallback: DaemonProvider, store: Store): void {
+  const replaced = herdrProvider
+  const next = createLocalHerdrPtyProvider(fallback, store)
+  herdrProvider = next
+  try {
+    setLocalPtyProvider(next)
+    rebindLocalProviderListeners()
+  } finally {
+    replaced?.dispose()
+  }
+}
+
 function getRuntimeDir(): string {
   const dir = join(app.getPath('userData'), 'daemon')
   mkdirSync(dir, { recursive: true })
@@ -929,9 +941,13 @@ export async function initDaemonPtyProvider(
   store?: Store | null
 ): Promise<void> {
   herdrStore = store ?? null
+  const boundStore = store ?? null
   // Why: react to backend switches without a restart, so toggling the terminal
   // backend in settings swaps the local provider in place.
   store?.onSettingsChanged((updates) => {
+    if (herdrStore !== boundStore) {
+      return
+    }
     if (!('terminalBackendDefault' in updates) && !('herdrSessionName' in updates)) {
       return
     }
@@ -943,9 +959,7 @@ export async function initDaemonPtyProvider(
     // it so a settings change applies without a restart. The Orca adapter stays
     // the fallback so a project can still choose Herdr when the global default
     // is Orca.
-    herdrProvider = createLocalHerdrPtyProvider(adapter, activeStore)
-    setLocalPtyProvider(herdrProvider)
-    rebindLocalProviderListeners()
+    installHerdrProvider(adapter, activeStore)
   })
   logDaemonMilestone('daemon-init-start')
   // Why: e2e coverage for the startup PTY gate (#5232) needs a daemon init that deterministically outlasts the first-window timeout.
@@ -1058,13 +1072,14 @@ export async function initDaemonPtyProvider(
   // Why: Herdr is per-project/host. Keep the Orca adapter as fallback so a
   // project can select Herdr while the global default stays Orca.
   if (store) {
-    herdrProvider = createLocalHerdrPtyProvider(routedAdapter, store)
-    setLocalPtyProvider(herdrProvider)
+    installHerdrProvider(routedAdapter, store)
   } else {
+    const replaced = herdrProvider
+    herdrProvider = null
     setLocalPtyProvider(routedAdapter)
+    rebindLocalProviderListeners()
+    replaced?.dispose()
   }
-  // Why: the first window may register PTY listeners before daemon init finishes; rebind so daemon PTYs still fan out events.
-  rebindLocalProviderListeners()
   logDaemonMilestone('daemon-init-done', {
     legacyAdapters: legacyAdapters.length
   })

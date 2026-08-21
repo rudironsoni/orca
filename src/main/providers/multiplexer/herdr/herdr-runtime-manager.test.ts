@@ -210,9 +210,11 @@ function stockTransport(
 describe('HerdrRuntimeManager stock reconciliation', () => {
   it('creates and tags a split without fork-only methods, then stays idempotent', async () => {
     const host = stockTransport()
+    const persistPaneId = vi.fn()
     const manager = new HerdrRuntimeManager(host.transport)
-    await manager.reconcileProjectHost(graph())
-    await manager.reconcileProjectHost(graph())
+    const projectGraph = { ...graph(), persistPaneId }
+    await manager.reconcileProjectHost(projectGraph)
+    await manager.reconcileProjectHost(projectGraph)
 
     expect(host.snapshot.workspaces).toHaveLength(1)
     expect(host.snapshot.panes).toHaveLength(2)
@@ -226,6 +228,9 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       host.requestMock.mock.calls.filter(([, method]) => method === 'pane.split')
     ).toHaveLength(1)
     expect(host.requestMock.mock.calls.map(([, method]) => method)).not.toContain('pane.bind')
+    expect(new Set(persistPaneId.mock.calls.map(([binding]) => binding.leafId))).toEqual(
+      new Set(['leaf-1', 'leaf-2'])
+    )
   })
 
   it('reconciles into the shared Orca session when a sharedName is configured', async () => {

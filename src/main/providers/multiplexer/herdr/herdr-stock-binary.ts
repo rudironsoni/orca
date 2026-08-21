@@ -24,8 +24,14 @@ export function resolveStockHerdrTestBinary(): string | null {
 const SOCKET_PATH_LIMIT = 104
 
 export function configHomeDir(): string {
-  for (const root of [tmpdir(), '/tmp']) {
-    const candidate = mkdtempSync(join(root, 'orca-h-'))
+  const roots = process.platform === 'win32' ? [tmpdir()] : [tmpdir(), '/tmp']
+  for (const root of new Set(roots)) {
+    let candidate: string
+    try {
+      candidate = mkdtempSync(join(root, 'orca-h-'))
+    } catch {
+      continue
+    }
     if (
       candidate.length + '/.config/herdr/sessions/ot-123456/herdr.sock'.length <=
       SOCKET_PATH_LIMIT

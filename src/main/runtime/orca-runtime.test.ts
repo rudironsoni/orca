@@ -15480,6 +15480,72 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('does not restore a stale pre-split layout over a concurrent layout mutation', async () => {
+    const tabId = 'concurrent-layout-tab'
+    const sourcePtyId = 'concurrent-layout-source'
+    const sourceLayout = makeHeadlessTerminalLayout({ [HEADLESS_LEAF_ID]: sourcePtyId })
+    const { runtimeStore, getSession, setSession } = makeRuntimeStoreWithWorkspaceSession(
+      makeWorkspaceSessionWithHeadlessTerminal({
+        tabsByWorktree: {
+          [TEST_WORKTREE_ID]: [
+            {
+              id: tabId,
+              ptyId: sourcePtyId,
+              worktreeId: TEST_WORKTREE_ID,
+              title: 'Concurrent layout',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 1
+            }
+          ]
+        },
+        terminalLayoutsByTabId: { [tabId]: sourceLayout }
+      })
+    )
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setPtyController({
+      spawn: vi.fn(async () => ({ id: 'concurrent-layout-split' })),
+      write: () => true,
+      kill: vi.fn(() => true),
+      stopAndWait: vi.fn(async () => true),
+      getForegroundProcess: async () => null
+    })
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    runtime.registerPty(sourcePtyId, TEST_WORKTREE_ID, null, {
+      tabId,
+      leafId: HEADLESS_LEAF_ID
+    })
+    const internals = runtime as unknown as {
+      issuePtyHandle: (pty: unknown) => string
+      ptysById: Map<string, unknown>
+      publishPtyBackedMobileSessionTerminal: () => void
+    }
+    internals.publishPtyBackedMobileSessionTerminal = () => {
+      const current = getSession()
+      setSession({
+        ...current,
+        terminalLayoutsByTabId: {
+          ...current.terminalLayoutsByTabId,
+          [tabId]: {
+            ...sourceLayout,
+            titlesByLeafId: { [HEADLESS_LEAF_ID]: 'Concurrent rename' }
+          }
+        }
+      })
+      throw new Error('concurrent publication failure')
+    }
+    const handle = internals.issuePtyHandle(internals.ptysById.get(sourcePtyId))
+
+    await expect(runtime.splitTerminal(handle, { direction: 'vertical' })).rejects.toThrow(
+      'concurrent publication failure'
+    )
+    expect(getSession().terminalLayoutsByTabId[tabId]).toEqual({
+      ...sourceLayout,
+      titlesByLeafId: { [HEADLESS_LEAF_ID]: 'Concurrent rename' }
+    })
+  })
+
   it('rejects a persisted split closed during spawn without recreating its tab', async () => {
     const tabId = 'closing-persisted-tab'
     const ptyId = 'closing-persisted-pty'
@@ -29458,11 +29524,13 @@ describe('OrcaRuntimeService', () => {
     const acknowledged = makeDeferred()
     const closeTerminalTab = vi.fn(() => acknowledged.promise)
     const kill = vi.fn(() => true)
+    const stopAndWait = vi.fn(async (_ptyId: string, _opts?: { deadlineMs?: number }) => true)
     const runtime = new OrcaRuntimeService(runtimeStore as never)
     runtime.setNotifier({ closeTerminal: vi.fn(), closeTerminalTab } as never)
     runtime.setPtyController({
       write: () => true,
       kill,
+      stopAndWait,
       getForegroundProcess: async () => null,
       listProcesses: async () => []
     })
@@ -29482,7 +29550,7 @@ describe('OrcaRuntimeService', () => {
           worktreeId: TEST_WORKTREE_ID,
           leafId: HEADLESS_LEAF_ID,
           paneRuntimeId: 1,
-          ptyId: 'persisted-pty'
+          ptyId: 'herdr:persisted-pty'
         }
       ],
       mobileSessionTabs: [
@@ -29499,7 +29567,7 @@ describe('OrcaRuntimeService', () => {
               id: `host-tab::${HEADLESS_LEAF_ID}`,
               parentTabId: 'host-tab',
               leafId: HEADLESS_LEAF_ID,
-              ptyId: 'persisted-pty',
+              ptyId: 'herdr:persisted-pty',
               title: 'Durable',
               isActive: true
             }
@@ -29507,7 +29575,7 @@ describe('OrcaRuntimeService', () => {
         }
       ]
     })
-    runtime.registerPty('persisted-pty', TEST_WORKTREE_ID, null, {
+    runtime.registerPty('herdr:persisted-pty', TEST_WORKTREE_ID, null, {
       tabId: 'host-tab',
       leafId: HEADLESS_LEAF_ID
     })
@@ -29534,7 +29602,13 @@ describe('OrcaRuntimeService', () => {
 
     acknowledged.resolve()
     await expect(pending).resolves.toEqual({ closed: true })
-    expect(kill).toHaveBeenCalledWith('persisted-pty')
+    expect(kill).toHaveBeenCalledWith('herdr:persisted-pty')
+    expect(stopAndWait).toHaveBeenCalledWith('herdr:persisted-pty', {
+      deadlineMs: expect.any(Number)
+    })
+    const deadlineMs = stopAndWait.mock.calls[0]?.[1]?.deadlineMs
+    expect(deadlineMs).toBeGreaterThan(Date.now())
+    expect(deadlineMs).toBeLessThanOrEqual(Date.now() + 2_000)
   })
 
   it('reuses pane close for live PTYs that do not own a renderer tab', async () => {

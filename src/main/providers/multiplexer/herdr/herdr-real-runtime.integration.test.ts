@@ -1,12 +1,14 @@
 import { execFileSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { configHomeDir } from './herdr-stock-binary'
+import { configHomeDir, resolveStockHerdrTestBinary } from './herdr-stock-binary'
 import { afterAll, describe, expect, it } from 'vitest'
 import { HerdrCliHostTransport, localHerdrCommand } from './herdr-cli-session'
-import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
-import { resolveStockHerdrTestBinary } from './herdr-stock-binary'
+import {
+  unwrapHerdrResponse,
+  type HerdrHostTransport,
+  type HerdrSessionSnapshot
+} from './herdr-runtime-contract'
 import { terminalLogicalInputFromBytes } from '../../../../shared/terminal-logical-key'
 
 const binary = resolveStockHerdrTestBinary()
@@ -227,40 +229,44 @@ describeRealHerdr('stock Herdr runtime integration', () => {
     expect(text.split('\n').some((line) => line.trim() === 'STREAM_SLEEP_DONE')).toBe(false)
   }, 30_000)
 
-  it('delivers Esc as a logical key to a raw reader', async () => {
-    await transport.ensureSession(sessionName)
-    const paneId = await createPane(transport, sessionName, configHome, 'Orca esc')
-    const reader = join(configHome, 'read-one.py')
-    writeFileSync(
-      reader,
-      [
-        'import sys, tty',
-        'tty.setraw(sys.stdin.fileno())',
-        'print("READY", flush=True)',
-        'b = sys.stdin.buffer.read(1)',
-        'print("\\r\\nGOT:" + b.hex(), flush=True)'
-      ].join('\n')
-    )
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_text', {
-        pane_id: paneId,
-        text: `python3 -u ${reader}`
-      })
-    )
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_keys', {
-        pane_id: paneId,
-        keys: ['Enter']
-      })
-    )
-    await waitForPaneText(transport, sessionName, paneId, (text) => text.includes('READY'))
-    await writeProductInput(transport, sessionName, paneId, '\x1b')
+  it.skipIf(process.platform === 'win32')(
+    'delivers Esc as a logical key to a raw reader',
+    async () => {
+      await transport.ensureSession(sessionName)
+      const paneId = await createPane(transport, sessionName, configHome, 'Orca esc')
+      const reader = join(configHome, 'read-one.py')
+      writeFileSync(
+        reader,
+        [
+          'import sys, tty',
+          'tty.setraw(sys.stdin.fileno())',
+          'print("READY", flush=True)',
+          'b = sys.stdin.buffer.read(1)',
+          'print("\\r\\nGOT:" + b.hex(), flush=True)'
+        ].join('\n')
+      )
+      unwrapHerdrResponse(
+        await transport.request(sessionName, 'pane.send_text', {
+          pane_id: paneId,
+          text: `python3 -u ${reader}`
+        })
+      )
+      unwrapHerdrResponse(
+        await transport.request(sessionName, 'pane.send_keys', {
+          pane_id: paneId,
+          keys: ['Enter']
+        })
+      )
+      await waitForPaneText(transport, sessionName, paneId, (text) => text.includes('READY'))
+      await writeProductInput(transport, sessionName, paneId, '\x1b')
 
-    const text = await waitForPaneText(transport, sessionName, paneId, (value) =>
-      value.includes('GOT:1b')
-    )
-    expect(text).toContain('GOT:1b')
-  }, 30_000)
+      const text = await waitForPaneText(transport, sessionName, paneId, (value) =>
+        value.includes('GOT:1b')
+      )
+      expect(text).toContain('GOT:1b')
+    },
+    30_000
+  )
 })
 
 async function createPane(

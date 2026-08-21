@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 import type { HerdrSocketConnectionOptions } from './herdr-socket-connection'
 import { herdrServerEnvironment } from './herdr-cli-session'
+import { assertHerdrSchemaCompatible, type HerdrApiSchema } from './herdr-runtime-contract'
 
 export type HerdrSocketSessionOptions = HerdrSocketConnectionOptions & {
   commandFor?: (args: string[]) => { file: string; args: string[]; env?: NodeJS.ProcessEnv }
@@ -14,7 +16,7 @@ export type HerdrSocketSessionOptions = HerdrSocketConnectionOptions & {
 export class HerdrSocketSessionManager {
   private readonly options: HerdrSocketSessionOptions
   private readonly sessionPromises = new Map<string, Promise<void>>()
-  private schema: { protocol: number } | null = null
+  private schema: HerdrApiSchema | null = null
 
   constructor(options: HerdrSocketSessionOptions) {
     this.options = options
@@ -52,21 +54,12 @@ export class HerdrSocketSessionManager {
     return (await this.loadSchema()).protocol
   }
 
-  private async loadSchema(): Promise<{ protocol: number }> {
+  private async loadSchema(): Promise<HerdrApiSchema> {
     if (!this.schema) {
       const result = await this.run(['api', 'schema', '--json'])
-      const schema = JSON.parse(result) as {
-        protocol: number
-        schema_version: number
-        schemas: Record<string, unknown>
-      }
-      if (schema.schema_version !== 1) {
-        throw new Error(`Orca requires Herdr API schema 1; received ${schema.schema_version}`)
-      }
-      if (!Number.isInteger(schema.protocol) || schema.protocol < 1) {
-        throw new Error('Herdr API schema has an invalid protocol')
-      }
-      this.schema = { protocol: schema.protocol }
+      const schema = JSON.parse(result) as HerdrApiSchema
+      assertHerdrSchemaCompatible(schema)
+      this.schema = schema
     }
     return this.schema
   }
@@ -156,16 +149,44 @@ export class HerdrSocketSessionManager {
         windowsHide: true,
         ...(command.env ? { env: command.env } : {})
       })
+      const stdoutDecoder = new StringDecoder('utf8')
+      const stderrDecoder = new StringDecoder('utf8')
       let stdout = ''
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString('utf8')
-      })
-      child.once('error', reject)
-      child.once('close', (code) => {
-        if (code === 0) {
-          resolve(stdout)
+      let stderr = ''
+      let settled = false
+      const finish = (error?: Error): void => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(timeout)
+        stdout += stdoutDecoder.end()
+        stderr += stderrDecoder.end()
+        if (error) {
+          reject(error)
         } else {
-          reject(new Error(`herdr ${args.join(' ')} exited with code ${code}`))
+          resolve(stdout)
+        }
+      }
+      const timeout = setTimeout(() => {
+        finish(new Error(`herdr ${args.join(' ')} timed out`))
+        child.kill()
+      }, this.options.timeoutMs ?? 15000)
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += stdoutDecoder.write(chunk)
+      })
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += stderrDecoder.write(chunk)
+      })
+      child.once('error', finish)
+      child.stdout.once('error', finish)
+      child.stderr.once('error', finish)
+      child.once('close', (code, signal) => {
+        if (code === 0) {
+          finish()
+        } else {
+          const status = code === null ? `signal ${signal ?? 'unknown'}` : `code ${code}`
+          finish(new Error(stderr.trim() || `herdr ${args.join(' ')} exited with ${status}`))
         }
       })
     })

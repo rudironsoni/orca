@@ -16,6 +16,7 @@ import {
 export type HerdrSocketEventConnectionOptions = HerdrSocketTransportOptions & {
   sessionName: string
   subscriptions?: Subscription[]
+  socketFactory?: (socketPath: string) => Socket
 }
 
 // Subscribe to every global event kind so Orca is a first-class client.
@@ -124,7 +125,8 @@ export class HerdrSocketEventConnection {
     await new Promise<void>((resolve, reject) => {
       let settled = false
       const parser = this.parser
-      const socket = createConnection(socketPath)
+      parser.reset()
+      const socket = (this.options.socketFactory ?? createConnection)(socketPath)
       this.socket = socket
 
       const connectTimer = setTimeout(() => {
@@ -180,6 +182,7 @@ export class HerdrSocketEventConnection {
       socket.once('close', () => {
         const wasSubscribed = this.subscribed
         this.connected = false
+        parser.reset()
         if (!settled) {
           finish(new Error(`Event connection to ${socketPath} closed before subscription started`))
           return
@@ -244,6 +247,7 @@ export class HerdrSocketReconnection {
   private onReconnected?: () => void
   private onMaxAttemptsReached?: (error: Error) => void
   private cancelled = false
+  private generation = 0
 
   constructor(
     connectFn: () => Promise<void>,
@@ -262,6 +266,7 @@ export class HerdrSocketReconnection {
   }
 
   async attemptReconnection(): Promise<void> {
+    const generation = this.generation
     if (this.cancelled) {
       return
     }
@@ -280,16 +285,19 @@ export class HerdrSocketReconnection {
     )
     this.onReconnecting?.(this.state.attempt, this.state.nextDelayMs)
     await this.sleep(this.state.nextDelayMs)
-    if (this.cancelled) {
+    if (this.cancelled || this.generation !== generation) {
       return
     }
     try {
       await this.connectFn()
+      if (this.generation !== generation) {
+        return
+      }
       this.state.attempt = 0
       this.state.nextDelayMs = 0
       this.onReconnected?.()
     } catch {
-      if (this.cancelled) {
+      if (this.cancelled || this.generation !== generation) {
         return
       }
       await this.attemptReconnection()
@@ -320,6 +328,8 @@ export class HerdrSocketReconnection {
   }
 
   reset(): void {
+    this.generation += 1
+    this.cancel()
     this.cancelled = false
     this.state = {
       attempt: 0,

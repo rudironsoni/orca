@@ -57,6 +57,47 @@ describe('repos:add + repos:clone', () => {
     registerRepoHandlers(mockWindow as never, mockStore as never)
   })
 
+  it('normalizes projects:update terminal backend host IDs and rejects invalid hosts', () => {
+    handlers.get('projects:update')!(null, {
+      projectId: 'project-1',
+      updates: {
+        terminalBackendByHost: {
+          ' ssh:conn-1 ': { state: 'ready', backend: 'herdr' },
+          local: { state: 'ready', backend: 'orca' }
+        }
+      }
+    })
+
+    expect(mockStore.updateProject).toHaveBeenCalledWith('project-1', {
+      terminalBackendByHost: {
+        'ssh:conn-1': { state: 'ready', backend: 'herdr' },
+        local: { state: 'ready', backend: 'orca' }
+      }
+    })
+    expect(() =>
+      handlers.get('projects:update')!(null, {
+        projectId: 'project-1',
+        updates: {
+          terminalBackendByHost: {
+            'not-an-execution-host': { state: 'ready', backend: 'herdr' }
+          }
+        }
+      })
+    ).toThrow('project_update_invalid_args')
+    expect(mockStore.updateProject).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects Herdr session names longer than 64 UTF-8 bytes', () => {
+    mockStore.updateProject.mockClear()
+    expect(() =>
+      handlers.get('projects:update')!(null, {
+        projectId: 'project-1',
+        updates: { herdrSessionName: '界'.repeat(22) }
+      })
+    ).toThrow('project_update_invalid_args')
+    expect(mockStore.updateProject).not.toHaveBeenCalled()
+  })
+
   it('defaults repos:add badgeColor to DEFAULT_REPO_BADGE_COLOR for folder repos', async () => {
     const result = await handlers.get('repos:add')!(null, { path: '/tmp/from-add', kind: 'folder' })
 

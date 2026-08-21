@@ -39,12 +39,6 @@ export function resolvePinnedHerdrBinary(): string | null {
       return resolved
     }
   } catch {
-    // Fall through to PATH.
-  }
-  try {
-    const found = execFileSync('which', ['herdr'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0]
-    return found && existsSync(found) ? found : null
-  } catch {
     return null
   }
 }

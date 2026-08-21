@@ -73,6 +73,7 @@ export class HerdrPtyProvider implements IPtyProvider {
     (payload: PtyBackgroundStreamEvent) => void
   >()
   private readonly writeUnavailableListeners = new Set<(payload: { id: string }) => void>()
+  private readonly writeQueues = new Map<string, Promise<void>>()
   private readonly dataListeners = new Set<(payload: PtyDataEvent) => void>()
   private readonly replayListeners = new Set<(payload: { id: string; data: string }) => void>()
   private readonly exitListeners = new Set<
@@ -85,7 +86,8 @@ export class HerdrPtyProvider implements IPtyProvider {
     resolveTarget: HerdrPtyTargetResolver,
     sharedName?: () => string | undefined,
     private readonly surfaceSync?: HerdrSurfaceSync,
-    private fallback?: IPtyProvider
+    private fallback?: IPtyProvider,
+    private readonly disconnectTransports?: () => void
   ) {
     this.transportForTarget = transportForTarget
     this.resolveTarget = resolveTarget
@@ -165,25 +167,26 @@ export class HerdrPtyProvider implements IPtyProvider {
     this.writeLogical(id, terminalLogicalInputFromBytes(data))
   }
 
-  writeLogical(id: string, input: TerminalLogicalInput): void {
+  writeLogical(id: string, input: TerminalLogicalInput): boolean {
     const binding = this.bindings.get(id)
     if (!binding) {
-      this.fallback?.writeLogical?.(id, input)
-      return
+      const result = this.fallback?.writeLogical?.(id, input)
+      return this.fallback?.writeLogical != null && result !== false
     }
     if (input.kind === 'bytes') {
-      void writeSharedHerdrInput(binding, input.data)
-      return
+      void this.sendInput(id, () => writeSharedHerdrInput(binding, input.data))
+      return true
     }
     const bytes =
       input.name === 'ctrl+c' || input.name === 'ctrl+\\'
         ? null
         : bytesFromTerminalLogicalKey(input.name)
     if (bytes !== null) {
-      void writeSharedHerdrInput(binding, bytes)
-      return
+      void this.sendInput(id, () => writeSharedHerdrInput(binding, bytes))
+      return true
     }
-    void sendHerdrNamedKey(binding, input.name)
+    void this.sendInput(id, () => sendHerdrNamedKey(binding, input.name))
+    return true
   }
 
   resize(id: string, cols: number, rows: number): void {
@@ -336,6 +339,10 @@ export class HerdrPtyProvider implements IPtyProvider {
   }
 
   async sendSignal(id: string, signal: string): Promise<void> {
+    if (isOrcaFallbackId(this.bindings, id, this.fallback)) {
+      await this.fallback.sendSignal(id, signal)
+      return
+    }
     const binding = this.bindings.get(id)
     if (!binding) {
       throw new Error(`Herdr PTY not found: ${id}`)
@@ -344,7 +351,7 @@ export class HerdrPtyProvider implements IPtyProvider {
     if (!key) {
       throw new Error(`Herdr does not support signal ${signal}`)
     }
-    await sendHerdrNamedKey(binding, key)
+    await this.sendInput(id, () => sendHerdrNamedKey(binding, key))
   }
 
   onData(callback: (payload: PtyDataEvent) => void): () => void {
@@ -412,6 +419,28 @@ export class HerdrPtyProvider implements IPtyProvider {
     emitHerdrPtyReplay(this.replayListeners, payload)
   }
 
+  private sendInput(id: string, write: () => Promise<void>): Promise<void> {
+    const previous = this.writeQueues.get(id) ?? Promise.resolve()
+    const pending = previous.catch(() => undefined).then(write)
+    this.writeQueues.set(id, pending)
+    void pending
+      .catch((error: unknown) => {
+        console.warn(`[herdr] Failed to write to ${id}:`, error)
+        if (!isHerdrWriteEndpointGone(error)) {
+          return
+        }
+        for (const listener of this.writeUnavailableListeners) {
+          listener({ id })
+        }
+      })
+      .finally(() => {
+        if (this.writeQueues.get(id) === pending) {
+          this.writeQueues.delete(id)
+        }
+      })
+    return pending
+  }
+
   advanceGeneration(): number {
     return 0
   }
@@ -425,9 +454,14 @@ export class HerdrPtyProvider implements IPtyProvider {
   dispose(): void {
     this.fallbackUnsub?.()
     this.fallbackUnsub = undefined
+    const transports = new Set([...this.bindings.values()].map((binding) => binding.transport))
     disposeAll(this.bindings, this.managers, () => {
-      for (const binding of this.bindings.values()) {
-        binding.transport.disconnect?.()
+      if (this.disconnectTransports) {
+        this.disconnectTransports()
+      } else {
+        for (const transport of transports) {
+          void transport.disconnect?.()
+        }
       }
     })
   }
@@ -448,4 +482,11 @@ export class HerdrPtyProvider implements IPtyProvider {
         )
       : undefined
   }
+}
+
+function isHerdrWriteEndpointGone(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /closed before response|not initialized|EPIPE|ECONNRESET|ECONNREFUSED|transport gone/i.test(
+    message
+  )
 }

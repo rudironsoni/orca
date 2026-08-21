@@ -1,5 +1,10 @@
 import type { Project } from '../../../../shared/project-types'
-import { ORCA_METADATA_SOURCE, orcaPaneBinding, paneBindingMapKey } from './herdr-binding-metadata'
+import {
+  claimOrcaPaneBinding,
+  ORCA_BINDING_TOKEN,
+  orcaPaneBinding,
+  paneBindingMapKey
+} from './herdr-binding-metadata'
 import { findHerdrWorkspaceForWorktree, type HerdrProjectHostGraph } from './ensure-herdr-workspace'
 import { collectHerdrPaneIds } from './herdr-tab-layout'
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
@@ -25,11 +30,11 @@ export async function materializeHerdrLeafPane(args: {
   const workspacePanes = snapshot.panes.filter(
     (pane) => workspace && pane.workspace_id === workspace.workspace_id
   )
-  const reusable =
-    workspacePanes.find((pane) => !claimedPaneIds.has(pane.pane_id)) ??
-    (workspacePanes.length === 1 ? workspacePanes[0] : undefined)
+  const reusable = workspacePanes.find(
+    (pane) => !claimedPaneIds.has(pane.pane_id) && !pane.tokens?.[ORCA_BINDING_TOKEN]
+  )
   if (reusable) {
-    return claimMaterializedPane(args, reusable.pane_id)
+    return claimMaterializedPane(args, reusable, snapshot)
   }
   if (!workspace) {
     return null
@@ -42,7 +47,7 @@ export async function materializeHerdrLeafPane(args: {
     await args.transport.request(args.sessionName, 'layout.apply', {
       workspace_id: workspace.workspace_id,
       tab_label: 'Terminal',
-      root: { type: 'pane', pane_id: args.leafId, cwd: args.cwd },
+      root: { type: 'pane', cwd: args.cwd },
       focus: false
     })
   )
@@ -52,7 +57,15 @@ export async function materializeHerdrLeafPane(args: {
   if (!paneId) {
     return null
   }
-  return claimMaterializedPane(args, paneId)
+  const pane = snapshot.panes.find((candidate) => candidate.pane_id === paneId) ?? {
+    pane_id: paneId,
+    tab_id: applied.tab_id,
+    workspace_id: applied.workspace_id
+  }
+  if (!snapshot.panes.includes(pane)) {
+    snapshot.panes.push(pane)
+  }
+  return claimMaterializedPane(args, pane, snapshot)
 }
 
 async function claimMaterializedPane(
@@ -63,16 +76,21 @@ async function claimMaterializedPane(
     leafId: string
     paneIdsBySessionAndBinding: Map<string, string>
   },
-  paneId: string
-): Promise<string> {
-  await args.transport.request(args.sessionName, 'pane.report_metadata', {
-    pane_id: paneId,
-    source: ORCA_METADATA_SOURCE,
-    tokens: { orca_binding: orcaPaneBinding(args.project.id, args.leafId) }
-  })
-  args.paneIdsBySessionAndBinding.set(
-    paneBindingMapKey(args.sessionName, orcaPaneBinding(args.project.id, args.leafId)),
-    paneId
+  pane: HerdrSessionSnapshot['panes'][number],
+  snapshot: HerdrSessionSnapshot
+): Promise<string | null> {
+  const binding = orcaPaneBinding(args.project.id, args.leafId)
+  await claimOrcaPaneBinding(
+    args.transport,
+    args.sessionName,
+    args.project.id,
+    args.leafId,
+    pane,
+    snapshot
   )
-  return paneId
+  if (pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
+    return null
+  }
+  args.paneIdsBySessionAndBinding.set(paneBindingMapKey(args.sessionName, binding), pane.pane_id)
+  return pane.pane_id
 }

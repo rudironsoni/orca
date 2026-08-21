@@ -11323,7 +11323,7 @@
           "sessionNameAria": "Shared Herdr session name",
           "sessionNamePlaceholder": "orca",
           "runtime": "Herdr runtime",
-          "runtimeDescription": "Stock from PATH starts or attaches to herdr --session orca so Ghostty and other Herdr clients see the same session. Built-in daemon is a private fallback that those clients cannot attach to.",
+          "runtimeDescription": "Stock from PATH starts or attaches to the configured Herdr session so other Herdr clients see the same session.",
           "runtimeAria": "Herdr runtime source",
           "daemon": "Built-in daemon",
           "stock": "Stock from PATH"

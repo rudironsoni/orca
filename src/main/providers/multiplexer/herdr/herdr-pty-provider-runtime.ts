@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { herdrSessionNameForProject } from '../../../../shared/herdr-session-identity'
-import type { PtyDataEvent, PtySpawnResult } from '../../types'
+import type { PtyDataEvent, PtySpawnOptions, PtySpawnResult } from '../../types'
 import { assertHerdrMigrationReady, decodeHerdrPtyId } from './herdr-pty-types'
 import type { HerdrPtyBinding, HerdrPtyIdentity, HerdrPtyTarget } from './herdr-pty-types'
 export { decodeHerdrPtyId, encodeHerdrPtyId } from './herdr-pty-types'
-import type { PtySpawnOptions } from '../../types'
 import {
   HerdrRuntimeManager,
   type HerdrLivePaneListener,
@@ -26,6 +25,19 @@ import {
   openSharedHerdrPaneController,
   writeSharedHerdrInput
 } from './herdr-pty-attach'
+
+const transportIds = new WeakMap<HerdrHostTransport, number>()
+let nextTransportId = 1
+
+function runtimeKey(target: HerdrPtyTarget, transport: HerdrHostTransport): string {
+  let id = transportIds.get(transport)
+  if (id === undefined) {
+    id = nextTransportId
+    nextTransportId += 1
+    transportIds.set(transport, id)
+  }
+  return `${target.identity.hostId}\n${id}`
+}
 
 function decodeFrame(frame: HerdrTerminalFrame): string {
   return Buffer.from(frame.bytes, 'base64').toString('utf8')
@@ -220,7 +232,8 @@ export function getRuntime(
   transport: HerdrHostTransport
 } {
   const transport = transportForTarget(target)
-  let manager = managers.get(target.identity.hostId)
+  const key = runtimeKey(target, transport)
+  let manager = managers.get(key)
   if (!manager) {
     manager = new HerdrRuntimeManager(
       transport,
@@ -229,7 +242,7 @@ export function getRuntime(
       surfaceSync,
       onPaneExited
     )
-    managers.set(target.identity.hostId, manager)
+    managers.set(key, manager)
   }
   return { manager, transport }
 }
@@ -301,6 +314,7 @@ export async function sendHerdrNamedKey(binding: HerdrPtyBinding, name: string):
       return
     }
     console.warn(`[herdr] pane.send_keys ${name} failed:`, error)
+    throw error
   }
 }
 
@@ -449,6 +463,6 @@ export async function attachHerdrPty(args: {
 export function killAllHerdrBindings(bindings: Map<string, HerdrPtyBinding>): void {
   for (const binding of bindings.values()) {
     void closeHerdrBindingSurface(binding).catch(() => undefined)
+    releaseBinding(binding, bindings)
   }
-  bindings.clear()
 }

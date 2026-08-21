@@ -9,6 +9,7 @@ import {
   outputMatchFlags,
   paneTargetFlags,
   renameTargetFlags,
+  requiredNumber,
   requiredString,
   requiredStrings,
   swapTargetFlags,
@@ -111,7 +112,7 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
         'move',
         requiredString(params.tab_id, 'tab_id'),
         '--insert-index',
-        requiredString(params.insert_index, 'insert_index')
+        requiredNumber(params.insert_index, 'insert_index')
       ]
     case 'tab.close':
       return ['tab', 'close', requiredString(params.tab_id, 'tab_id')]
@@ -235,7 +236,7 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
         'pane',
         'rename',
         requiredString(params.pane_id, 'pane_id'),
-        ...optionalLabelFlag(params.label)
+        ...renameTargetFlags(params.label)
       ]
     case 'pane.layout':
       return ['pane', 'layout', ...paneTargetFlags(params)]
@@ -337,7 +338,7 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
       return [
         'notification',
         'show',
-        requiredString(params.title, 'title'),
+        assertNoLeadingDash(requiredString(params.title, 'title'), 'title'),
         ...optionalFlag('--body', params.body),
         ...optionalFlag('--position', params.position),
         ...optionalFlag('--sound', params.sound)

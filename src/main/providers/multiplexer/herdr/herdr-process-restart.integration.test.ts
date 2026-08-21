@@ -3,19 +3,25 @@ import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { herdrSessionNameForProject } from '../../../../shared/herdr-session-identity'
-import { localHerdrCommand } from './herdr-cli-session'
-import { configHomeDir } from './herdr-stock-binary'
+import { herdrServerEnvironment, localHerdrCommand } from './herdr-cli-session'
+import { configHomeDir, resolveStockHerdrTestBinary } from './herdr-stock-binary'
 import { ORCA_BINDING_TOKEN } from './herdr-binding-metadata'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
 import { unwrapHerdrResponse } from './herdr-runtime-contract'
-import { herdrServerEnvironment } from './herdr-cli-session'
 import { HerdrSocketTransport } from './herdr-socket-transport'
-import { resolveStockHerdrTestBinary } from './herdr-stock-binary'
 import type { Project } from '../../../../shared/project-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
 const binary = resolveStockHerdrTestBinary()
 const describeRealHerdr = binary ? describe : describe.skip
+
+async function waitForSocketRemoval(socketPath: string): Promise<void> {
+  const deadline = Date.now() + 10_000
+  while (existsSync(socketPath) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  expect(existsSync(socketPath)).toBe(false)
+}
 
 describeRealHerdr('stock Herdr process restart', () => {
   const configHome = configHomeDir()
@@ -108,7 +114,7 @@ describeRealHerdr('stock Herdr process restart', () => {
       stdio: 'ignore',
       timeout: 30_000
     })
-    expect(existsSync(socketPath)).toBe(false)
+    await waitForSocketRemoval(socketPath)
 
     await transport.ensureSession(sessionName)
     const restored = unwrapHerdrResponse<{ snapshot: typeof first }>(

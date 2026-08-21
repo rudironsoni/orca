@@ -76,4 +76,9 @@ describe('normalizeHerdrSessionName', () => {
   it('accepts the maximum-length name', () => {
     expect(normalizeHerdrSessionName('a'.repeat(64))).toBe('a'.repeat(64))
   })
+
+  it('enforces the session limit in UTF-8 bytes', () => {
+    expect(normalizeHerdrSessionName('界'.repeat(21))).toBe('界'.repeat(21))
+    expect(normalizeHerdrSessionName('界'.repeat(22))).toBeUndefined()
+  })
 })

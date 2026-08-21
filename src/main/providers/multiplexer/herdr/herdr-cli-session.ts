@@ -125,6 +125,7 @@ export class HerdrCliSessionManager {
       windowsHide: true,
       ...(command.env ? { env: command.env } : {})
     })
+    child.unref()
     await new Promise<void>((resolve, reject) => {
       let settled = false
       const finish = (error?: Error): void => {
@@ -140,7 +141,6 @@ export class HerdrCliSessionManager {
         }
       }
       const started = setTimeout(() => {
-        child.unref()
         finish()
       }, 100)
       child.once('error', (error) => finish(error))
@@ -180,6 +180,7 @@ export class HerdrCliSessionManager {
         reject(new Error(`Herdr command timed out after ${this.options.timeoutMs ?? 15_000}ms`))
       }, this.options.timeoutMs ?? 15_000)
       child.stdout.setEncoding('utf8')
+      child.stderr.setEncoding('utf8')
       child.stdout.on('data', (chunk: string) => (stdout += chunk))
       child.stderr.on('data', (chunk: string) => (stderr += chunk))
       child.once('error', (error) => {
@@ -277,6 +278,7 @@ export type HerdrCliHostTransportOptions = {
     env?: NodeJS.ProcessEnv
   }
   timeoutMs?: number
+  onDisconnect?: () => void
 }
 
 export class HerdrCliHostTransport implements HerdrHostTransport {
@@ -321,5 +323,9 @@ export class HerdrCliHostTransport implements HerdrHostTransport {
     return createHerdrSessionControlController(
       this.options.commandFor(herdrSessionControlArgs(sessionName, target, options))
     )
+  }
+
+  async disconnect(): Promise<void> {
+    this.options.onDisconnect?.()
   }
 }

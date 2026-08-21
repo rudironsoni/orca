@@ -23,7 +23,8 @@ describe('Herdr session identity', () => {
 
   it('derives a stable stock Herdr session name when no name is configured', () => {
     const name = herdrSessionNameForProject({ id: 'Project 1' })
-    expect(name).toMatch(/^orca-[a-f0-9]{8}$/)
+    expect(name).toBe('orca-ea135471')
+    expect(herdrSessionNameForProject({ id: 'Project 1' })).toBe(name)
     expect(name.length).toBeLessThanOrEqual(13)
     expect(herdrSessionNameForProject({ id: `${'project-'.repeat(20)}a` })).not.toBe(
       herdrSessionNameForProject({ id: `${'project-'.repeat(20)}b` })

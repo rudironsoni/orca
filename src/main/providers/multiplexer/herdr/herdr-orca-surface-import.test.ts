@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Project } from '../../../../shared/project-types'
 import { ORCA_BINDING_TOKEN, orcaPaneBinding, orcaWorkspaceBinding } from './herdr-binding-metadata'
-import { collectUnboundHerdrSurfaces } from './herdr-orca-surface-import'
+import { collectUnboundHerdrSurfaces, herdrLayoutToOrcaLayout } from './herdr-orca-surface-import'
+import { decodeHerdrPtyId } from './herdr-pty-types'
 import type { HerdrSessionSnapshot } from './herdr-runtime-contract'
 
 const project: Project = {
@@ -34,6 +35,7 @@ describe('collectUnboundHerdrSurfaces', () => {
     const surfaces = collectUnboundHerdrSurfaces(
       'orca',
       {
+        hostId: 'ssh:server-1',
         project,
         worktrees: [worktree],
         tabsByWorktreeId: { 'wt-1': [] },
@@ -58,9 +60,10 @@ describe('collectUnboundHerdrSurfaces', () => {
     })
     expect(surfaces[0].splitFromLeafId).toBeUndefined()
     expect(surfaces[0].ptyId.startsWith('herdr:')).toBe(true)
+    expect(decodeHerdrPtyId(surfaces[0].ptyId)?.hostId).toBe('ssh:server-1')
   })
 
-  it('imports a Herdr-created tab even when its pane still has a stale binding', () => {
+  it('does not reclaim a Herdr-created pane carrying another live binding', () => {
     const workspaceBinding = orcaWorkspaceBinding(project.id, worktree)
     const staleBinding = orcaPaneBinding(project.id, 'gone-leaf')
     const surfaces = collectUnboundHerdrSurfaces(
@@ -85,15 +88,36 @@ describe('collectUnboundHerdrSurfaces', () => {
           }
         ]
       }),
+      new Map([[`orca:${staleBinding}`, 'w1:p9']])
+    )
+
+    expect(surfaces).toEqual([])
+  })
+
+  it('refuses an ownerless multi-pane tab rather than dropping sibling panes', () => {
+    const workspaceBinding = orcaWorkspaceBinding(project.id, worktree)
+    const surfaces = collectUnboundHerdrSurfaces(
+      'orca',
+      {
+        project,
+        worktrees: [worktree],
+        tabsByWorktreeId: { 'wt-1': [] },
+        layoutsByTabId: {}
+      },
+      snapshot({
+        workspaces: [
+          { workspace_id: 'w1', label: 'repo', tokens: { [ORCA_BINDING_TOKEN]: workspaceBinding } }
+        ],
+        tabs: [{ tab_id: 'w1:t2', workspace_id: 'w1', label: 'logs' }],
+        panes: [
+          { pane_id: 'w1:p1', tab_id: 'w1:t2', workspace_id: 'w1' },
+          { pane_id: 'w1:p2', tab_id: 'w1:t2', workspace_id: 'w1' }
+        ]
+      }),
       new Map()
     )
 
-    expect(surfaces).toHaveLength(1)
-    expect(surfaces[0]).toMatchObject({
-      worktreeId: 'wt-1',
-      paneId: 'w1:p9',
-      title: 'logs'
-    })
+    expect(surfaces).toEqual([])
   })
 
   it('does not import a materialized leaf tab when the worktree already has an Orca tab', () => {
@@ -291,5 +315,44 @@ describe('collectUnboundHerdrSurfaces', () => {
       splitFromLeafId: leafId,
       splitDirection: 'vertical'
     })
+  })
+})
+
+describe('herdrLayoutToOrcaLayout', () => {
+  it('keeps the existing layout when a Herdr layout has more than two panes', () => {
+    expect(
+      herdrLayoutToOrcaLayout(
+        {
+          workspace_id: 'workspace-1',
+          tab_id: 'tab-1',
+          focused_pane_id: 'pane-1',
+          panes: [
+            { pane_id: 'pane-1', rect: { x: 0, y: 0, width: 40, height: 20 } },
+            { pane_id: 'pane-2', rect: { x: 40, y: 0, width: 40, height: 10 } },
+            { pane_id: 'pane-3', rect: { x: 40, y: 10, width: 40, height: 10 } }
+          ],
+          splits: [
+            {
+              id: 'split-1',
+              direction: 'right',
+              ratio: 0.5,
+              rect: { x: 0, y: 0, width: 80, height: 20 }
+            },
+            {
+              id: 'split-2',
+              direction: 'down',
+              ratio: 0.5,
+              rect: { x: 40, y: 0, width: 40, height: 20 }
+            }
+          ],
+          zoomed: false
+        },
+        new Map([
+          ['pane-1', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }],
+          ['pane-2', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-2' }],
+          ['pane-3', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-3' }]
+        ])
+      )
+    ).toBeNull()
   })
 })

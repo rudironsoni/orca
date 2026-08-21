@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { HerdrSocketTransport } from './herdr-socket-transport'
+import { unwrapHerdrResponse } from './herdr-runtime-contract'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -58,8 +59,19 @@ describe.skipIf(!RUN)('live herdr socket probe', () => {
     transport.onEvent((event) => events.push(event.event))
     await transport.eventsSubscribe([])
 
-    const workspaces = await transport.workspaceList()
-    expect(workspaces).toBeDefined()
+    const created = unwrapHerdrResponse<{
+      workspace: { workspace_id: string }
+    }>(
+      await transport.request(SESSION, 'workspace.create', {
+        cwd: PROBE_HOME,
+        label: 'Socket event probe',
+        focus: false
+      })
+    )
+    await expect.poll(() => events.length, { timeout: 5000 }).toBeGreaterThan(0)
+    await transport.request(SESSION, 'workspace.close', {
+      workspace_id: created.workspace.workspace_id
+    })
 
     await transport.disconnect()
     await new Promise((resolve) => setTimeout(resolve, 100))

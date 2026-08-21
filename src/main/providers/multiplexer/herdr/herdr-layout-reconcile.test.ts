@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TerminalPaneLayoutNode } from '../../../../shared/terminal-tab-types'
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
-import { terminalLayoutToHerdrLayout, applyTabLayout } from './herdr-tab-layout'
+import { terminalLayoutToHerdrLayout, applyTabLayout, ensureTabLayout } from './herdr-tab-layout'
 import { ORCA_BINDING_TOKEN, orcaPaneBinding } from './herdr-binding-metadata'
 
 const PROJECT = 'proj'
@@ -168,5 +168,73 @@ describe('applyTabLayout', () => {
       makeSnapshot()
     )
     expect(result).toBeNull()
+  })
+
+  it('clears replaced server bindings and persists applied pane ids', async () => {
+    const { transport, calls } = makeTransport({
+      'layout.apply': () => ({
+        layout: {
+          tab_id: 't2',
+          root: {
+            type: 'split',
+            direction: 'right',
+            first: { type: 'pane', pane_id: 'w1:p3' },
+            second: { type: 'pane', pane_id: 'w1:p4' }
+          }
+        }
+      }),
+      'pane.report_metadata': () => ({ ok: true })
+    })
+    const persisted: Record<string, string> = {}
+    const snapshot = makeSnapshot()
+    snapshot.tabs = [{ tab_id: 't1', workspace_id: WORKSPACE, label: 'T' }]
+    snapshot.panes = [
+      {
+        pane_id: 'w1:p1',
+        tab_id: 't1',
+        workspace_id: WORKSPACE,
+        tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding(PROJECT, 'l1') }
+      },
+      {
+        pane_id: 'w1:p2',
+        tab_id: 't1',
+        workspace_id: WORKSPACE,
+        tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding(PROJECT, 'l2') }
+      }
+    ]
+
+    await ensureTabLayout(
+      transport,
+      SESSION,
+      PROJECT,
+      WORKSPACE,
+      {
+        ...tab,
+        id: 'orca-tab',
+        ptyId: null,
+        worktreeId: 'wt',
+        color: null,
+        sortOrder: 0,
+        createdAt: 1
+      },
+      root,
+      snapshot,
+      persisted
+    )
+
+    expect(persisted).toEqual({ l1: 'w1:p3', l2: 'w1:p4' })
+    const metadataCalls = calls.filter((call) => call.method === 'pane.report_metadata')
+    expect(metadataCalls.slice(0, 2).map((call) => call.params)).toEqual([
+      {
+        pane_id: 'w1:p1',
+        source: 'orca',
+        tokens: { [ORCA_BINDING_TOKEN]: null }
+      },
+      {
+        pane_id: 'w1:p2',
+        source: 'orca',
+        tokens: { [ORCA_BINDING_TOKEN]: null }
+      }
+    ])
   })
 })

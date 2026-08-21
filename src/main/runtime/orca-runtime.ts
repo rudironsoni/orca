@@ -125,6 +125,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { isDeepStrictEqual } from 'node:util'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
@@ -7458,6 +7459,10 @@ export class OrcaRuntimeService {
     return typeof ptyId === 'string' && ptyId.startsWith('serve-')
   }
 
+  private isHerdrOwnedPtyId(ptyId: string | null | undefined): ptyId is string {
+    return typeof ptyId === 'string' && ptyId.startsWith('herdr:')
+  }
+
   private isSshOwnedPtyId(ptyId: string | null | undefined): boolean {
     return typeof ptyId === 'string' && parseAppSshPtyId(ptyId) !== null
   }
@@ -9072,10 +9077,10 @@ export class OrcaRuntimeService {
     ptyId: string
     splitFromLeafId: string
     direction: 'horizontal' | 'vertical'
-  }): boolean {
+  }): TerminalLayoutSnapshot | null {
     const session = this.getWorkspaceSessionForWorktree(args.worktreeId)
     if (!session || !this.store?.setWorkspaceSession) {
-      return false
+      return null
     }
     const existing = session.terminalLayoutsByTabId?.[args.tabId]
     const nextLayout = buildHeadlessTerminalSplitLayout(
@@ -9089,16 +9094,23 @@ export class OrcaRuntimeService {
         [args.tabId]: nextLayout
       }
     })
-    return true
+    const committed =
+      this.getWorkspaceSessionForWorktree(args.worktreeId)?.terminalLayoutsByTabId[args.tabId] ??
+      nextLayout
+    return structuredClone(committed)
   }
 
   private restoreHeadlessTerminalLayout(
     worktreeId: string,
     tabId: string,
-    previousLayout: TerminalLayoutSnapshot | undefined
+    previousLayout: TerminalLayoutSnapshot | undefined,
+    expectedLayout: TerminalLayoutSnapshot
   ): void {
     const session = this.getWorkspaceSessionForWorktree(worktreeId)
     if (!session || !this.store?.setWorkspaceSession) {
+      return
+    }
+    if (!isDeepStrictEqual(session.terminalLayoutsByTabId[tabId], expectedLayout)) {
       return
     }
     const terminalLayoutsByTabId = { ...session.terminalLayoutsByTabId }
@@ -9317,7 +9329,7 @@ export class OrcaRuntimeService {
               }
               const ptyId =
                 this.findPtyForMobileTerminalTab(worktreeId, candidate)?.ptyId ?? candidate.ptyId
-              return ptyId?.startsWith('herdr:') ? [ptyId] : []
+              return this.isHerdrOwnedPtyId(ptyId) ? [ptyId] : []
             })
           )
         )
@@ -9358,10 +9370,19 @@ export class OrcaRuntimeService {
           this.notifyRendererOfHeadlessTerminalClose(tab.parentTabId)
           this.store?.flushOrThrow?.()
         }
+        const deadlineMs = Date.now() + EXPLICIT_TERMINAL_CLOSE_STOP_TIMEOUT_MS
         const stopResults = await Promise.allSettled(
           herdrPtyIds.map(async (ptyId) => {
+            this.markPtyStopRequested(ptyId)
             if (this.ptyController?.stopAndWait) {
-              await this.ptyController.stopAndWait(ptyId)
+              const stopped = await this.ptyController.stopAndWait(ptyId, { deadlineMs })
+              if (!stopped) {
+                this.ptyController?.kill(ptyId)
+                this.markPtyLivenessUnverifiable(
+                  ptyId,
+                  'a follow-up stop was issued but its outcome could not be verified'
+                )
+              }
             } else {
               this.ptyController?.kill(ptyId)
             }
@@ -18476,7 +18497,7 @@ export class OrcaRuntimeService {
       this.assertLiveTerminalHandleTargetsPty(handle, pty.pty.ptyId)
       return {
         ...summary,
-        backend: pty.pty.ptyId.startsWith('herdr:') ? 'herdr' : 'orca',
+        backend: this.isHerdrOwnedPtyId(pty.pty.ptyId) ? 'herdr' : 'orca',
         preview,
         tabId: pty.pty.tabId ?? pty.record.tabId,
         leafId: parsePaneKey(pty.pty.paneKey ?? '')?.leafId ?? pty.record.leafId,
@@ -18500,7 +18521,7 @@ export class OrcaRuntimeService {
     }
     return {
       ...summary,
-      backend: leaf.ptyId?.startsWith('herdr:') ? 'herdr' : 'orca',
+      backend: this.isHerdrOwnedPtyId(leaf.ptyId) ? 'herdr' : 'orca',
       preview,
       paneRuntimeId: leaf.paneRuntimeId,
       ptyId: leaf.ptyId,
@@ -30124,7 +30145,7 @@ export class OrcaRuntimeService {
       })
     }
 
-    let persistedSplit = false
+    let persistedSplit: TerminalLayoutSnapshot | null = null
     try {
       const revalidateSourceAuthority = (): void => {
         const current = this.resolveTerminalSplitSourceAuthority(
@@ -30151,6 +30172,11 @@ export class OrcaRuntimeService {
         revalidateSourceAuthority()
       }
       if (createdPty) {
+        const latestLayout = this.getWorkspaceSessionForWorktree(workspace.id)
+          ?.terminalLayoutsByTabId?.[parentTabId]
+        if (!isDeepStrictEqual(latestLayout, existingLayout)) {
+          throw new Error('terminal_layout_changed')
+        }
         const persisted = this.persistHeadlessTerminalSplit({
           worktreeId: workspace.id,
           tabId: parentTabId,
@@ -30173,7 +30199,12 @@ export class OrcaRuntimeService {
       }
     } catch (error) {
       if (persistedSplit) {
-        this.restoreHeadlessTerminalLayout(workspace.id, parentTabId, existingLayout)
+        this.restoreHeadlessTerminalLayout(
+          workspace.id,
+          parentTabId,
+          existingLayout,
+          persistedSplit
+        )
       }
       this.setPairedRendererSessionOwnership(result.id, false)
       let stopped = false

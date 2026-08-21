@@ -4,7 +4,13 @@ import type { SshConnection } from '../../../ssh/ssh-connection'
 import { shellEscape } from '../../../ssh/ssh-connection-utils'
 import { powerShellCommand, powerShellLiteral } from '../../../ssh/ssh-remote-powershell'
 import type { RemoteHostPlatform } from '../../../ssh/ssh-remote-platform'
-import type { HerdrApiSchema, HerdrResponse } from './herdr-runtime-contract'
+import type {
+  HerdrApiSchema,
+  HerdrHostTransport,
+  HerdrResponse,
+  HerdrTerminalController,
+  HerdrTerminalControlOptions
+} from './herdr-runtime-contract'
 import {
   assertHerdrSchemaCompatible,
   assertHerdrServerCompatible,
@@ -21,12 +27,6 @@ import {
   herdrSessionControlArgs,
   herdrSessionControlStreamFromChannel
 } from './herdr-session-control'
-import type {
-  HerdrHostTransport,
-  HerdrTerminalController,
-  HerdrTerminalControlOptions
-} from './herdr-runtime-contract'
-
 export type HerdrSshSessionOptions = {
   connection: SshConnection
   timeoutMs?: number
@@ -157,25 +157,64 @@ export class HerdrSshSessionManager {
     const channel = await this.open(args)
     return await new Promise((resolve, reject) => {
       const stdoutDecoder = new StringDecoder('utf8')
+      const stderrDecoder = new StringDecoder('utf8')
       let stdout = ''
       let stderr = ''
+      let exit:
+        | { kind: 'code'; code: number }
+        | { kind: 'signal'; signal: string; description: string }
+        | null = null
+      let settled = false
+      const finish = (error?: Error): void => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(timeout)
+        stdout += stdoutDecoder.end()
+        stderr += stderrDecoder.end()
+        if (error) {
+          reject(error)
+        } else if (exit?.kind === 'code' && exit.code === 0) {
+          resolve(stdout)
+        } else if (exit?.kind === 'code') {
+          reject(new Error(stderr.trim() || `Remote Herdr exited with code ${exit.code}`))
+        } else if (exit?.kind === 'signal') {
+          const detail = exit.description.trim()
+          reject(
+            new Error(
+              stderr.trim() ||
+                `Remote Herdr exited with signal ${exit.signal}${detail ? `: ${detail}` : ''}`
+            )
+          )
+        } else {
+          reject(new Error(stderr.trim() || 'Remote Herdr closed without reporting exit status'))
+        }
+      }
       const timeout = setTimeout(() => {
+        finish(new Error(`Remote Herdr command timed out after ${this.timeoutMs}ms`))
         channel.close()
-        reject(new Error(`Remote Herdr command timed out after ${this.timeoutMs}ms`))
       }, this.timeoutMs)
       channel.on('data', (chunk: Buffer) => (stdout += stdoutDecoder.write(chunk)))
-      channel.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')))
-      channel.once('error', (error: Error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
-      channel.once('close', (code: number) => {
-        clearTimeout(timeout)
-        if (code === 0) {
-          resolve(stdout)
-        } else {
-          reject(new Error(stderr.trim() || `Remote Herdr exited with code ${code}`))
+      channel.stderr.on('data', (chunk: Buffer) => (stderr += stderrDecoder.write(chunk)))
+      channel.stderr.once('error', finish)
+      channel.once('error', finish)
+      channel.once(
+        'exit',
+        (code: number | null, signal?: string, _dump?: string, description?: string) => {
+          if (typeof code === 'number') {
+            exit = { kind: 'code', code }
+          } else if (signal) {
+            exit = {
+              kind: 'signal',
+              signal,
+              description: description ?? ''
+            }
+          }
         }
+      )
+      channel.once('close', () => {
+        finish()
       })
       channel.end()
     })

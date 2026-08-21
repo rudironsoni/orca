@@ -26,7 +26,9 @@ function createChild(): MockChild {
     stdout: Object.assign(new EventEmitter(), {
       setEncoding: vi.fn()
     }),
-    stderr: new EventEmitter(),
+    stderr: Object.assign(new EventEmitter(), {
+      setEncoding: vi.fn()
+    }),
     kill: vi.fn()
   })
   return child as unknown as MockChild
@@ -95,6 +97,25 @@ describe('createHerdrSessionControlController', () => {
       `${JSON.stringify({ type: 'terminal.release' })}\n`
     ])
   })
+
+  it.each(['stdin', 'stdout'] as const)('closes cleanly when %s emits an error', async (pipe) => {
+    const child = createChild()
+    spawnMock.mockReturnValue(child)
+    const { createHerdrSessionControlController } = await import('./herdr-session-control')
+    const controller = createHerdrSessionControlController({
+      file: '/mock/herdr',
+      args: []
+    })
+    const closed = vi.fn()
+    controller.onClosed(closed)
+
+    child[pipe].emit('error', new Error(`${pipe} failed`))
+
+    expect(closed).toHaveBeenCalledWith({
+      type: 'terminal.closed',
+      reason: `${pipe} failed`
+    })
+  })
 })
 
 describe('createHerdrSessionControlFromOpen', () => {
@@ -125,6 +146,83 @@ describe('createHerdrSessionControlFromOpen', () => {
       `${JSON.stringify({ type: 'terminal.input', text: 'hello' })}\n`,
       `${JSON.stringify({ type: 'terminal.resize', cols: 80, rows: 24 })}\n`
     ])
+    controller.release()
+  })
+
+  it('retains every frame emitted before a listener is attached', async () => {
+    const { createHerdrSessionControlFromOpen } = await import('./herdr-session-control')
+    let emitData: ((chunk: string) => void) | undefined
+    const controller = createHerdrSessionControlFromOpen(async () => ({
+      writable: true,
+      write: vi.fn(),
+      end: vi.fn(),
+      close: vi.fn(),
+      onData: (listener) => {
+        emitData = listener
+      },
+      onError: vi.fn(),
+      onClose: vi.fn()
+    }))
+    await Promise.resolve()
+
+    for (let seq = 0; seq < 513; seq += 1) {
+      emitData?.(
+        `${JSON.stringify({
+          type: 'terminal.frame',
+          seq,
+          encoding: 'ansi',
+          width: 80,
+          height: 24,
+          full: false,
+          bytes: ''
+        })}\n`
+      )
+    }
+    const frames: number[] = []
+    controller.onFrame((frame) => frames.push(frame.seq))
+    expect(frames).toEqual(Array.from({ length: 512 }, (_, index) => index + 1))
+    controller.release()
+  })
+
+  it('keeps the latest full frame when pending frames overflow', async () => {
+    const { createHerdrSessionControlFromOpen } = await import('./herdr-session-control')
+    let emitData: ((chunk: string) => void) | undefined
+    const controller = createHerdrSessionControlFromOpen(async () => ({
+      writable: true,
+      write: vi.fn(),
+      end: vi.fn(),
+      close: vi.fn(),
+      onData: (listener) => {
+        emitData = listener
+      },
+      onError: vi.fn(),
+      onClose: vi.fn()
+    }))
+    await Promise.resolve()
+
+    const send = (seq: number, full: boolean): void => {
+      emitData?.(
+        `${JSON.stringify({
+          type: 'terminal.frame',
+          seq,
+          encoding: 'ansi',
+          width: 80,
+          height: 24,
+          full,
+          bytes: ''
+        })}\n`
+      )
+    }
+    send(0, false)
+    send(1, true)
+    for (let seq = 2; seq < 514; seq += 1) {
+      send(seq, false)
+    }
+    const frames: number[] = []
+    controller.onFrame((frame) => frames.push(frame.seq))
+    expect(frames[0]).toBe(1)
+    expect(frames.at(-1)).toBe(513)
+    expect(frames).toHaveLength(512)
     controller.release()
   })
 })

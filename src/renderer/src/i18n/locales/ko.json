@@ -6653,8 +6653,8 @@
           "hide": "숨기기",
           "externalWorktreesGlobal": "전역 기본값: {{value0}}",
           "useGlobal": "전역 설정 사용",
-          "terminalBackend": "Terminal backend",
-          "terminalBackendDescription": "Choose Orca or Herdr for this project."
+          "terminalBackend": "터미널 백엔드",
+          "terminalBackendDescription": "이 프로젝트에서 Orca 또는 Herdr를 선택합니다."
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "명령 템플릿",
@@ -10180,42 +10180,47 @@
           "openAutomationsDescription": "일정을 생성하고 최근 실행을 확인합니다."
         },
         "ProjectTerminalBackendSetting": {
-          "title": "Terminal backend",
-          "active": "Active: {{value0}}",
+          "title": "터미널 백엔드",
+          "active": "활성: {{value0}}",
           "herdr": "Herdr",
           "orca": "Orca",
-          "preference": "Project preference",
-          "preferenceDescription": "Changing an active project requires an explicit migration. Running Orca PTYs block migration to Herdr.",
-          "aria": "Project terminal backend",
-          "inherit": "Inherit",
+          "preference": "프로젝트 설정",
+          "preferenceDescription": "활성 프로젝트를 변경하려면 명시적으로 마이그레이션해야 합니다. Orca PTY가 실행 중이면 Herdr로 마이그레이션할 수 없습니다.",
+          "aria": "프로젝트 터미널 백엔드",
+          "inherit": "상속",
           "blockedSingular": "이 프로젝트를 Herdr로 마이그레이션하기 전에 실행 중인 Orca 터미널 {{count}}개를 닫으세요.",
           "blockedPlural": "이 프로젝트를 Herdr로 마이그레이션하기 전에 실행 중인 Orca 터미널 {{count}}개를 닫으세요."
         },
         "TerminalBackendSection": {
-          "title": "Terminal runtime",
-          "description": "Choose which runtime owns new project terminal sessions.",
-          "defaultBackend": "Default backend",
-          "defaultDescription": "Existing projects keep their active backend until you migrate them explicitly.",
-          "defaultAria": "Default terminal backend",
+          "title": "터미널 런타임",
+          "description": "새 프로젝트 터미널 세션을 관리할 런타임을 선택합니다.",
+          "defaultBackend": "기본 백엔드",
+          "defaultDescription": "기존 프로젝트는 명시적으로 마이그레이션할 때까지 활성 백엔드를 유지합니다.",
+          "defaultAria": "기본 터미널 백엔드",
           "orca": "Orca",
           "herdr": "Herdr",
-          "installation": "Herdr installation",
-          "installationDescription": "From PATH resolves the stock Herdr executable on each execution host.",
-          "installationAria": "Herdr installation source",
-          "system": "From PATH",
-          "custom": "Custom",
-          "customPath": "Custom Herdr path",
-          "customPathDescription": "Absolute executable path on the execution host.",
-          "customPathAria": "Custom Herdr executable path",
+          "installation": "Herdr 설치",
+          "installationDescription": "각 실행 호스트의 PATH에서 기본 Herdr 실행 파일을 찾습니다.",
+          "installationAria": "Herdr 설치 소스",
+          "system": "PATH에서",
+          "custom": "사용자 지정",
+          "customPath": "사용자 지정 Herdr 경로",
+          "customPathDescription": "실행 호스트에 있는 실행 파일의 절대 경로입니다.",
+          "customPathAria": "사용자 지정 Herdr 실행 파일 경로",
           "customPathPlaceholder": "/usr/local/bin/herdr",
-          "sessionName": "Shared Herdr session name",
-          "sessionNameDescription": "All projects without an explicit override share this stock Herdr session. Clear it to fall back to per-project sessions.",
-          "sessionNameAria": "Shared Herdr session name",
-          "sessionNamePlaceholder": "orca"
+          "sessionName": "공유 Herdr 세션 이름",
+          "sessionNameDescription": "명시적으로 재정의하지 않은 모든 프로젝트가 이 기본 Herdr 세션을 공유합니다. 비우면 프로젝트별 세션을 사용합니다.",
+          "sessionNameAria": "공유 Herdr 세션 이름",
+          "sessionNamePlaceholder": "orca",
+          "runtime": "Herdr 런타임",
+          "runtimeDescription": "PATH의 기본 버전은 구성된 Herdr 세션을 시작하거나 연결하므로 다른 Herdr 클라이언트와 동일한 세션을 볼 수 있습니다.",
+          "runtimeAria": "Herdr 런타임 소스",
+          "daemon": "기본 제공 데몬",
+          "stock": "PATH의 기본 버전"
         },
         "terminalSearch": {
-          "runtimeTitle": "Terminal runtime",
-          "runtimeDescription": "Choose Orca or Herdr as the terminal backend."
+          "runtimeTitle": "터미널 런타임",
+          "runtimeDescription": "터미널 백엔드로 Orca 또는 Herdr를 선택합니다."
         }
       },
       "right": {

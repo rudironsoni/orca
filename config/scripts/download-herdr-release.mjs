@@ -6,7 +6,17 @@
 //
 // The version/protocol/schema pin lives in config/herdr-version.json and is
 // cross-checked against the runtime contract by herdr-version-pin.test.ts.
-import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import {
+  chmodSync,
+  createReadStream,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -44,18 +54,44 @@ function assetNameForHost(version) {
   return `herdr-${osName}-${archName}`
 }
 
-async function download(url, destPath) {
+async function sha256(path) {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk)
+  }
+  return hash.digest('hex')
+}
+
+async function isVerified(path, expectedSha256) {
+  return existsSync(path) && (await sha256(path)) === expectedSha256
+}
+
+async function download(url, destPath, expectedSha256) {
   mkdirSync(dirname(destPath), { recursive: true })
-  if (existsSync(destPath)) {
+  if (await isVerified(destPath, expectedSha256)) {
     return destPath
   }
-  const response = await fetch(url, { redirect: 'follow' })
-  if (!response.ok || !response.body) {
-    throw new Error(`Download failed (${response.status}) for ${url}`)
-  }
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(destPath))
-  if (process.platform !== 'win32') {
-    chmodSync(destPath, 0o755)
+  rmSync(destPath, { force: true })
+  const tempPath = `${destPath}.${process.pid}-${randomUUID()}.tmp`
+  try {
+    const response = await fetch(url, { redirect: 'follow' })
+    if (!response.ok || !response.body) {
+      throw new Error(`Download failed (${response.status}) for ${url}`)
+    }
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(tempPath, { flags: 'wx' }))
+    const actualSha256 = await sha256(tempPath)
+    if (actualSha256 !== expectedSha256) {
+      throw new Error(
+        `SHA-256 mismatch for ${url}: expected ${expectedSha256}, received ${actualSha256}`
+      )
+    }
+    if (process.platform !== 'win32') {
+      chmodSync(tempPath, 0o755)
+    }
+    renameSync(tempPath, destPath)
+  } catch (error) {
+    rmSync(tempPath, { force: true })
+    throw error
   }
   return destPath
 }
@@ -66,8 +102,12 @@ async function main() {
   const cacheRoot =
     process.env.ORCA_HERDR_BINARY_CACHE ?? join(homedir(), '.cache', 'orca', 'herdr')
   const destPath = join(cacheRoot, pin.version, asset)
+  const expectedSha256 = pin.sha256?.[asset]
+  if (typeof expectedSha256 !== 'string') {
+    throw new Error(`No SHA-256 pin for ${asset}`)
+  }
   const url = `https://github.com/${HERDR_RELEASE_REPO}/releases/download/v${pin.version}/${asset}`
-  const resolved = await download(url, destPath)
+  const resolved = await download(url, destPath, expectedSha256)
   process.stdout.write(`${resolved}\n`)
 }
 
