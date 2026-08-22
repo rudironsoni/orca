@@ -14,14 +14,14 @@ import {
   unwrapHerdrResponse
 } from './herdr-runtime-contract'
 import { herdrStockCliArgs } from './herdr-stock-cli-args'
+import { ensureStockHerdrSession, type HerdrListedSession } from './herdr-stock-session'
 import {
   createHerdrSessionControlController,
   herdrSessionControlArgs
 } from './herdr-session-control'
 
 export type HerdrCommand = { file: string; args: string[]; env?: NodeJS.ProcessEnv }
-
-export type HerdrListedSession = { name: string; running: boolean }
+export type { HerdrListedSession }
 
 export function localHerdrCommand(
   executable = 'herdr',
@@ -67,33 +67,19 @@ export class HerdrCliSessionManager {
   }
 
   async ensureSession(sessionName: string): Promise<void> {
-    const existing = this.sessionPromises.get(sessionName)
-    if (existing) {
-      return await existing
-    }
-    const pending = this.ensureSessionInner(sessionName)
-    this.sessionPromises.set(sessionName, pending)
-    try {
-      await pending
-    } finally {
-      if (this.sessionPromises.get(sessionName) === pending) {
-        this.sessionPromises.delete(sessionName)
+    await ensureStockHerdrSession(this.sessionPromises, sessionName, {
+      loadSchema: () => this.loadSchema(),
+      listSessions: () => this.listSessions(),
+      startServer: (name) => this.startServer(name),
+      timeoutMs: this.options.timeoutMs,
+      afterReady: async (schema) => {
+        const invocation = herdrStockCliInvocation(sessionName, 'session.snapshot', {})
+        const response = invocation.parse(await this.run(invocation.args)) as HerdrResponse<{
+          snapshot: { protocol: number }
+        }>
+        assertHerdrServerCompatible(schema, unwrapHerdrResponse(response).snapshot.protocol)
       }
-    }
-  }
-
-  private async ensureSessionInner(sessionName: string): Promise<void> {
-    const schema = await this.loadSchema()
-    const sessions = await this.listSessions()
-    if (!sessions.some((session) => session.name === sessionName && session.running)) {
-      await this.startServer(sessionName)
-      await this.waitForSession(sessionName)
-    }
-    const invocation = herdrStockCliInvocation(sessionName, 'session.snapshot', {})
-    const response = invocation.parse(await this.run(invocation.args)) as HerdrResponse<{
-      snapshot: { protocol: number }
-    }>
-    assertHerdrServerCompatible(schema, unwrapHerdrResponse(response).snapshot.protocol)
+    })
   }
 
   private async loadSchema(): Promise<HerdrApiSchema> {
@@ -105,7 +91,7 @@ export class HerdrCliSessionManager {
     return this.schema
   }
 
-  private async listSessions(): Promise<{ name: string; running: boolean }[]> {
+  private async listSessions(): Promise<HerdrListedSession[]> {
     return parseHerdrSessionList(await this.run(['session', 'list', '--json']))
   }
 
@@ -148,21 +134,6 @@ export class HerdrCliSessionManager {
         finish(new Error(`Herdr server exited during startup with code ${code ?? 'unknown'}`))
       })
     })
-  }
-
-  private async waitForSession(sessionName: string): Promise<void> {
-    const deadline = Date.now() + (this.options.timeoutMs ?? 15_000)
-    while (Date.now() < deadline) {
-      const sessions = await this.listSessions().catch(() => [])
-      if (sessions.some((session) => session.name === sessionName && session.running)) {
-        return
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    throw new HerdrRuntimeError(
-      'herdr_unavailable',
-      `Herdr session ${sessionName} did not start within ${this.options.timeoutMs ?? 15_000}ms`
-    )
   }
 
   private async runCli(args: string[], input?: string): Promise<string> {

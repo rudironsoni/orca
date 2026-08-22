@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { herdrSessionNameForProject } from '../../../../shared/herdr-session-identity'
+import type { HerdrTerminalController } from './herdr-runtime-contract'
 import { decodeHerdrPtyId, HerdrPtyProvider } from './herdr-pty-provider'
 import { findLegacyMigrationBlockers } from './herdr-pty-types'
 import { target, transport } from './herdr-pty-provider-test-transport'

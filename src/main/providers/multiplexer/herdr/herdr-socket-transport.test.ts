@@ -301,7 +301,11 @@ describe('HerdrSocketTransport', () => {
 
   const sessionManager = {
     ensureSession: async () => undefined,
-    schemaProtocol: async () => HERDR_PROTOCOL_VERSION
+    compatibleSchema: async () => ({
+      protocol: HERDR_PROTOCOL_VERSION,
+      schema_version: 1,
+      schemas: {}
+    })
   } as unknown as HerdrSocketSessionManager
 
   const disabledReconnection = {
@@ -410,7 +414,11 @@ describe('HerdrSocketTransport', () => {
         restarts += 1
         down = false
       },
-      schemaProtocol: async () => HERDR_PROTOCOL_VERSION
+      compatibleSchema: async () => ({
+        protocol: HERDR_PROTOCOL_VERSION,
+        schema_version: 1,
+        schemas: {}
+      })
     } as unknown as HerdrSocketSessionManager
     server.setResponder(sessionSnapshotResponder(() => ({ result: { type: 'pong' } })))
     const transport = new HerdrSocketTransport(
@@ -500,7 +508,11 @@ describe('HerdrSocketTransport', () => {
     const ensureSession = vi.fn(async () => undefined)
     const manager = {
       ensureSession,
-      schemaProtocol: async () => HERDR_PROTOCOL_VERSION
+      compatibleSchema: async () => ({
+        protocol: HERDR_PROTOCOL_VERSION,
+        schema_version: 1,
+        schemas: {}
+      })
     } as unknown as HerdrSocketSessionManager
     server.setResponder(
       sessionSnapshotResponder((_socketPath, method) =>

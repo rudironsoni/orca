@@ -5,7 +5,7 @@ import type {
   HerdrTerminalController,
   HerdrTerminalControlOptions
 } from './herdr-runtime-contract'
-import { HerdrRuntimeError } from './herdr-runtime-contract'
+import { assertHerdrServerCompatible, HerdrRuntimeError } from './herdr-runtime-contract'
 import {
   HerdrSocketConnection,
   HerdrSocketRequestTimeoutError,
@@ -86,16 +86,12 @@ export class HerdrSocketTransport implements HerdrHostTransport {
   }
 
   private async assertServerProtocolMatches(connection: HerdrSocketConnection): Promise<void> {
-    const expectedProtocol = await this.sessionManager.schemaProtocol()
+    const schema = await this.sessionManager.compatibleSchema()
     const snapshot = await connection.request<{ snapshot: { protocol: number } }>(
       'session.snapshot',
       {}
     )
-    if (expectedProtocol !== snapshot.snapshot.protocol) {
-      throw new Error(
-        `Herdr client protocol ${expectedProtocol} does not match the running server protocol ${snapshot.snapshot.protocol}. Restart the Herdr session with the installed binary.`
-      )
-    }
+    assertHerdrServerCompatible(schema, snapshot.snapshot.protocol)
   }
 
   private connectionFor(sessionName: string): HerdrSocketConnection {
