@@ -403,8 +403,15 @@ export class HerdrPtyProvider implements IPtyProvider {
       binding,
       (payload) => this.emitData(payload),
       (payload) => this.emitExit(payload),
+      (payload) => this.emitWriteUnavailable(payload),
       () => releaseBinding(binding, this.bindings)
     )
+  }
+
+  private emitWriteUnavailable(payload: { id: string }): void {
+    for (const listener of this.writeUnavailableListeners) {
+      listener(payload)
+    }
   }
 
   private emitData(payload: PtyDataEvent): void {

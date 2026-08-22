@@ -160,7 +160,7 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
         'pane',
         'send-text',
         requiredString(params.pane_id, 'pane_id'),
-        assertNoLeadingDash(requiredString(params.text, 'text'), 'text')
+        requiredString(params.text, 'text')
       ]
     case 'pane.wait_for_output':
       return [
@@ -320,7 +320,7 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
         'agent',
         'prompt',
         requiredString(params.target, 'target'),
-        assertNoLeadingDash(requiredString(params.text, 'text'), 'text'),
+        requiredString(params.text, 'text'),
         ...(params.wait ? ['--wait'] : []),
         ...untilFlags(params.until),
         ...optionalFlag('--timeout', params.timeout_ms)

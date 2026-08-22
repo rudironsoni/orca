@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { HerdrTerminalFrame } from './herdr-runtime-contract'
-import { retireExitedHerdrPane, waitForFirstHerdrFrame } from './herdr-pty-provider-runtime'
+import { retireExitedHerdrPane } from './herdr-pty-provider-runtime'
+import { waitForFirstHerdrFrame } from './herdr-pty-frames'
 import type { HerdrPtyBinding } from './herdr-pty-types'
 
 function frame(bytes: string, opts: { full?: boolean; seq?: number } = {}): HerdrTerminalFrame {
@@ -73,8 +74,11 @@ describe('waitForFirstHerdrFrame', () => {
   it('emits only the appended tail of subsequent full frames', async () => {
     const { binding, push } = makeBinding()
     const emitData = vi.fn()
-    const emitExit = vi.fn()
-    const pending = waitForFirstHerdrFrame(binding, { emitData, emitExit, detach: vi.fn() })
+    const pending = waitForFirstHerdrFrame(binding, {
+      emitData,
+      emitWriteUnavailable: vi.fn(),
+      detach: vi.fn()
+    })
 
     push(frame('line1\n'))
     const first = await pending
@@ -103,7 +107,7 @@ describe('waitForFirstHerdrFrame', () => {
     const emitData = vi.fn()
     const pending = waitForFirstHerdrFrame(binding, {
       emitData,
-      emitExit: vi.fn(),
+      emitWriteUnavailable: vi.fn(),
       detach: vi.fn()
     })
 
@@ -114,19 +118,19 @@ describe('waitForFirstHerdrFrame', () => {
     expect(emitData).toHaveBeenCalledWith({ id: binding.id, data: 'b', sequenceChars: 1 })
   })
 
-  it('emits exit when the controller closes after the first frame', async () => {
+  it('signals write-unavailable when the controller closes after the first frame', async () => {
     const { binding, push, close } = makeBinding()
     const emitData = vi.fn()
-    const emitExit = vi.fn()
+    const emitWriteUnavailable = vi.fn()
     const detach = vi.fn()
-    const pending = waitForFirstHerdrFrame(binding, { emitData, emitExit, detach })
+    const pending = waitForFirstHerdrFrame(binding, { emitData, emitWriteUnavailable, detach })
 
     push(frame('prompt'))
     await pending
 
     close()
-    expect(emitExit).toHaveBeenCalledWith({ id: binding.id, code: 0 })
-    expect(detach).toHaveBeenCalled()
+    expect(emitWriteUnavailable).toHaveBeenCalledWith({ id: binding.id })
+    expect(detach).not.toHaveBeenCalled()
   })
 })
 

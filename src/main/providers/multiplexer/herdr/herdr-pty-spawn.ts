@@ -60,12 +60,8 @@ export async function spawnHerdrPtyPane(args: {
   const resolvedPaneId =
     paneId ??
     runtime.manager.getPaneId(sessionName, target.identity.projectId, target.identity.leafId)
-  const staleAttach =
-    opts.attachOnly === true &&
-    persistedIdentity !== null &&
-    (resolvedPaneId === null || resolvedPaneId !== persistedIdentity.paneId)
-  if (!resolvedPaneId || staleAttach) {
-    if (staleAttach) {
+  if (!resolvedPaneId) {
+    if (opts.attachOnly === true && persistedIdentity !== null) {
       throw new SessionNotFoundError(opts.sessionId ?? '')
     }
     throw new Error(`Herdr pane is not reconciled: ${target.identity.leafId}`)

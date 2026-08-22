@@ -579,19 +579,26 @@ describe('stock Herdr CLI request adapter', () => {
     ).toEqual(['--session', 'orca-app', 'agent', 'send-keys', 'w1:p1', 'ctrl+c'])
   })
 
-  it('rejects agent.prompt and pane.send_text text that starts with a dash', () => {
-    expect(() =>
-      herdrStockCliInvocation('orca-app', 'agent.prompt', {
-        target: 'w1:p1',
-        text: '--force'
-      })
-    ).toThrow('must not start with a dash')
-    expect(() =>
+  it('passes pane.send_text and agent.prompt text that starts with a dash', () => {
+    expect(
       herdrStockCliInvocation('orca-app', 'pane.send_text', {
         pane_id: 'w1:p1',
         text: '-n'
-      })
-    ).toThrow('must not start with a dash')
+      }).args
+    ).toEqual(['--session', 'orca-app', 'pane', 'send-text', 'w1:p1', '-n'])
+    expect(
+      herdrStockCliInvocation('orca-app', 'pane.send_text', {
+        pane_id: 'w1:p1',
+        text: '--help'
+      }).args
+    ).toEqual(['--session', 'orca-app', 'pane', 'send-text', 'w1:p1', '--help'])
+    expect(
+      herdrStockCliInvocation('orca-app', 'agent.prompt', {
+        target: 'w1:p1',
+        text: '--force',
+        wait: true
+      }).args
+    ).toEqual(['--session', 'orca-app', 'agent', 'prompt', 'w1:p1', '--force', '--wait'])
   })
 
   it('rejects a label that starts with a dash to prevent argument injection', () => {

@@ -10,14 +10,9 @@ import {
   type HerdrPaneExitListener,
   type HerdrSurfaceSync
 } from './herdr-runtime-manager'
-import { Buffer } from 'node:buffer'
-import { TERMINAL_SCROLLBACK_REPLAY_BYTE_LIMIT } from '../../../../shared/terminal-scrollback-limits'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import {
-  unwrapHerdrResponse,
-  type HerdrHostTransport,
-  type HerdrTerminalFrame
-} from './herdr-runtime-contract'
+import { unwrapHerdrResponse, type HerdrHostTransport } from './herdr-runtime-contract'
+export { awaitFirstFrame } from './herdr-pty-frames'
 import { bytesFromTerminalLogicalKey } from '../../../../shared/terminal-logical-key'
 import {
   applyHerdrPaneSize,
@@ -37,82 +32,6 @@ function runtimeKey(target: HerdrPtyTarget, transport: HerdrHostTransport): stri
     transportIds.set(transport, id)
   }
   return `${target.identity.hostId}\n${id}`
-}
-
-function decodeFrame(frame: HerdrTerminalFrame): string {
-  return Buffer.from(frame.bytes, 'base64').toString('utf8')
-}
-
-export async function waitForFirstHerdrFrame(
-  binding: HerdrPtyBinding,
-  callbacks: {
-    emitData(payload: { id: string; data: string; sequenceChars: number }): void
-    emitExit(payload: { id: string; code: number }): void
-    detach(): void
-  }
-): Promise<{ frame: HerdrTerminalFrame; data: string } | null> {
-  return await new Promise((resolve, reject) => {
-    let first = true
-    const timeout = setTimeout(() => {
-      first = false
-      resolve(null)
-    }, 2_000)
-    binding.unsubscribe.push(
-      binding.controller.onFrame((frame) => {
-        const data = decodeFrame(frame)
-        binding.cols = frame.width
-        binding.rows = frame.height
-        if (first) {
-          first = false
-          clearTimeout(timeout)
-          binding.snapshot = data
-          resolve({ frame, data })
-          return
-        }
-        if (frame.full) {
-          const previous = binding.snapshot
-          binding.snapshot = data
-          const appended = data.startsWith(previous)
-          const delta = appended ? data.slice(previous.length) : data
-          if (!delta) {
-            return
-          }
-          const out = appended ? delta : `\x1b[0m\x1b[2J\x1b[H${data}`
-          binding.sequenceChars += out.length
-          callbacks.emitData({ id: binding.id, data: out, sequenceChars: binding.sequenceChars })
-          return
-        }
-        binding.snapshot = `${binding.snapshot}${data}`
-        if (binding.snapshot.length > TERMINAL_SCROLLBACK_REPLAY_BYTE_LIMIT) {
-          binding.snapshot = binding.snapshot.slice(
-            binding.snapshot.length - TERMINAL_SCROLLBACK_REPLAY_BYTE_LIMIT
-          )
-        }
-        binding.sequenceChars += data.length
-        callbacks.emitData({ id: binding.id, data, sequenceChars: binding.sequenceChars })
-      }),
-      binding.controller.onClosed((event) => {
-        if (binding.detached) {
-          return
-        }
-        if (first) {
-          first = false
-          clearTimeout(timeout)
-          callbacks.detach()
-          reject(
-            new Error(
-              event.reason
-                ? `Herdr terminal controller closed before its first frame: ${event.reason}`
-                : 'Herdr terminal controller closed before its first frame'
-            )
-          )
-          return
-        }
-        callbacks.detach()
-        callbacks.emitExit({ id: binding.id, code: 0 })
-      })
-    )
-  })
 }
 
 const HERDR_AGENT_KINDS = new Set([
@@ -258,15 +177,6 @@ export function createBinding(
   const binding = bindController(input)
   bindings.set(input.id, binding)
   return binding
-}
-
-export function awaitFirstFrame(
-  binding: HerdrPtyBinding,
-  emitData: (payload: { id: string; data: string; sequenceChars: number }) => void,
-  emitExit: (payload: { id: string; code: number }) => void,
-  detach: () => void
-): Promise<{ frame: HerdrTerminalFrame; data: string } | null> {
-  return waitForFirstHerdrFrame(binding, { emitData, emitExit, detach })
 }
 
 export function releaseBinding(

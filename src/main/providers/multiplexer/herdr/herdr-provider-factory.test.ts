@@ -19,6 +19,12 @@ import {
   presentHerdrImportedSurface,
   presentHerdrSurfaceAction
 } from './herdr-provider-factory'
+import { clearWslHerdrExecutableCache, resolveWslHerdrExecutable } from './herdr-wsl-executable'
+
+vi.mock('./herdr-wsl-executable', () => ({
+  resolveWslHerdrExecutable: vi.fn(() => '/usr/local/bin/herdr'),
+  clearWslHerdrExecutableCache: vi.fn()
+}))
 import type { SshConnection } from '../../../ssh/ssh-connection'
 
 function makeStore(settings: ReturnType<typeof getDefaultSettings>): Store {
@@ -46,6 +52,39 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
     electronMocks.getAllWindows.mockReturnValue([])
     electronMocks.getFocusedWindow.mockReturnValue(null)
     delete process.env.HERDR_TEST_LEAK
+    clearWslHerdrExecutableCache()
+  })
+
+  it('execs the login-PATH herdr binary for a WSL host', () => {
+    const settings: TestSettings = {
+      ...getDefaultSettings('/tmp'),
+      terminalBackendDefault: 'herdr'
+    }
+    const provider = createLocalHerdrPtyProvider(undefined, makeStore(settings))
+    const transport = (
+      provider as unknown as {
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string }
+        }): HerdrHostTransport
+      }
+    ).transportForTarget({
+      identity: { hostId: 'wsl:Ubuntu' },
+      project: { id: 'project-1' }
+    })
+    expect(transport).toBeInstanceOf(HerdrCliHostTransport)
+    const command = (
+      transport as unknown as {
+        options: { commandFor(args: string[]): { file: string; args: string[] } }
+      }
+    ).options.commandFor(['workspace', 'list'])
+    expect(command.file).toBe('wsl.exe')
+    expect(command.args[0]).toBe('-d')
+    expect(command.args[1]).toBe('Ubuntu')
+    expect(command.args[2]).toBe('--exec')
+    expect(command.args[3]).toBe('/usr/local/bin/herdr')
+    expect(command.args.slice(4)).toEqual(['workspace', 'list'])
+    expect(resolveWslHerdrExecutable).toHaveBeenCalled()
   })
 
   it('routes the herdr backend to the stock socket transport by default', () => {

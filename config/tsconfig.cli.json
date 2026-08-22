@@ -105,6 +105,8 @@
     "../src/main/providers/multiplexer/herdr/herdr-pty-orca-fallback.ts",
     "../src/main/providers/multiplexer/herdr/herdr-pty-spawn.ts",
     "../src/main/providers/multiplexer/herdr/herdr-pty-attach.ts",
+    "../src/main/providers/multiplexer/herdr/herdr-pty-frames.ts",
+    "../src/main/providers/multiplexer/herdr/herdr-wsl-executable.ts",
     "../src/main/providers/multiplexer/herdr/herdr-binding-metadata.ts",
     "../src/main/providers/multiplexer/herdr/herdr-runtime-manager.ts",
     "../src/main/providers/multiplexer/herdr/herdr-leaf-materialize.ts",
