@@ -2,11 +2,18 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { localHerdrCommand } from './herdr-cli-session'
 
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
-vi.mock('node:child_process', () => ({ spawn: spawnMock }))
+const { runProcessMock, spawnProcessMock } = vi.hoisted(() => ({
+  runProcessMock: vi.fn(),
+  spawnProcessMock: vi.fn()
+}))
+vi.mock('../../../../shared/child-process/run-process', () => ({
+  runProcess: runProcessMock,
+  spawnProcess: spawnProcessMock
+}))
 
 beforeEach(() => {
-  spawnMock.mockReset()
+  runProcessMock.mockReset()
+  spawnProcessMock.mockReset()
 })
 
 type MockChild = EventEmitter & {
@@ -33,42 +40,47 @@ function createChild(): MockChild {
 }
 
 async function loadTransport() {
-  const mocks = await import('node:child_process')
   const { HerdrCliHostTransport } = await import('./herdr-cli-session')
   const transport = new HerdrCliHostTransport({
     commandFor: localHerdrCommand('/mock/herdr')
   })
-  return { transport, spawn: mocks.spawn as ReturnType<typeof vi.fn> }
+  return transport
 }
 
 describe('HerdrCliHostTransport', () => {
   it('parses a JSON response from herdr stdout', async () => {
-    const { transport, spawn } = await loadTransport()
-    const child = createChild()
-    spawn.mockReturnValue(child)
-
-    const promise = transport.request('main', 'session.snapshot', {})
-    child.stdout.emit('data', JSON.stringify({ id: '1', result: { sessions: [] } }))
-    child.emit('close', 0)
-    const response = await promise
-    expect(response).toEqual({ id: '1', result: { sessions: [] } })
+    const transport = await loadTransport()
+    runProcessMock.mockResolvedValue({
+      code: 0,
+      signal: null,
+      stdout: JSON.stringify({ id: '1', result: { sessions: [] } }),
+      stderr: '',
+      timedOut: false
+    })
+    await expect(transport.request('main', 'session.snapshot', {})).resolves.toEqual({
+      id: '1',
+      result: { sessions: [] }
+    })
   })
 
   it('rejects an invalid response from herdr', async () => {
-    const { transport, spawn } = await loadTransport()
-    const child = createChild()
-    spawn.mockReturnValue(child)
-
-    const promise = transport.request('main', 'session.snapshot', {})
-    child.stdout.emit('data', 'not json')
-    child.emit('close', 0)
-    await expect(promise).rejects.toMatchObject({ code: 'herdr_invalid_response' })
+    const transport = await loadTransport()
+    runProcessMock.mockResolvedValue({
+      code: 0,
+      signal: null,
+      stdout: 'not json',
+      stderr: '',
+      timedOut: false
+    })
+    await expect(transport.request('main', 'session.snapshot', {})).rejects.toMatchObject({
+      code: 'herdr_invalid_response'
+    })
   })
 
   it('streams terminal frames and buffers them until subscribed', async () => {
-    const { transport, spawn } = await loadTransport()
+    const transport = await loadTransport()
     const child = createChild()
-    spawn.mockReturnValue(child)
+    spawnProcessMock.mockReturnValue(child)
 
     const controller = transport.controlTerminal('ws', 'w1:p1', { cols: 80, rows: 24 })
     const frames: { seq: number }[] = []
@@ -79,9 +91,9 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('emits closed on a terminal.closed frame', async () => {
-    const { transport, spawn } = await loadTransport()
+    const transport = await loadTransport()
     const child = createChild()
-    spawn.mockReturnValue(child)
+    spawnProcessMock.mockReturnValue(child)
 
     const controller = transport.controlTerminal('ws', 'w1:p1', { cols: 80, rows: 24 })
     const closed: unknown[] = []
@@ -91,9 +103,9 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('sends input, resize, and release over stdin', async () => {
-    const { transport, spawn } = await loadTransport()
+    const transport = await loadTransport()
     const child = createChild()
-    spawn.mockReturnValue(child)
+    spawnProcessMock.mockReturnValue(child)
 
     const controller = transport.controlTerminal('ws', 'w1:p1', { cols: 80, rows: 24 })
     controller.write('hello')
@@ -110,9 +122,9 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('emits closed when the child exits without releasing', async () => {
-    const { transport, spawn } = await loadTransport()
+    const transport = await loadTransport()
     const child = createChild()
-    spawn.mockReturnValue(child)
+    spawnProcessMock.mockReturnValue(child)
 
     const controller = transport.controlTerminal('ws', 'w1:p1', { cols: 80, rows: 24 })
     const closed: { reason: string }[] = []

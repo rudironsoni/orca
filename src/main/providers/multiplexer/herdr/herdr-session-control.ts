@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
+import { spawnProcess } from '../../../../shared/child-process/run-process'
 import type {
   HerdrTerminalClosed,
   HerdrTerminalController,
@@ -268,43 +268,41 @@ export function createHerdrSessionControlFromOpen(
   return sessionControlController(state)
 }
 
-export function createHerdrSessionControlController(
-  command: HerdrSessionControlCommand
-): HerdrTerminalController {
-  const child = spawn(command.file, command.args, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true,
-    ...(command.env ? { env: command.env } : {})
-  })
-  child.stdout.setEncoding('utf8')
-  child.stderr.setEncoding('utf8')
-  const state = createSessionControlState()
-  child.stderr.on('data', (chunk: Buffer | string) => {
-    state.stderr += typeof chunk === 'string' ? chunk : chunk.toString()
-  })
-  attachSessionControlStream(state, {
+export function herdrSessionControlStreamFromProcess(
+  child: ReturnType<typeof spawnProcess>
+): HerdrSessionControlStream {
+  child.stdout?.setEncoding('utf8')
+  child.stderr?.setEncoding('utf8')
+  return {
     get writable() {
-      return child.stdin.writable
+      return child.stdin?.writable === true
     },
     write: (data) => {
-      if (child.stdin.writable) {
+      if (child.stdin?.writable) {
         child.stdin.write(data)
       }
     },
-    end: () => child.stdin.end(),
+    end: () => child.stdin?.end(),
     close: () => child.kill(),
-    onData: (listener) => {
-      child.stdout.on('data', listener)
-    },
+    onData: (listener) => child.stdout?.on('data', listener),
     onError: (listener) => {
       child.once('error', listener)
-      child.stdin.once('error', listener)
-      child.stdout.once('error', listener)
-      child.stderr.once('error', listener)
+      child.stdin?.once('error', listener)
+      child.stdout?.once('error', listener)
+      child.stderr?.once('error', listener)
     },
-    onClose: (listener) => {
-      child.once('close', (code) => listener(code ?? null))
-    }
+    onClose: (listener) => child.once('close', (code) => listener(code ?? null))
+  }
+}
+
+export function createHerdrSessionControlController(
+  command: HerdrSessionControlCommand
+): HerdrTerminalController {
+  const child = spawnProcess({ program: command.file, args: command.args, env: command.env })
+  const state = createSessionControlState()
+  child.stderr?.on('data', (chunk: Buffer | string) => {
+    state.stderr += typeof chunk === 'string' ? chunk : chunk.toString()
   })
+  attachSessionControlStream(state, herdrSessionControlStreamFromProcess(child))
   return sessionControlController(state)
 }

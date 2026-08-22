@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runProcessSync } from '../../../../shared/child-process/run-process'
 
 /** Resolve a stock herdr binary for live tests: explicit env, then PATH. */
 export function resolveStockHerdrTestBinary(): string | null {
@@ -10,12 +10,13 @@ export function resolveStockHerdrTestBinary(): string | null {
     return explicit
   }
   try {
-    const found = execFileSync(process.platform === 'win32' ? 'where' : 'which', ['herdr'], {
-      encoding: 'utf8'
+    const result = runProcessSync({
+      program: process.platform === 'win32' ? 'where' : 'which',
+      args: ['herdr'],
+      timeoutMs: 5_000
     })
-      .trim()
-      .split(/\r?\n/)[0]
-    return found && existsSync(found) ? found : null
+    const found = result.stdout.trim().split(/\r?\n/)[0]
+    return result.code === 0 && found && existsSync(found) ? found : null
   } catch {
     return null
   }

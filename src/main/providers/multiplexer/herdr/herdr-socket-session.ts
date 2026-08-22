@@ -1,7 +1,10 @@
-import { spawn } from 'node:child_process'
-import { StringDecoder } from 'node:string_decoder'
 import type { HerdrSocketConnectionOptions } from './herdr-socket-connection'
-import { herdrServerEnvironment, parseHerdrSessionList } from './herdr-cli-session'
+import {
+  herdrServerEnvironment,
+  parseHerdrSessionList,
+  startDetachedHerdrCommand
+} from './herdr-cli-session'
+import { runProcess } from '../../../../shared/child-process/run-process'
 import { assertHerdrSchemaCompatible, type HerdrApiSchema } from './herdr-runtime-contract'
 import { ensureStockHerdrSession, type HerdrListedSession } from './herdr-stock-session'
 
@@ -59,100 +62,41 @@ export class HerdrSocketSessionManager {
   }
 
   private async startServer(sessionName: string): Promise<void> {
-    const command =
-      this.options.serverCommandFor?.(sessionName) ??
-      (() => {
-        const base = this.options.commandFor?.(['--session', sessionName, 'server']) ?? {
-          file: 'herdr',
-          args: ['--session', sessionName, 'server']
-        }
-        return {
-          ...base,
-          env: herdrServerEnvironment(base.env)
-        }
-      })()
-    const child = spawn(command.file, command.args, {
-      stdio: 'ignore',
-      detached: true,
-      windowsHide: true,
-      ...(command.env ? { env: command.env } : {})
-    })
-    await new Promise<void>((resolve, reject) => {
-      let settled = false
-      const finish = (error?: Error): void => {
-        if (settled) {
-          return
-        }
-        settled = true
-        clearTimeout(started)
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-      const started = setTimeout(() => {
-        child.unref()
-        finish()
-      }, 100)
-      child.once('error', (error) => finish(error))
-      child.once('close', (code) => {
-        finish(new Error(`Herdr server exited during startup with code ${code ?? 'unknown'}`))
-      })
-    })
+    const command = this.options.serverCommandFor
+      ? await this.options.serverCommandFor(sessionName)
+      : await (async () => {
+          const base = this.options.commandFor?.(['--session', sessionName, 'server']) ?? {
+            file: 'herdr',
+            args: ['--session', sessionName, 'server']
+          }
+          const resolved = await base
+          return {
+            ...resolved,
+            env: herdrServerEnvironment(resolved.env)
+          }
+        })()
+    await startDetachedHerdrCommand(command)
   }
 
   private async run(args: string[]): Promise<string> {
-    const command = this.options.commandFor?.(args) ?? {
+    const command = (await this.options.commandFor?.(args)) ?? {
       file: 'herdr',
       args
     }
-    return new Promise<string>((resolve, reject) => {
-      const child = spawn(command.file, command.args, {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-        ...(command.env ? { env: command.env } : {})
-      })
-      const stdoutDecoder = new StringDecoder('utf8')
-      const stderrDecoder = new StringDecoder('utf8')
-      let stdout = ''
-      let stderr = ''
-      let settled = false
-      const finish = (error?: Error): void => {
-        if (settled) {
-          return
-        }
-        settled = true
-        clearTimeout(timeout)
-        stdout += stdoutDecoder.end()
-        stderr += stderrDecoder.end()
-        if (error) {
-          reject(error)
-        } else {
-          resolve(stdout)
-        }
-      }
-      const timeout = setTimeout(() => {
-        finish(new Error(`herdr ${args.join(' ')} timed out`))
-        child.kill()
-      }, this.options.timeoutMs ?? 15000)
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdout += stdoutDecoder.write(chunk)
-      })
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += stderrDecoder.write(chunk)
-      })
-      child.once('error', finish)
-      child.stdout.once('error', finish)
-      child.stderr.once('error', finish)
-      child.once('close', (code, signal) => {
-        if (code === 0) {
-          finish()
-        } else {
-          const status = code === null ? `signal ${signal ?? 'unknown'}` : `code ${code}`
-          finish(new Error(stderr.trim() || `herdr ${args.join(' ')} exited with ${status}`))
-        }
-      })
+    const result = await runProcess({
+      program: command.file,
+      args: command.args,
+      env: command.env,
+      timeoutMs: this.options.timeoutMs ?? 15_000
     })
+    if (result.timedOut) {
+      throw new Error(`herdr ${args.join(' ')} timed out`)
+    }
+    if (result.code === 0) {
+      return result.stdout
+    }
+    const status =
+      result.code === null ? `signal ${result.signal ?? 'unknown'}` : `code ${result.code}`
+    throw new Error(result.stderr.trim() || `herdr ${args.join(' ')} exited with ${status}`)
   }
 }

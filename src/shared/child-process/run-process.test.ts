@@ -13,6 +13,13 @@ describe('resolveSpawn', () => {
     }
   })
 
+  it('ignores stdio when the child is detached', () => {
+    const resolved = resolveSpawn({ program: 'herdr', args: ['server'], detached: true }, 'darwin')
+    expect(resolved.options.detached).toBe(true)
+    expect(resolved.options.stdio).toBe('ignore')
+    expect(resolved.options.windowsHide).toBe(true)
+  })
+
   it('spawns a non-cmd program directly, letting Node do the argv quoting', () => {
     // Node's own Windows quoting is already CommandLineToArgvW-correct for real
     // executables; re-implementing it here would add risk for no gain.

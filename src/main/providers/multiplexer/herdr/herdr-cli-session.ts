@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
+import { runProcess, spawnProcess } from '../../../../shared/child-process/run-process'
+import { buildWslExecArgs } from '../../../../shared/wsl-login-shell-command'
+import { resolveWslExecutablePath } from '../../../wsl/wsl-executable-path'
 import type {
   HerdrApiSchema,
   HerdrHostTransport,
@@ -17,10 +19,13 @@ import { herdrStockCliArgs } from './herdr-stock-cli-args'
 import { ensureStockHerdrSession, type HerdrListedSession } from './herdr-stock-session'
 import {
   createHerdrSessionControlController,
-  herdrSessionControlArgs
+  createHerdrSessionControlFromOpen,
+  herdrSessionControlArgs,
+  herdrSessionControlStreamFromProcess
 } from './herdr-session-control'
 
 export type HerdrCommand = { file: string; args: string[]; env?: NodeJS.ProcessEnv }
+export type HerdrCommandFactory = (herdrArgs: string[]) => HerdrCommand | Promise<HerdrCommand>
 export type { HerdrListedSession }
 
 export function localHerdrCommand(
@@ -52,9 +57,55 @@ export function herdrServerEnvironment(base: NodeJS.ProcessEnv | undefined): Nod
 }
 
 export type HerdrCliSessionOptions = {
-  commandFor: (herdrArgs: string[]) => HerdrCommand
-  serverCommandFor?: (sessionName: string) => HerdrCommand
+  commandFor: HerdrCommandFactory
+  serverCommandFor?: (sessionName: string) => HerdrCommand | Promise<HerdrCommand>
   timeoutMs?: number
+  wslDistro?: string
+}
+
+export function herdrHostProcessSpec(
+  command: HerdrCommand,
+  wslDistro?: string
+): { program: string; args: string[]; env?: NodeJS.ProcessEnv } {
+  if (!wslDistro) {
+    return { program: command.file, args: command.args, env: command.env }
+  }
+  return {
+    program: resolveWslExecutablePath(),
+    args: buildWslExecArgs(wslDistro, [command.file, ...command.args]),
+    env: command.env
+  }
+}
+
+export async function startDetachedHerdrCommand(
+  command: HerdrCommand,
+  wslDistro?: string
+): Promise<void> {
+  const spec = herdrHostProcessSpec(command, wslDistro)
+  const child = spawnProcess({ ...spec, detached: true })
+  child.unref()
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const finish = (error?: Error): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(started)
+      if (error) {
+        reject(error)
+      } else {
+        resolve()
+      }
+    }
+    const started = setTimeout(() => {
+      finish()
+    }, 100)
+    child.once('error', (error) => finish(error))
+    child.once('close', (code) => {
+      finish(new Error(`Herdr server exited during startup with code ${code ?? 'unknown'}`))
+    })
+  })
 }
 
 export class HerdrCliSessionManager {
@@ -96,78 +147,30 @@ export class HerdrCliSessionManager {
   }
 
   private async startServer(sessionName: string): Promise<void> {
-    const command =
-      this.options.serverCommandFor?.(sessionName) ??
-      (() => {
-        const base = this.options.commandFor(['--session', sessionName, 'server'])
-        return {
-          ...base,
-          env: herdrServerEnvironment(base.env)
-        }
-      })()
-    const child = spawn(command.file, command.args, {
-      stdio: 'ignore',
-      detached: true,
-      windowsHide: true,
-      ...(command.env ? { env: command.env } : {})
-    })
-    child.unref()
-    await new Promise<void>((resolve, reject) => {
-      let settled = false
-      const finish = (error?: Error): void => {
-        if (settled) {
-          return
-        }
-        settled = true
-        clearTimeout(started)
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-      const started = setTimeout(() => {
-        finish()
-      }, 100)
-      child.once('error', (error) => finish(error))
-      child.once('close', (code) => {
-        finish(new Error(`Herdr server exited during startup with code ${code ?? 'unknown'}`))
-      })
-    })
+    const command = this.options.serverCommandFor
+      ? await this.options.serverCommandFor(sessionName)
+      : await (async () => {
+          const base = await this.options.commandFor(['--session', sessionName, 'server'])
+          return { ...base, env: herdrServerEnvironment(base.env) }
+        })()
+    await startDetachedHerdrCommand(command, this.options.wslDistro)
   }
 
   private async runCli(args: string[], input?: string): Promise<string> {
-    const command = this.options.commandFor(args)
-    return await new Promise<string>((resolve, reject) => {
-      const child = spawn(command.file, command.args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-        ...(command.env ? { env: command.env } : {})
-      })
-      let stdout = ''
-      let stderr = ''
-      const timeout = setTimeout(() => {
-        child.kill()
-        reject(new Error(`Herdr command timed out after ${this.options.timeoutMs ?? 15_000}ms`))
-      }, this.options.timeoutMs ?? 15_000)
-      child.stdout.setEncoding('utf8')
-      child.stderr.setEncoding('utf8')
-      child.stdout.on('data', (chunk: string) => (stdout += chunk))
-      child.stderr.on('data', (chunk: string) => (stderr += chunk))
-      child.once('error', (error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
-      child.once('close', (code) => {
-        clearTimeout(timeout)
-        if (code === 0) {
-          resolve(stdout)
-        } else {
-          reject(new Error(stderr.trim() || `Herdr exited with code ${code ?? 'unknown'}`))
-        }
-      })
-      child.stdin.end(input)
+    const command = await this.options.commandFor(args)
+    const spec = herdrHostProcessSpec(command, this.options.wslDistro)
+    const result = await runProcess({
+      ...spec,
+      input,
+      timeoutMs: this.options.timeoutMs ?? 15_000
     })
+    if (result.timedOut) {
+      throw new Error(`Herdr command timed out after ${this.options.timeoutMs ?? 15_000}ms`)
+    }
+    if (result.code === 0) {
+      return result.stdout
+    }
+    throw new Error(result.stderr.trim() || `Herdr exited with code ${result.code ?? 'unknown'}`)
   }
 
   async run(args: string[]): Promise<string> {
@@ -242,13 +245,10 @@ function okInvocation(args: string[]): HerdrStockCliInvocation {
 }
 
 export type HerdrCliHostTransportOptions = {
-  commandFor: (herdrArgs: string[]) => { file: string; args: string[]; env?: NodeJS.ProcessEnv }
-  serverCommandFor?: (sessionName: string) => {
-    file: string
-    args: string[]
-    env?: NodeJS.ProcessEnv
-  }
+  commandFor: HerdrCommandFactory
+  serverCommandFor?: (sessionName: string) => HerdrCommand | Promise<HerdrCommand>
   timeoutMs?: number
+  wslDistro?: string
   onDisconnect?: () => void
 }
 
@@ -259,7 +259,8 @@ export class HerdrCliHostTransport implements HerdrHostTransport {
     this.sessionManager = new HerdrCliSessionManager({
       commandFor: options.commandFor,
       serverCommandFor: options.serverCommandFor,
-      timeoutMs: options.timeoutMs
+      timeoutMs: options.timeoutMs,
+      wslDistro: options.wslDistro
     })
   }
 
@@ -291,9 +292,15 @@ export class HerdrCliHostTransport implements HerdrHostTransport {
     target: string,
     options: HerdrTerminalControlOptions
   ): HerdrTerminalController {
-    return createHerdrSessionControlController(
-      this.options.commandFor(herdrSessionControlArgs(sessionName, target, options))
-    )
+    const command = this.options.commandFor(herdrSessionControlArgs(sessionName, target, options))
+    if (command instanceof Promise || this.options.wslDistro) {
+      return createHerdrSessionControlFromOpen(async () => {
+        const resolved = await command
+        const child = spawnProcess(herdrHostProcessSpec(resolved, this.options.wslDistro))
+        return herdrSessionControlStreamFromProcess(child)
+      })
+    }
+    return createHerdrSessionControlController(command)
   }
 
   async disconnect(): Promise<void> {

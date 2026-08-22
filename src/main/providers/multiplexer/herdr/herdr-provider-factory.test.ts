@@ -22,7 +22,7 @@ import {
 import { clearWslHerdrExecutableCache, resolveWslHerdrExecutable } from './herdr-wsl-executable'
 
 vi.mock('./herdr-wsl-executable', () => ({
-  resolveWslHerdrExecutable: vi.fn(() => '/usr/local/bin/herdr'),
+  resolveWslHerdrExecutable: vi.fn(async () => '/usr/local/bin/herdr'),
   clearWslHerdrExecutableCache: vi.fn()
 }))
 import type { SshConnection } from '../../../ssh/ssh-connection'
@@ -55,7 +55,7 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
     clearWslHerdrExecutableCache()
   })
 
-  it('execs the login-PATH herdr binary for a WSL host', () => {
+  it('execs the login-PATH herdr binary for a WSL host', async () => {
     const settings: TestSettings = {
       ...getDefaultSettings('/tmp'),
       terminalBackendDefault: 'herdr'
@@ -73,17 +73,19 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
       project: { id: 'project-1' }
     })
     expect(transport).toBeInstanceOf(HerdrCliHostTransport)
-    const command = (
+    const command = await (
       transport as unknown as {
-        options: { commandFor(args: string[]): { file: string; args: string[] } }
+        options: {
+          wslDistro?: string
+          commandFor(args: string[]): Promise<{ file: string; args: string[] }>
+        }
       }
     ).options.commandFor(['workspace', 'list'])
-    expect(command.file).toBe('wsl.exe')
-    expect(command.args[0]).toBe('-d')
-    expect(command.args[1]).toBe('Ubuntu')
-    expect(command.args[2]).toBe('--exec')
-    expect(command.args[3]).toBe('/usr/local/bin/herdr')
-    expect(command.args.slice(4)).toEqual(['workspace', 'list'])
+    expect((transport as unknown as { options: { wslDistro?: string } }).options.wslDistro).toBe(
+      'Ubuntu'
+    )
+    expect(command.file).toBe('/usr/local/bin/herdr')
+    expect(command.args).toEqual(['workspace', 'list'])
     expect(resolveWslHerdrExecutable).toHaveBeenCalled()
   })
 

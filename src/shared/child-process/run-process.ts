@@ -39,6 +39,11 @@ export type ProcessSpec = {
   maxOutputBytes?: number
   /** Kills the process when aborted; the result still reports the exit. */
   signal?: AbortSignal
+  /**
+   * Detach from the parent so the child can outlive this process.
+   * stdio is ignored; the caller should `unref()` the returned child.
+   */
+  detached?: boolean
 }
 
 export type ProcessResult = {
@@ -81,7 +86,8 @@ export function resolveSpawn(spec: ProcessSpec, platform: NodeJS.Platform): Reso
   const base: NodeSpawnOptions = {
     cwd: spec.cwd,
     env: spec.env,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: spec.detached ? 'ignore' : ['pipe', 'pipe', 'pipe'],
+    ...(spec.detached ? { detached: true } : {}),
     // Why unconditional: Orca's main process is GUI-subsystem and owns no
     // console, so every console-subsystem child it starts gets a fresh visible
     // conhost that takes foreground — keystrokes typed into an Orca terminal at

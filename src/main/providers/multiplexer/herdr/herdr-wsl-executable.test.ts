@@ -7,45 +7,49 @@ describe('resolveWslHerdrExecutable', () => {
     clearWslHerdrExecutableCache()
   })
 
-  it('returns an absolute custom guest path without probing', () => {
+  it('returns an absolute custom guest path without probing', async () => {
     let probed = 0
-    const path = resolveWslHerdrExecutable('Ubuntu', { kind: 'custom', path: '/opt/herdr' }, () => {
-      probed += 1
-      return '/unused'
-    })
+    const path = await resolveWslHerdrExecutable(
+      'Ubuntu',
+      { kind: 'custom', path: '/opt/herdr' },
+      () => {
+        probed += 1
+        return '/unused'
+      }
+    )
     expect(path).toBe('/opt/herdr')
     expect(probed).toBe(0)
   })
 
-  it('rejects a non-absolute custom path', () => {
-    expect(() =>
+  it('rejects a non-absolute custom path', async () => {
+    await expect(
       resolveWslHerdrExecutable('Ubuntu', { kind: 'custom', path: 'herdr' }, () => '/unused')
-    ).toThrow(HerdrRuntimeError)
+    ).rejects.toThrow(HerdrRuntimeError)
   })
 
-  it('caches the probed login-PATH binary per distro', () => {
+  it('caches the probed login-PATH binary per distro', async () => {
     let probed = 0
     const probe = (distro: string) => {
       probed += 1
       return `/usr/bin/herdr-${distro}`
     }
-    expect(resolveWslHerdrExecutable('Ubuntu', { kind: 'system' }, probe)).toBe(
+    expect(await resolveWslHerdrExecutable('Ubuntu', { kind: 'system' }, probe)).toBe(
       '/usr/bin/herdr-Ubuntu'
     )
-    expect(resolveWslHerdrExecutable('Ubuntu', { kind: 'system' }, probe)).toBe(
+    expect(await resolveWslHerdrExecutable('Ubuntu', { kind: 'system' }, probe)).toBe(
       '/usr/bin/herdr-Ubuntu'
     )
-    expect(resolveWslHerdrExecutable('Debian', { kind: 'system' }, probe)).toBe(
+    expect(await resolveWslHerdrExecutable('Debian', { kind: 'system' }, probe)).toBe(
       '/usr/bin/herdr-Debian'
     )
     expect(probed).toBe(2)
   })
 
-  it('throws herdr_unavailable when the probe fails', () => {
-    expect(() =>
+  it('throws herdr_unavailable when the probe fails', async () => {
+    await expect(
       resolveWslHerdrExecutable('Ubuntu', { kind: 'system' }, () => {
         throw new HerdrRuntimeError('herdr_unavailable', 'missing')
       })
-    ).toThrow(/missing/)
+    ).rejects.toThrow(/missing/)
   })
 })

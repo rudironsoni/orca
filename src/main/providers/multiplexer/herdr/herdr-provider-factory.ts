@@ -28,7 +28,6 @@ import { HerdrRuntimeError } from './herdr-runtime-contract'
 import type { HerdrImportedSurface, HerdrOrcaSurfaceAction } from './herdr-orca-surface-import'
 import { herdrRemoteCommandEnv, writeHerdrRemoteSshLaunch } from './herdr-remote-ssh'
 import { resolveWslHerdrExecutable } from './herdr-wsl-executable'
-import { buildWslExecArgs } from '../../../../shared/wsl-login-shell-command'
 
 export function createLocalHerdrPtyProvider(
   fallback: IPtyProvider | undefined,
@@ -48,24 +47,25 @@ export function createLocalHerdrPtyProvider(
       }
       const wslDistro = parseWslHostId(hostId)
       if (wslDistro) {
-        const executable = resolveWslHerdrExecutable(wslDistro, source)
+        const executableFor = () => resolveWslHerdrExecutable(wslDistro, source)
         transport = new HerdrCliHostTransport({
-          commandFor: (args) => ({
-            file: 'wsl.exe',
-            args: buildWslExecArgs(wslDistro, [executable, ...args])
+          wslDistro,
+          commandFor: async (args) => ({
+            file: await executableFor(),
+            args
           }),
-          serverCommandFor: (sessionName) => {
+          serverCommandFor: async (sessionName) => {
+            const executable = await executableFor()
             const envKeysToRemove = Object.keys(process.env).filter((k) => k.startsWith('HERDR_'))
             return {
-              file: 'wsl.exe',
-              args: buildWslExecArgs(wslDistro, [
-                'env',
+              file: '/usr/bin/env',
+              args: [
                 ...envKeysToRemove.flatMap((k) => ['-u', k]),
                 executable,
                 '--session',
                 sessionName,
                 'server'
-              ])
+              ]
             }
           }
         })
