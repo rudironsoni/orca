@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Project } from '../../../../shared/project-types'
-import type {
-  HerdrHostTransport,
-  HerdrResponse,
-  HerdrSessionSnapshot
+import {
+  HERDR_PROTOCOL_VERSION,
+  type HerdrHostTransport,
+  type HerdrResponse,
+  type HerdrSessionSnapshot
 } from './herdr-runtime-contract'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
 
@@ -55,8 +56,8 @@ function singleLeafGraph() {
 
 function stockTransport() {
   const snapshot: HerdrSessionSnapshot = {
-    version: '0.8.0',
-    protocol: 19,
+    version: '0.8.2',
+    protocol: HERDR_PROTOCOL_VERSION,
     workspaces: [],
     tabs: [],
     panes: [],

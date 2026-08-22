@@ -3,7 +3,7 @@ import type { Project } from '../../../../shared/project-types'
 import { ORCA_BINDING_TOKEN, orcaPaneBinding, orcaWorkspaceBinding } from './herdr-binding-metadata'
 import { collectUnboundHerdrSurfaces, herdrLayoutToOrcaLayout } from './herdr-orca-surface-import'
 import { decodeHerdrPtyId } from './herdr-pty-types'
-import type { HerdrSessionSnapshot } from './herdr-runtime-contract'
+import { HERDR_PROTOCOL_VERSION, type HerdrSessionSnapshot } from './herdr-runtime-contract'
 
 const project: Project = {
   id: 'project-1',
@@ -18,8 +18,8 @@ const worktree = { id: 'wt-1', path: '/repo', displayName: 'repo' }
 
 function snapshot(overrides: Partial<HerdrSessionSnapshot> = {}): HerdrSessionSnapshot {
   return {
-    version: '0.8.0',
-    protocol: 19,
+    version: '0.8.2',
+    protocol: HERDR_PROTOCOL_VERSION,
     workspaces: [],
     tabs: [],
     panes: [],

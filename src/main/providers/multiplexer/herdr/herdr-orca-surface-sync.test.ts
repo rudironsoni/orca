@@ -5,7 +5,7 @@ import {
   herdrLayoutToOrcaLayout,
   resolveHerdrPaneIdentities
 } from './herdr-orca-surface-import'
-import type { HerdrSessionSnapshot } from './herdr-runtime-contract'
+import { HERDR_PROTOCOL_VERSION, type HerdrSessionSnapshot } from './herdr-runtime-contract'
 import type { Project } from '../../../../shared/project-types'
 
 const project: Project = {
@@ -19,8 +19,8 @@ const project: Project = {
 
 function snapshot(overrides: Partial<HerdrSessionSnapshot> = {}): HerdrSessionSnapshot {
   return {
-    version: '0.8.0',
-    protocol: 19,
+    version: '0.8.2',
+    protocol: HERDR_PROTOCOL_VERSION,
     workspaces: [],
     tabs: [],
     panes: [],

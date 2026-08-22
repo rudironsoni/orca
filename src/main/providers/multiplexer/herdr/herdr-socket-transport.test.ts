@@ -13,6 +13,7 @@ import {
   isSocketResponse
 } from './herdr-socket-connection'
 import { HerdrSocketReconnection } from './herdr-socket-events'
+import { HERDR_PROTOCOL_VERSION } from './herdr-runtime-contract'
 import { HerdrSocketTransport, isHerdrProcessGone } from './herdr-socket-transport'
 import type { HerdrSocketSessionManager } from './herdr-socket-session'
 
@@ -300,7 +301,7 @@ describe('HerdrSocketTransport', () => {
 
   const sessionManager = {
     ensureSession: async () => undefined,
-    schemaProtocol: async () => 19
+    schemaProtocol: async () => HERDR_PROTOCOL_VERSION
   } as unknown as HerdrSocketSessionManager
 
   const disabledReconnection = {
@@ -320,7 +321,7 @@ describe('HerdrSocketTransport', () => {
   ) {
     return (socketPath: string, method: string, params: unknown) => {
       if (method === 'session.snapshot') {
-        return { result: { snapshot: { protocol: 19 } } }
+        return { result: { snapshot: { protocol: HERDR_PROTOCOL_VERSION } } }
       }
       return respond(socketPath, method, params)
     }
@@ -409,7 +410,7 @@ describe('HerdrSocketTransport', () => {
         restarts += 1
         down = false
       },
-      schemaProtocol: async () => 19
+      schemaProtocol: async () => HERDR_PROTOCOL_VERSION
     } as unknown as HerdrSocketSessionManager
     server.setResponder(sessionSnapshotResponder(() => ({ result: { type: 'pong' } })))
     const transport = new HerdrSocketTransport(
@@ -499,7 +500,7 @@ describe('HerdrSocketTransport', () => {
     const ensureSession = vi.fn(async () => undefined)
     const manager = {
       ensureSession,
-      schemaProtocol: async () => 19
+      schemaProtocol: async () => HERDR_PROTOCOL_VERSION
     } as unknown as HerdrSocketSessionManager
     server.setResponder(
       sessionSnapshotResponder((_socketPath, method) =>

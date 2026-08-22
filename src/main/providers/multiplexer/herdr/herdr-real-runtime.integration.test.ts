@@ -5,6 +5,7 @@ import { configHomeDir, resolveStockHerdrTestBinary } from './herdr-stock-binary
 import { afterAll, describe, expect, it } from 'vitest'
 import { HerdrCliHostTransport, localHerdrCommand } from './herdr-cli-session'
 import {
+  HERDR_PROTOCOL_VERSION,
   unwrapHerdrResponse,
   type HerdrHostTransport,
   type HerdrSessionSnapshot
@@ -68,7 +69,7 @@ describeRealHerdr('stock Herdr runtime integration', () => {
     const snapshot = unwrapHerdrResponse<{ snapshot: HerdrSessionSnapshot }>(
       await transport.request(sessionName, 'session.snapshot', {})
     ).snapshot
-    expect(snapshot.protocol).toBe(19)
+    expect(snapshot.protocol).toBe(HERDR_PROTOCOL_VERSION)
     expect(
       snapshot.workspaces.find(
         (workspace) => workspace.workspace_id === created.workspace.workspace_id
