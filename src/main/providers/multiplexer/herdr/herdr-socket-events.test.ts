@@ -142,4 +142,22 @@ describe('HerdrSocketEventConnection', () => {
     expect(connectFn).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
+
+  it('ignores a second reconnect while one is in flight', async () => {
+    vi.useFakeTimers()
+    const connectFn = vi.fn(async () => undefined)
+    const reconnection = new HerdrSocketReconnection(connectFn, {
+      enabled: true,
+      initialDelayMs: 1000,
+      maxDelayMs: 1000,
+      maxAttempts: 5,
+      factor: 1
+    })
+    const first = reconnection.attemptReconnection()
+    const second = reconnection.attemptReconnection()
+    await vi.advanceTimersByTimeAsync(1000)
+    await Promise.all([first, second])
+    expect(connectFn).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
 })

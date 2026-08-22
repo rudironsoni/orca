@@ -1,10 +1,20 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { SshTarget } from '../../../../shared/ssh-types'
 import {
   createRetryingCleanup,
+  herdrRemoteCommandEnv,
   herdrRemoteDest,
   herdrRemoteSshArgs,
   herdrWindowsSshShim,
@@ -107,6 +117,45 @@ describe('writeHerdrRemoteSshLaunch', () => {
     cleanup()
     cleanup()
     expect(attempts).toBe(2)
+  })
+
+  it('drops inherited HERDR_* keys and keeps the launch config path', () => {
+    const env = herdrRemoteCommandEnv(
+      {
+        dest: 'box',
+        env: { HERDR_CONFIG_PATH: '/tmp/config.toml', PATH: '/shim' },
+        joinControlPath: null,
+        sshArgs: [],
+        sshBinary: 'ssh',
+        cleanup: () => undefined
+      },
+      { HERDR_SOCKET_PATH: '/tmp/parent.sock', HERDR_PANE_ID: 'w1:p1', OTHER: 'keep' }
+    )
+    expect(env.HERDR_CONFIG_PATH).toBe('/tmp/config.toml')
+    expect(env.PATH).toBe('/shim')
+    expect(env.HERDR_SOCKET_PATH).toBeUndefined()
+    expect(env.HERDR_PANE_ID).toBeUndefined()
+    expect(env.OTHER).toBe('keep')
+  })
+
+  it('tightens a world-readable launch root that this process owns', () => {
+    if (process.platform === 'win32') {
+      return
+    }
+    const root = join(tmpdir(), `orca-herdr-remote-${process.getuid?.() ?? 'user'}`)
+    mkdirSync(root, { recursive: true, mode: 0o777 })
+    chmodSync(root, 0o777)
+    const bin = mkdtempSync(join(tmpdir(), 'orca-fake-ssh-'))
+    dirs.push(bin)
+    const sshBinary = join(bin, 'ssh')
+    writeFileSync(sshBinary, 'echo')
+    const launch = writeHerdrRemoteSshLaunch({
+      target: target({ source: 'manual' }),
+      sshBinary
+    })
+    dirs.push(launch.env.PATH.split(':')[0] ?? '')
+    expect(statSync(root).mode & 0o777).toBe(0o700)
+    launch.cleanup()
   })
 
   it('quotes Windows paths and escapes percent expansion in the batch shim', () => {

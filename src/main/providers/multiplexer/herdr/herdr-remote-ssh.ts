@@ -1,7 +1,8 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import type { SshTarget } from '../../../../shared/ssh-types'
+import { herdrServerEnvironment } from './herdr-cli-session'
 import {
   buildSshArgs,
   findSystemSsh,
@@ -75,6 +76,7 @@ export function writeHerdrRemoteSshLaunch(args: {
   const { dest, joinControlPath, sshArgs } = herdrRemoteSshArgs(args.target, args.resolvedConfig)
   const root = join(tmpdir(), `orca-herdr-remote-${process.getuid?.() ?? 'user'}`)
   mkdirSync(root, { recursive: true, mode: 0o700 })
+  assertOwnedLaunchRoot(root)
   const dir = mkdtempSync(join(root, `${sanitizeDirName(args.target.id || dest)}-`))
   chmodSync(dir, 0o700)
   writeFileSync(join(dir, 'config.toml'), '[remote]\nmanage_ssh_config = false\n', { mode: 0o600 })
@@ -136,10 +138,26 @@ export function herdrRemoteCommandEnv(
   extra?: NodeJS.ProcessEnv
 ): NodeJS.ProcessEnv {
   return {
-    ...process.env,
+    ...herdrServerEnvironment(extra),
     PATH: launch.env.PATH,
-    HERDR_CONFIG_PATH: launch.env.HERDR_CONFIG_PATH,
-    ...extra
+    HERDR_CONFIG_PATH: launch.env.HERDR_CONFIG_PATH
+  }
+}
+
+function assertOwnedLaunchRoot(root: string): void {
+  if (process.platform === 'win32') {
+    return
+  }
+  const stats = lstatSync(root)
+  const uid = process.getuid?.()
+  if (!stats.isDirectory() || (uid !== undefined && stats.uid !== uid)) {
+    throw new Error(`Unsafe herdr remote launch directory ${root}`)
+  }
+  if ((stats.mode & 0o077) !== 0) {
+    chmodSync(root, 0o700)
+    if ((lstatSync(root).mode & 0o077) !== 0) {
+      throw new Error(`Unsafe herdr remote launch directory ${root}`)
+    }
   }
 }
 

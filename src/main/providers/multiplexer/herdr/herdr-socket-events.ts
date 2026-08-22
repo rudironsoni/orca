@@ -248,6 +248,7 @@ export class HerdrSocketReconnection {
   private onMaxAttemptsReached?: (error: Error) => void
   private cancelled = false
   private generation = 0
+  private inFlight = false
 
   constructor(
     connectFn: () => Promise<void>,
@@ -270,6 +271,20 @@ export class HerdrSocketReconnection {
     if (this.cancelled) {
       return
     }
+    if (this.inFlight) {
+      return
+    }
+    this.inFlight = true
+    try {
+      await this.runAttempt(generation)
+    } finally {
+      if (this.generation === generation) {
+        this.inFlight = false
+      }
+    }
+  }
+
+  private async runAttempt(generation: number): Promise<void> {
     if (!this.config.enabled) {
       throw new ReconnectionCancelledError('Reconnection is disabled')
     }
@@ -300,7 +315,7 @@ export class HerdrSocketReconnection {
       if (this.cancelled || this.generation !== generation) {
         return
       }
-      await this.attemptReconnection()
+      await this.runAttempt(generation)
     }
   }
 
@@ -308,6 +323,9 @@ export class HerdrSocketReconnection {
 
   private sleep(ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
+      if (this.state.timer) {
+        clearTimeout(this.state.timer)
+      }
       this.sleepResolve = resolve
       this.state.timer = setTimeout(() => {
         this.sleepResolve = null
@@ -329,6 +347,7 @@ export class HerdrSocketReconnection {
 
   reset(): void {
     this.generation += 1
+    this.inFlight = false
     this.cancel()
     this.cancelled = false
     this.state = {

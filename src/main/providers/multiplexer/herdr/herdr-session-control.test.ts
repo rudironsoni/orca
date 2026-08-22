@@ -220,9 +220,23 @@ describe('createHerdrSessionControlFromOpen', () => {
     }
     const frames: number[] = []
     controller.onFrame((frame) => frames.push(frame.seq))
-    expect(frames[0]).toBe(1)
-    expect(frames.at(-1)).toBe(513)
-    expect(frames).toHaveLength(512)
+    expect(frames).toEqual(Array.from({ length: 512 }, (_, index) => index + 1))
+    controller.release()
+  })
+
+  it('releases queued input when open rejects', async () => {
+    const { createHerdrSessionControlFromOpen } = await import('./herdr-session-control')
+    const closed: { type: string; reason: string }[] = []
+    const controller = createHerdrSessionControlFromOpen(async () => {
+      throw new Error('no stream')
+    })
+    controller.write('hello')
+    controller.onClosed((event) => closed.push(event))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(closed).toEqual([{ type: 'terminal.closed', reason: 'no stream' }])
+    controller.write('later')
+    controller.resize(80, 24)
     controller.release()
   })
 })

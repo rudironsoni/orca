@@ -28,6 +28,11 @@ describe('terminalLogicalInputFromBytes', () => {
     expect(terminalLogicalInputFromBytes('\x1b[127u')).toEqual({ kind: 'key', name: 'backspace' })
     expect(terminalLogicalInputFromBytes('\x1b[97;5u')).toEqual({ kind: 'key', name: 'ctrl+a' })
     expect(terminalLogicalInputFromBytes('\x1b[99;5u')).toEqual({ kind: 'key', name: 'ctrl+c' })
+    expect(terminalLogicalInputFromBytes('\x1b[99:67;5u')).toEqual({ kind: 'key', name: 'ctrl+c' })
+    expect(terminalLogicalInputFromBytes('\x1b[99:67;5:1u')).toEqual({
+      kind: 'key',
+      name: 'ctrl+c'
+    })
     expect(terminalLogicalInputFromBytes('\x1b[100;5u')).toEqual({ kind: 'key', name: 'ctrl+d' })
   })
 
@@ -46,6 +51,10 @@ describe('terminalLogicalInputFromBytes', () => {
     expect(terminalLogicalInputFromBytes('\x1b[57352;2u')).toEqual({
       kind: 'bytes',
       data: '\x1b[57352;2u'
+    })
+    expect(terminalLogicalInputFromBytes('\x1b[113;3;97:769u')).toEqual({
+      kind: 'bytes',
+      data: '\x1b[113;3;97:769u'
     })
   })
 

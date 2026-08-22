@@ -6,6 +6,12 @@ export function pushPendingHerdrFrame(
   frames: HerdrTerminalFrame[],
   event: HerdrTerminalFrame
 ): void {
+  if (!event.full && frames.length > 0) {
+    const last = frames.at(-1)
+    if (!last || last.seq + 1 !== event.seq) {
+      return
+    }
+  }
   frames.push(event)
   if (frames.length <= MAX_PENDING_HERDR_FRAMES) {
     return
@@ -21,9 +27,8 @@ export function pushPendingHerdrFrame(
     if (lastFull > 0) {
       frames.splice(0, lastFull)
     }
-    const extra = frames.length - MAX_PENDING_HERDR_FRAMES
-    if (extra > 0) {
-      frames.splice(1, extra)
+    if (frames.length > MAX_PENDING_HERDR_FRAMES) {
+      frames.length = MAX_PENDING_HERDR_FRAMES
     }
     return
   }

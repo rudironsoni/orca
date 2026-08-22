@@ -258,6 +258,8 @@ export function createHerdrSessionControlFromOpen(
   void open()
     .then((opened) => attachSessionControlStream(state, opened))
     .catch((error: unknown) => {
+      state.released = true
+      state.pendingMessages.length = 0
       emitClosed(state, {
         type: 'terminal.closed',
         reason: error instanceof Error ? error.message : String(error)

@@ -149,7 +149,8 @@ const BYTES_TO_KEY: Readonly<Record<string, string>> = {
   '\x7f': 'backspace'
 }
 
-const KITTY_CSI_U = new RegExp(`^${ESC}\\[(\\d+)(?:[;:](\\d+))?(?:[;:](\\d+))?u$`)
+// Colon fields are alternate keys. A third semicolon field is associated text.
+const KITTY_CSI_U = new RegExp(`^${ESC}\\[(\\d+)(?::\\d*){0,2}(?:;(\\d+)(?::(\\d+))?)?u$`)
 const CSI_SEQ = new RegExp(`^${ESC}\\[(?:(\\d+)?(?:;(\\d+))?)?([A-Z~])$`)
 const SS3_SEQ = new RegExp(`^${ESC}O([A-Z])$`)
 const ALT_CHAR = new RegExp(`^${ESC}([a-z0-9])$`)
