@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { setLocalPtyProvider } from '../ipc/pty'
+import {
+  composeTerminalBackendProvider,
+  type TerminalBackendComposition
+} from '../providers/terminal-backend-registry'
 import { DegradedDaemonPtyProvider } from './degraded-daemon-pty-provider'
 import { getDaemonRuntimeDir as getRuntimeDir } from './daemon-launch-paths'
 import { parseDaemonPidFile, type ParsedDaemonPid } from './daemon-pid-file-parse'
@@ -15,6 +19,15 @@ import { PROTOCOL_VERSION } from './types'
 
 let spawner: DaemonSpawner | null = null
 let adapter: DaemonProvider | null = null
+let terminalBackendComposition: TerminalBackendComposition | null = null
+
+function installLocalTerminalBackend(fallback: DaemonProvider): void {
+  const previous = terminalBackendComposition
+  const next = composeTerminalBackendProvider(fallback, { kind: 'local' })
+  terminalBackendComposition = next
+  setLocalPtyProvider(next.provider)
+  previous?.dispose()
+}
 
 export function installDaemonProvider(newSpawner: DaemonSpawner, newAdapter: DaemonProvider): void {
   spawner = newSpawner
@@ -118,18 +131,22 @@ export async function listLiveDaemonPtyIds(): Promise<string[] | null> {
 // Why: keep the module-level adapter and ipc/pty.ts's localProvider in sync so app-quit can't dispose a stale reference.
 export function replaceDaemonProvider(newAdapter: DaemonProvider): void {
   adapter = newAdapter
-  setLocalPtyProvider(newAdapter)
+  installLocalTerminalBackend(newAdapter)
 }
 
 // Disconnect without killing: the daemon survives app quit so sessions stay warm for reattach.
 // Leave history sessions marked "unclean" so a daemon crash while Orca is closed stays recoverable.
 export async function disconnectDaemon(): Promise<void> {
+  terminalBackendComposition?.dispose()
+  terminalBackendComposition = null
   await adapter?.disconnectOnly()
   adapter = null
 }
 
 /** Kill the daemon and all its sessions. Use for full cleanup only. */
 export async function shutdownDaemon(): Promise<void> {
+  terminalBackendComposition?.dispose()
+  terminalBackendComposition = null
   adapter?.dispose()
   adapter = null
   await spawner?.shutdown()
