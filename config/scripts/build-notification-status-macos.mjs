@@ -8,7 +8,7 @@
 // ad-hoc deep sign) derives the correct code identifier automatically —
 // macOS keys notification records to that identifier.
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -27,8 +27,18 @@ if (process.platform !== 'darwin') {
   process.exit(0)
 }
 
+// Why distribution-aware: release builds call this without --bundle-id, and the
+// embedded identifier must match the app the helper ships inside — a downstream
+// (ORCA_DOWNSTREAM_BUILD=1) build reads the wrong app's notification records if
+// it embeds the official id. Same switch as config/electron-builder.config.cjs.
+const distributionIdentities = JSON.parse(
+  readFileSync(path.join(repoRoot, 'src', 'shared', 'distribution-identity.json'), 'utf8')
+)
+const defaultBundleId =
+  distributionIdentities[process.env.ORCA_DOWNSTREAM_BUILD === '1' ? 'horca' : 'official'].appId
+
 const args = process.argv.slice(2)
-const bundleId = readArg('--bundle-id') ?? 'com.stablyai.orca'
+const bundleId = readArg('--bundle-id') ?? defaultBundleId
 const outputPath = readArg('--output') ?? defaultOutputPath
 // Why: dev launches only need the host architecture; release builds ship a
 // universal binary matching the app's x64 + arm64 targets.

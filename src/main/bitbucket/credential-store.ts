@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   CredentialDecryptionError,
@@ -8,6 +7,7 @@ import {
   writeCredentialFileAtomic,
   writeEncryptedCredential
 } from '../integration-credential-file'
+import { getLocalStateRoot } from '../local-state-root'
 import type { BitbucketAuthMode } from '../../shared/bitbucket-credentials'
 
 // Why: the secret stays encrypted via safeStorage while this metadata stays
@@ -49,7 +49,7 @@ let cachedSecret: BitbucketStoredSecret | null = null
 let credentialError: string | null = null
 
 function getOrcaDir(): string {
-  return join(homedir(), '.orca')
+  return getLocalStateRoot()
 }
 
 function getMetadataPath(): string {

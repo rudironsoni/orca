@@ -779,3 +779,7 @@ function findInstalledMacSigningIdentity(keychainFile) {
   } catch {}
   return null
 }
+
+module.exports = require('./electron-builder-downstream.cjs').applyDownstreamDistribution(
+  module.exports
+)

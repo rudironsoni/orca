@@ -11,6 +11,7 @@ import {
   type KeybindingFileSnapshot,
   type KeybindingOverrides
 } from '../../shared/keybindings'
+import { getLocalStateRoot } from '../local-state-root'
 import {
   createEmptyDocument,
   FILE_VERSION,
@@ -25,7 +26,7 @@ import {
 } from './keybinding-file-parser'
 
 export function getUserKeybindingsPath(homePath: string): string {
-  return join(homePath, '.orca', 'keybindings.json')
+  return join(getLocalStateRoot(homePath), 'keybindings.json')
 }
 
 export function readKeybindingFile(

@@ -9,8 +9,11 @@ import type {
   ComputerUsePermissionSetupResult,
   ComputerUsePermissionStatusResult
 } from '../../shared/computer-use-permissions-types'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
-const DEFAULT_COMPUTER_USE_BUNDLE_ID = 'com.stablyai.orca.computer-use'
+// Derived from the distribution's app id: the packaged helper's bundle id is
+// always `<appId>.computer-use` (see config/scripts and native/computer-use-macos).
+const DEFAULT_COMPUTER_USE_BUNDLE_ID = `${getDistributionIdentity().appId}.computer-use`
 
 export { getComputerUsePermissionStatus } from './macos-computer-use-permission-status'
 
