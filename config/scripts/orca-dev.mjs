@@ -2,8 +2,14 @@
 
 import { spawnSync } from 'node:child_process'
 import { accessSync, constants, existsSync, realpathSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { prepareDevCliTerminalWrappers } from './dev-cli-terminal-wrapper.mjs'
+
+const { applyHorcaViteDistributionEnv } = createRequire(import.meta.url)(
+  '../../src/shared/horca-vite-distribution.cjs'
+)
+applyHorcaViteDistributionEnv(process.env)
 
 const scriptPath = realpathSync(import.meta.filename)
 const scriptDir = path.dirname(scriptPath)

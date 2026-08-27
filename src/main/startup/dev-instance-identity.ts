@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { AppIdentity } from '../../shared/app-identity'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
-const BASE_APP_NAME = 'Orca'
-const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
+// Distribution-scoped so a downstream build carries its own app name and
+// AppUserModelID (official builds resolve to 'Orca' / 'com.stablyai.orca').
+const BASE_APP_NAME = getDistributionIdentity().productName
+const BASE_APP_USER_MODEL_ID = getDistributionIdentity().appUserModelId
 const MAX_LABEL_LENGTH = 80
 
 export type DevInstanceIdentity = AppIdentity & {

@@ -12,6 +12,7 @@ import {
 import { dirname, join, win32 as winPath } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 import type { ProcessLivenessVerdict } from './daemon-incarnation-evidence-types'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 import { parseDaemonPidFile } from './daemon-pid-file-parse'
 import { quarantineCorruptDaemonPidRecord } from './daemon-pid-record-quarantine'
 import { inspectProcessLiveness, mergeProcessLivenessVerdict } from './daemon-process-inspection'
@@ -38,8 +39,10 @@ export type RelocatedDaemonHost = {
 const HOST_SUBDIR = 'daemon-host'
 const MARKER_NAME = '.materialized.json'
 
-// LOCAL appData (not roaming) so OneDrive/roaming never syncs this ~260MB runtime. Shared with NSIS uninstall (config/nsis/orca-installer-hooks.nsh) — keep in sync.
-const LOCAL_HOST_ROOT_NAME = 'Orca'
+// LOCAL appData (not roaming) so OneDrive/roaming never syncs this ~260MB runtime. Distribution-scoped
+// (side-by-side installs must never share or uninstall each other's daemon hosts) and kept in sync with
+// the per-distribution NSIS uninstall include (config/nsis/daemon-host-uninstall*.nsh).
+const LOCAL_HOST_ROOT_NAME = getDistributionIdentity().windowsDaemonHostRootName
 
 /**
  * The host exe keeps the app exe's own file name, so the relocated image is a byte-for-byte,

@@ -1,10 +1,13 @@
 @echo off
 setlocal
 set "SCRIPT_DIR=%~dp0"
-set "LAUNCHER=%SCRIPT_DIR%orca.exe"
+REM Why %~n0: downstream distributions ship this same shim under their own CLI
+REM name (e.g. horca.cmd beside horca.exe), so the native launcher name
+REM derives from the shim's own basename.
+set "LAUNCHER=%SCRIPT_DIR%%~n0.exe"
 
 if not exist "%LAUNCHER%" (
-  echo Unable to locate the native Orca CLI launcher at "%LAUNCHER%" 1>&2
+  echo Unable to locate the native CLI launcher at "%LAUNCHER%" 1>&2
   exit /b 1
 )
 
