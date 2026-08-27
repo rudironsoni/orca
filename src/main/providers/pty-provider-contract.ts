@@ -1,7 +1,9 @@
 import type { TuiAgent } from '../../shared/tui-agent'
+import type { TerminalLayoutSnapshot } from '../../shared/terminal-tab-types'
 import type { PtyStartupIngressIntent } from '../../shared/pty-startup-ingress'
 import type { StartupCommandDelivery } from '../../shared/codex-startup-delivery'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
+import type { TerminalLogicalInput } from '../../shared/horca/terminal-logical-key'
 import type { PtyBackgroundStreamEvent, PtyDataEvent } from './pty-provider-events'
 import type { PtySpawnResult } from './pty-spawn-result'
 import type { PtyIncarnationId } from '../../shared/pty-incarnation'
@@ -66,6 +68,7 @@ export type PtySpawnOptions = {
   /** Stable terminal tab identity used as a coarser attach guard when a pane
    *  identity is unavailable. */
   tabId?: string
+  terminalLayout?: TerminalLayoutSnapshot
   /** Daemon session ID. A caller-provided ID is treated as an attach request;
    *  daemon hosts also pass minted IDs for fresh sessions that need stable
    *  per-PTY state before provider.spawn returns. */
@@ -140,6 +143,7 @@ export type IPtyProvider = {
   /** Exact provider readback: false only when the provider answered that the PTY is absent. */
   probePtyLiveness?: (id: string) => Promise<boolean | null>
   write(id: string, data: string): boolean | void
+  writeLogical?: (id: string, input: TerminalLogicalInput) => boolean | void
   writeWithSettlement?: (id: string, data: string) => Promise<boolean>
   resize(id: string, cols: number, rows: number): void
   /**
@@ -247,4 +251,18 @@ export type IPtyProvider = {
       cause?: TerminalExitCause
     }) => void
   ): () => void
+
+  /** Optional: SSH-specific rejected data events (e.g., source malformed). */
+  onRejectedData?: (
+    callback: (payload: {
+      id: string
+      data: string
+      providerGeneration: number
+      ptyIncarnation: string
+      sequenceChars?: number
+      transformed?: boolean
+      seq?: number
+      sourceMalformed?: boolean
+    }) => void
+  ) => () => void
 }
