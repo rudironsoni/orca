@@ -6,6 +6,7 @@ import {
 } from '../../providers/terminal-backend-registry'
 import type { IPtyProvider } from '../../providers/types'
 import { registerHerdrTerminalBackend } from './register-herdr-terminal-backend'
+import type { HorcaTerminalSettingsSource } from './horca-terminal-settings'
 
 const providers = vi.hoisted(() => ({
   local: { dispose: vi.fn() },
@@ -24,7 +25,7 @@ describe('registerHerdrTerminalBackend', () => {
   })
 
   it('wraps local and SSH providers without changing the core registry', () => {
-    const unregister = registerHerdrTerminalBackend({} as Store)
+    const unregister = registerHerdrTerminalBackend({} as Store, {} as HorcaTerminalSettingsSource)
     const fallback = {} as IPtyProvider
 
     const local = composeTerminalBackendProvider(fallback, { kind: 'local' })
