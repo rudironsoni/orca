@@ -1,6 +1,7 @@
 import { shell } from 'electron'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
-const MACOS_PACKAGED_BUNDLE_ID = 'com.stablyai.orca'
+const MACOS_PACKAGED_BUNDLE_ID = getDistributionIdentity().appId
 const MACOS_NOTIFICATION_SETTINGS_URL =
   'x-apple.systempreferences:com.apple.Notifications-Settings.extension'
 

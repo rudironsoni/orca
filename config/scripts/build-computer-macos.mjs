@@ -1,11 +1,19 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 
+const require = createRequire(import.meta.url)
 const repoRoot = path.resolve(import.meta.dirname, '../..')
+// Why distribution-scoped: the helper .app carries its own TCC identity, so
+// side-by-side distributions need distinct helper bundle ids and names.
+const distributionIdentity = require('../../src/shared/distribution-identity.json')[
+  process.env.ORCA_DOWNSTREAM_BUILD === '1' ? 'horca' : 'official'
+]
 const packagePath = path.join(repoRoot, 'native', 'computer-use-macos')
 const binaryPath = path.join(packagePath, '.build', 'release', 'orca-computer-use-macos')
-const appPath = path.join(packagePath, '.build', 'release', 'Orca Computer Use.app')
+const displayName = `${distributionIdentity.productName} Computer Use`
+const appPath = path.join(packagePath, '.build', 'release', `${displayName}.app`)
 const appExecutablePath = path.join(appPath, 'Contents', 'MacOS', 'orca-computer-use-macos')
 const appIconPath = path.join(appPath, 'Contents', 'Resources', 'AppIcon.icns')
 const entitlementsPath = path.join(
@@ -14,8 +22,8 @@ const entitlementsPath = path.join(
   'build',
   'entitlements.computer-use.mac.plist'
 )
-const bundleId = process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? 'com.stablyai.orca.computer-use'
-const displayName = 'Orca Computer Use'
+const bundleId =
+  process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? `${distributionIdentity.appId}.computer-use`
 const signingIdentity = resolveSigningIdentity()
 const universalTriples = ['arm64-apple-macosx', 'x86_64-apple-macosx']
 
@@ -30,10 +38,41 @@ createHelperApp()
 function buildUniversalBinary() {
   const builtBinaries = universalTriples.map((triple) => {
     run('swift', ['build', '-c', 'release', '--package-path', packagePath, '--triple', triple])
-    return path.join(packagePath, '.build', triple, 'release', 'orca-computer-use-macos')
+    const tripleBinary = path.join(
+      packagePath,
+      '.build',
+      triple,
+      'release',
+      'orca-computer-use-macos'
+    )
+    return thinToTriple(tripleBinary, triple)
   })
   mkdirSync(path.dirname(binaryPath), { recursive: true })
   run('lipo', ['-create', ...builtBinaries, '-output', binaryPath])
+}
+
+// Why: stale .build state can leave a fat (multi-arch) artifact in a triple
+// dir, and lipo -create rejects duplicate architectures. Thin fat artifacts
+// back to the triple they represent; non-fat artifacts pass through.
+function thinToTriple(binary, triple) {
+  const arch = triple === 'arm64-apple-macosx' ? 'arm64' : 'x86_64'
+  const info = spawnSync('lipo', ['-info', binary], { encoding: 'utf8' })
+  if (info.status !== 0) {
+    console.error(`[computer-macos] lipo -info failed for ${binary}: ${info.stderr}`)
+    process.exit(1)
+  }
+  if (info.stdout.includes('Non-fat file')) {
+    if (!info.stdout.includes(`is architecture: ${arch}`)) {
+      console.error(
+        `[computer-macos] ${triple} artifact has unexpected architecture: ${info.stdout.trim()}`
+      )
+      process.exit(1)
+    }
+    return binary
+  }
+  const thinned = path.join(path.dirname(binary), `orca-computer-use-macos-${arch}`)
+  run('lipo', ['-thin', arch, binary, '-output', thinned])
+  return thinned
 }
 
 function createHelperApp() {
@@ -123,9 +162,9 @@ function infoPlist() {
   <key>LSUIElement</key>
   <true/>
   <key>NSAccessibilityUsageDescription</key>
-  <string>Orca Computer Use needs Accessibility permission to read and interact with app interfaces when you ask Orca to use apps.</string>
+  <string>${escapePlist(displayName)} needs Accessibility permission to read and interact with app interfaces when you ask ${escapePlist(distributionIdentity.productName)} to use apps.</string>
   <key>NSScreenCaptureUsageDescription</key>
-  <string>Orca Computer Use needs Screen Recording permission to capture app windows when you ask Orca to inspect your screen.</string>
+  <string>${escapePlist(displayName)} needs Screen Recording permission to capture app windows when you ask ${escapePlist(distributionIdentity.productName)} to inspect your screen.</string>
 </dict>
 </plist>
 `

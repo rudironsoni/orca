@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { cp, mkdir, readdir, rename, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
 export type SpeechModelCacheDir = {
   modelsDir: string
@@ -54,8 +55,12 @@ export function getSpeechModelCacheDirCandidates(
     .update(resolve(requestedModelsDir))
     .digest('hex')
     .slice(0, WINDOWS_SAFE_CACHE_HASH_LENGTH)
+  // Distribution-scoped folder so a downstream build never writes Orca-branded
+  // ProgramData (the hash already differs per userData, but ownership must too).
   const candidates = getWindowsAsciiSharedDataRoots()
-    .map((root) => join(root, 'Orca', 'speech-models', requestedModelsDirHash))
+    .map((root) =>
+      join(root, getDistributionIdentity().productName, 'speech-models', requestedModelsDirHash)
+    )
     .filter((modelsDir) => !hasNonAsciiCharacters(modelsDir))
     .map((modelsDir) => ({ modelsDir, migrationSourceDir: requestedModelsDir }))
 
