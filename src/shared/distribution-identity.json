@@ -1,0 +1,32 @@
+{
+  "official": {
+    "distribution": "official",
+    "productName": "Orca",
+    "appId": "com.stablyai.orca",
+    "appUserModelId": "com.stablyai.orca",
+    "protocol": "orca",
+    "publicCli": "orca",
+    "stateRootDirName": ".orca",
+    "updaterEnabled": true,
+    "windowsDaemonHostRootName": "Orca",
+    "windowsTerminalDaemonImageName": "orca-terminal-daemon.exe",
+    "linuxExecutableName": "orca-ide",
+    "linuxStartupWmClass": "orca",
+    "linuxPackageName": "orca-ide"
+  },
+  "horca": {
+    "distribution": "horca",
+    "productName": "Horca",
+    "appId": "com.rudironsoni.horca",
+    "appUserModelId": "com.rudironsoni.horca",
+    "protocol": "horca",
+    "publicCli": "horca",
+    "stateRootDirName": ".horca",
+    "updaterEnabled": false,
+    "windowsDaemonHostRootName": "Horca",
+    "windowsTerminalDaemonImageName": "horca-terminal-daemon.exe",
+    "linuxExecutableName": "horca-ide",
+    "linuxStartupWmClass": "horca",
+    "linuxPackageName": "horca-ide"
+  }
+}
