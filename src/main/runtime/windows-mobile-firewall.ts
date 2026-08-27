@@ -6,9 +6,12 @@ import type {
   WindowsNetworkCategory
 } from '../../shared/windows-mobile-firewall'
 import { hasSufficientWindowsFirewallRemoteScope } from './windows-firewall-remote-scope'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
-const FIREWALL_RULE_NAME = 'Orca.MobilePairing'
-const FIREWALL_RULE_DISPLAY_NAME = 'Orca Mobile Pairing'
+// Distribution-scoped: side-by-side installs each own a rule keyed to their exe;
+// a shared name would let one app's repair delete/re-point the other's rule.
+const FIREWALL_RULE_NAME = `${getDistributionIdentity().productName}.MobilePairing`
+const FIREWALL_RULE_DISPLAY_NAME = `${getDistributionIdentity().productName} Mobile Pairing`
 const POWERSHELL_TIMEOUT_MS = 10_000
 const ELEVATION_TIMEOUT_MS = 5 * 60_000
 

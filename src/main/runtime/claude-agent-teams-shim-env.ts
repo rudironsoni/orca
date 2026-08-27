@@ -1,6 +1,5 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { accessSync, constants, existsSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import {
   addClaudeTeammateModeAuto,
@@ -8,7 +7,9 @@ import {
   isDirectClaudeCommand,
   type ClaudeAgentTeamsMode
 } from '../../shared/claude-agent-teams-tmux-compat'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import { getLocalStateRoot } from '../local-state-root'
 import { resolvePathEnvKey } from '../pty/windows-path-segment-merge'
 
 export type ClaudeAgentTeamsLaunchPlan = {
@@ -84,21 +85,22 @@ export function resolveClaudeAgentTeamsShimBin(
 }
 
 function defaultShimRoot(): string {
-  return join(homedir(), '.orca', 'claude-agent-teams-bin')
+  return join(getLocalStateRoot(), 'claude-agent-teams-bin')
 }
 
 function bundledLauncherPath(): string | null {
   if (!process.resourcesPath) {
     return null
   }
+  const publicCli = getDistributionIdentity().publicCli
   if (process.platform === 'darwin') {
-    return join(process.resourcesPath, 'bin', 'orca')
+    return join(process.resourcesPath, 'bin', publicCli)
   }
   if (process.platform === 'linux') {
     return join(process.resourcesPath, 'bin', 'orca-ide')
   }
   if (process.platform === 'win32') {
-    return join(process.resourcesPath, 'bin', 'orca.exe')
+    return join(process.resourcesPath, 'bin', `${publicCli}.exe`)
   }
   return null
 }

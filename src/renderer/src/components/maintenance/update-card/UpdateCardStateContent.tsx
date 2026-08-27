@@ -4,6 +4,7 @@ import type {
   UpdateStatus
 } from '../../../../../shared/update-status-types'
 import { getReleaseNotesUrlForVersion } from '../../../../../shared/release-channel'
+import { downstreamUpdatesDisabledCopy } from '../../../../../shared/distribution-update-copy'
 import { UpdateErrorCardContent, type UpdateErrorCardModel } from '../../UpdateErrorCardContent'
 import { LinuxPackageInstallRecoveryCard } from '../../LinuxPackageInstallRecoveryCard'
 import { translate } from '@/i18n/i18n'
@@ -62,7 +63,11 @@ export function UpdateCardStateContent({
     return (
       <UpdateCheckFeedback
         icon="check"
-        text={translate('auto.components.UpdateCard.ea2a41adbe', "You're on the latest version.")}
+        text={
+          status.updatesDisabledReason
+            ? downstreamUpdatesDisabledCopy('card')
+            : translate('auto.components.UpdateCard.ea2a41adbe', "You're on the latest version.")
+        }
       />
     )
   }
