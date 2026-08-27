@@ -71,6 +71,7 @@ import {
   composeTerminalBackendProvider,
   type TerminalBackendComposition
 } from '../providers/terminal-backend-registry'
+import type { IPtyProvider, PtyDataEvent } from '../providers/types'
 import { notifyRemoteWorkspaceHandlers } from '../ipc/remote-workspace-events'
 import { PortScanner } from './ssh-port-scanner'
 import { isMainWindowVisible, onMainWindowBecameVisible } from '../window/main-window-visibility'
@@ -1165,7 +1166,7 @@ export class SshRelaySession {
       connection: this.requireReadyConnection(),
       hostPlatform: this.getHostPlatform() ?? undefined
     })
-    const ptyProvider = this.terminalBackendComposition.provider as SshPtyProvider
+    const ptyProvider = this.terminalBackendComposition.provider
     registerSshPtyProvider(this.targetId, ptyProvider)
     this.installPtyRecoveryNotifications(mux)
 
@@ -1207,7 +1208,7 @@ export class SshRelaySession {
     )
     registerSshGitProvider(this.targetId, gitProvider)
 
-    this.wireUpPtyEvents(ptyProvider, mux, providerGeneration)
+    this.wireUpPtyEvents(ptyProvider, rawPtyProvider, mux, providerGeneration)
     this.wireUpAgentHookEvents(mux)
     this.wireUpRemoteWorkspaceEvents(mux)
     void this.installManagedHooksOnRemote(mux, shouldContinue)
@@ -1794,30 +1795,36 @@ export class SshRelaySession {
   }
 
   private wireUpPtyEvents(
-    ptyProvider: SshPtyProvider,
+    ptyProvider: IPtyProvider,
+    rawPtyProvider: SshPtyProvider,
     mux: SshChannelMultiplexer,
     providerGeneration: number
   ): void {
     ptyProvider.onData((payload) => {
+      if (!('providerGeneration' in payload)) {
+        this.acceptComposedPtyData(payload, mux)
+        return
+      }
+      const relayPayload = payload as SshPtyDataPayload
       if (
         this.mux !== mux ||
         this.activePtyProviderGeneration !== providerGeneration ||
-        payload.providerGeneration !== providerGeneration
+        relayPayload.providerGeneration !== providerGeneration
       ) {
         return
       }
-      const pending = this.pendingPtyReattaches.get(payload.id)
+      const pending = this.pendingPtyReattaches.get(relayPayload.id)
       if (pending && this.activePtyConsumerOwner()?.outputFlowControl) {
         if (pending.livePassthrough) {
-          void this.acceptPtyData(payload).catch(() => {})
+          void this.acceptPtyData(relayPayload).catch(() => {})
           return
         }
-        this.quarantineReattachData(pending, payload)
+        this.quarantineReattachData(pending, relayPayload)
         return
       }
-      void this.acceptPtyData(payload).catch(() => {})
+      void this.acceptPtyData(relayPayload).catch(() => {})
     })
-    ptyProvider.onRejectedData?.((payload) => {
+    rawPtyProvider.onRejectedData?.((payload) => {
       if (
         this.mux !== mux ||
         this.activePtyProviderGeneration !== providerGeneration ||
@@ -1845,25 +1852,62 @@ export class SshRelaySession {
       }
     })
     ptyProvider.onExit((payload) => {
+      if (!('providerGeneration' in payload)) {
+        this.acceptComposedPtyExit(payload, mux)
+        return
+      }
+      const relayPayload = payload as SshPtyExitPayload
       if (
         this.mux !== mux ||
         this.activePtyProviderGeneration !== providerGeneration ||
-        payload.providerGeneration !== providerGeneration
+        relayPayload.providerGeneration !== providerGeneration
       ) {
         return
       }
-      const pendingReattach = this.pendingPtyReattaches.get(payload.id)
+      const pendingReattach = this.pendingPtyReattaches.get(relayPayload.id)
       if (pendingReattach && !pendingReattach.activated) {
         // Why: attach response and exit can share one transport batch, before incarnation restoration runs.
-        pendingReattach.exits.push(payload)
+        pendingReattach.exits.push(relayPayload)
         this.wakeRecovery(pendingReattach)
         return
       }
-      if (!isCurrentPtyExit(payload)) {
+      if (!isCurrentPtyExit(relayPayload)) {
         return
       }
-      void this.acceptPtyExit(payload).catch(() => {})
+      void this.acceptPtyExit(relayPayload).catch(() => {})
     })
+  }
+
+  private acceptComposedPtyData(payload: PtyDataEvent, mux: SshChannelMultiplexer): void {
+    if (this.mux !== mux) {
+      return
+    }
+    const rawLength = payload.sequenceChars ?? payload.data.length
+    this.runtime?.onPtyData(
+      payload.id,
+      payload.data,
+      Date.now(),
+      rawLength,
+      payload.transformed === true
+    )
+    const win = this.getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pty:data', payload)
+    }
+  }
+
+  private acceptComposedPtyExit(
+    payload: { id: string; code: number; incarnationId?: string },
+    mux: SshChannelMultiplexer
+  ): void {
+    if (this.mux !== mux || !isCurrentPtyExit(payload)) {
+      return
+    }
+    this.runtime?.onPtyExit(payload.id, payload.code, payload.incarnationId)
+    const win = this.getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pty:exit', payload)
+    }
   }
 
   private acceptPtyData(payload: SshPtyDataPayload): Promise<unknown> {
