@@ -7,7 +7,9 @@ describe('packaged Windows CLI launcher asset', () => {
     const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca.cmd')
     const launcher = readFileSync(launcherPath, 'utf8')
 
-    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca.exe"')
+    // Why %~n0: the shim ships under each distribution's CLI name and must
+    // resolve the native launcher from its own basename.
+    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%%~n0.exe"')
     expect(launcher).toContain('orca.cmd cannot safely forward orchestration message bodies')
     expect(launcher).not.toContain('"%ELECTRON%" "%CLI%" %*')
   })
@@ -25,6 +27,11 @@ describe('packaged Windows CLI launcher asset', () => {
       'string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");'
     )
     expect(source).toContain('requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"')
+    // Why: downstream distributions rename the launcher, which must then find
+    // its own distribution's app executable rather than a hardcoded Orca.exe.
+    expect(source).toContain(
+      'string launcherBaseName = Path.GetFileNameWithoutExtension(launcherPath);'
+    )
     expect(source).toContain('child.WaitForExit();')
     expect(source).toContain('return child.ExitCode;')
   })

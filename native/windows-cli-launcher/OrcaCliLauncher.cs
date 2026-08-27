@@ -9,10 +9,20 @@ internal static class OrcaCliLauncher
     {
         try
         {
-            string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
+            string launcherPath = typeof(OrcaCliLauncher).Assembly.Location;
+            string launcherDirectory = Path.GetDirectoryName(launcherPath);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca.exe");
+            // Why: downstream distributions ship this launcher under their own CLI
+            // name beside a matching app executable (horca.exe -> Horca.exe);
+            // Windows path lookup is case-insensitive, so the launcher's own
+            // basename resolves the right app for every distribution.
+            string launcherBaseName = Path.GetFileNameWithoutExtension(launcherPath);
+            string electronPath = Path.Combine(appDirectory, launcherBaseName + ".exe");
+            if (!File.Exists(electronPath))
+            {
+                electronPath = Path.Combine(appDirectory, "Orca.exe");
+            }
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -23,7 +33,7 @@ internal static class OrcaCliLauncher
 
             if (!File.Exists(electronPath))
             {
-                Console.Error.WriteLine("Unable to locate Orca.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine("Unable to locate the app executable next to \"{0}\"", resourcesDirectory);
                 return 1;
             }
 
