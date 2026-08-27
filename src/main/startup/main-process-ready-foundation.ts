@@ -142,7 +142,7 @@ export async function initializeReadyFoundation(): Promise<void> {
   })
   state.store = store
   if (getDistributionIdentity().distribution === 'horca') {
-    initializeHorca(store)
+    initializeHorca(store, profile.dataFile)
   }
   // Why: create pending readiness before the guard can observe the default session.
   // Why parked on state instead of awaited here: Dock/Launchpad launches don't inherit shell
