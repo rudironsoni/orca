@@ -1,6 +1,6 @@
 import { ipcMain, Menu, Notification, type BrowserWindow } from 'electron'
+import { downstreamMinimizeToTrayNotice } from '../../shared/distribution-update-copy'
 import { QUIT_RENDERER_ACK_TIMEOUT_MS } from '../../shared/quit-teardown-deadline'
-import { translateMain } from '../i18n/main-i18n'
 import type { Store } from '../persistence'
 import { resolveWindowCloseAction } from './window-close-decision'
 import type { CreateMainWindowOptions } from './main-window-contracts'
@@ -74,13 +74,7 @@ export function installMainWindowCloseLifecycle(args: {
     // Why: notify once that closing only hid the window; the persisted flag stops it repeating on every later minimize.
     if (store.getUI().trayMinimizeNoticeShown !== true) {
       try {
-        new Notification({
-          title: 'Orca',
-          body: translateMain(
-            'tray.minimizeNotice.body',
-            'Orca is still running in the system tray'
-          )
-        }).show()
+        new Notification(downstreamMinimizeToTrayNotice()).show()
       } catch {
         // Notification is best-effort — never block hiding the window.
       }

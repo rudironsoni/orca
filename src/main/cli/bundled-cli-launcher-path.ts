@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 
 // Why `orca-ide` on Linux: GNOME Orca ships /usr/bin/orca, so the CLI never claims that name.
 export const LINUX_CLI_COMMAND_NAME = 'orca-ide'
@@ -10,14 +11,15 @@ export function getBundledLauncherPath(
   platform: NodeJS.Platform,
   resourcesPath: string
 ): string | null {
+  const publicCli = getDistributionIdentity().publicCli
   if (platform === 'darwin') {
-    return join(resourcesPath, 'bin', 'orca')
+    return join(resourcesPath, 'bin', publicCli)
   }
   if (platform === 'linux') {
     return join(resourcesPath, 'bin', LINUX_CLI_COMMAND_NAME)
   }
   if (platform === 'win32') {
-    return join(resourcesPath, 'bin', 'orca.exe')
+    return join(resourcesPath, 'bin', `${publicCli}.exe`)
   }
   return null
 }

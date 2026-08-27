@@ -1,3 +1,4 @@
+import { getAcceptedDeepLinkProtocols, getDistributionIdentity } from './distribution-identity'
 import {
   PAIRING_OFFER_VERSION,
   PairingOfferSchema,
@@ -23,7 +24,7 @@ export function encodePairingOffer(offer: PairingOffer): string {
   }
   // Why: Android camera intents and Expo Router preserve query params more
   // reliably than URL fragments when launching a custom-scheme app.
-  return `orca://pair?code=${base64url}`
+  return `${getDistributionIdentity().protocol}://pair?code=${base64url}`
 }
 
 export function decodePairingOffer(url: string): PairingOffer {
@@ -32,7 +33,7 @@ export function decodePairingOffer(url: string): PairingOffer {
   }
   const code = extractPairingCodeFromUrl(url)
   if (!code) {
-    throw new Error('Invalid pairing URL: must start with orca://pair and include a pairing code')
+    throw new Error('Invalid pairing URL: must be a pairing deep link and include a pairing code')
   }
   return decodePairingBase64(code)
 }
@@ -46,7 +47,7 @@ function extractPairingCodeFromUrl(url: string): string | null {
   }
   // Why: prefix checks accepted routes like `orca://pairing?...`; only the
   // pairing deep-link host may carry runtime auth material.
-  if (parsed.protocol !== 'orca:' || parsed.hostname !== 'pair') {
+  if (!getAcceptedDeepLinkProtocols().has(parsed.protocol) || parsed.hostname !== 'pair') {
     return null
   }
   if (parsed.pathname !== '' && parsed.pathname !== '/') {
@@ -71,7 +72,8 @@ export function parsePairingCode(input: string): PairingOffer | null {
     return null
   }
   try {
-    if (trimmed.toLowerCase().startsWith('orca://')) {
+    const pairingPrefixes = [...getAcceptedDeepLinkProtocols()].map((protocol) => `${protocol}//`)
+    if (pairingPrefixes.some((prefix) => trimmed.toLowerCase().startsWith(prefix))) {
       return decodePairingOffer(trimmed)
     }
     return decodePairingBase64(trimmed)

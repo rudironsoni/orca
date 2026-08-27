@@ -16,6 +16,7 @@ import { getLinuxPackageType } from '../linux-update-package-type'
 import { createUpdaterDiagnosticLogger } from '../linux-package-install-diagnostic'
 import { registerAutoUpdaterHandlers } from '../updater-events'
 import { getServeUpdateHandoffFailure } from '../serve-update-handoff'
+import { getUpdatesDisabledStatus, isInAppUpdaterEnabled } from '../updater-distribution-gate'
 import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { AUTO_UPDATE_CHECK_INTERVAL_MS } from './updater-state'
 import { UpdaterDownloadInstall } from './updater-download-install'
@@ -40,6 +41,11 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
   }
 
   checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
+    // Why force: the disabled card auto-dismisses, so a repeat click must re-deliver an identical status.
+    if (!isInAppUpdaterEnabled()) {
+      this.sendStatus(getUpdatesDisabledStatus(true), { force: true })
+      return
+    }
     super.checkForUpdatesFromMenu(options)
   }
 
@@ -95,6 +101,12 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
   }
 
   async listAvailableReleaseBuilds(channel: ReleaseChannel): Promise<ReleaseBuild[]> {
+    // Why: the release picker lists official Orca builds this distribution can neither download nor install.
+    if (!isInAppUpdaterEnabled()) {
+      throw new Error(
+        'In-app updates are disabled for this build. Updates ship via Homebrew or GitHub Releases.'
+      )
+    }
     return super.listAvailableReleaseBuilds(channel)
   }
 
@@ -118,6 +130,15 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
     this.getReleaseChannelOverride = opts?.getReleaseChannelOverride ?? null
     this.updateInstallMode = opts?.installMode ?? 'interactive'
     this.lastInstallDeferralVersion = { download: null, install: null }
+
+    // The whole-updater gate for downstream distributions: no feed pinning, no
+    // electron-updater handlers, no nudge/changelog polling, no scheduled checks.
+    // autoUpdaterInitialized stays false, so remote server update support reports
+    // the existing 'updater-unavailable' reason without a wire change.
+    if (!isInAppUpdaterEnabled()) {
+      this.sendStatus(getUpdatesDisabledStatus())
+      return
+    }
 
     const serveHandoffFailure = getServeUpdateHandoffFailure()
     if (serveHandoffFailure) {
