@@ -78,7 +78,14 @@ export type UpdateStatus = (
        *  Additive and optional — older clients simply keep offering their own download. */
       externallyManaged?: boolean
     }
-  | { state: 'not-available'; userInitiated?: boolean }
+  // Why updatesDisabledReason: downstream distributions (Horca) ship without an
+  // in-app updater; the renderer must explain where updates come from instead of
+  // implying a completed check. Optional field keeps remote wire compatibility.
+  | {
+      state: 'not-available'
+      userInitiated?: boolean
+      updatesDisabledReason?: 'downstream-distribution'
+    }
   | { state: 'downloading'; percent: number; version: string; activeNudgeId?: string }
   | { state: 'downloaded'; version: string; releaseUrl?: string; activeNudgeId?: string }
   | {

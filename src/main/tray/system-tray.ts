@@ -4,6 +4,7 @@ import menuBarIconRetinaPath from '../../../resources/tray/orca-menu-barTemplate
 import { deferAppKitSceneMutation } from '../appkit-scene-mutation'
 import { createAppIconImage } from '../app-icon'
 import { translateMain } from '../i18n/main-i18n'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 import { composeTrayAttentionIcon, tintTrayTemplateForAttention } from './tray-attention-icon'
 import { stampTrayDevBadge } from './tray-dev-badge'
 
@@ -46,10 +47,11 @@ let nativeThemeUpdatedListener: (() => void) | null = null
 // Why: multiple dev instances can run side by side (one per worktree); the
 // tooltip carries the worktree/branch label so hovering tells them apart.
 function baseTooltip(): string {
+  const appName = getDistributionIdentity().productName
   if (!devIndicator) {
-    return 'Orca'
+    return appName
   }
-  return devIndicator.label ? `Orca DEV (${devIndicator.label})` : 'Orca DEV'
+  return devIndicator.label ? `${appName} DEV (${devIndicator.label})` : `${appName} DEV`
 }
 
 // Why: on Windows the notification area expects a 16px icon; the app icon PNG
