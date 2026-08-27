@@ -23,7 +23,10 @@ import {
   normalizeHerdrBinarySource,
   type HerdrBinarySource
 } from '../../../../shared/horca/terminal-backend'
-import { createHorcaTerminalSettingsSource } from '../../../horca/terminal-backend/horca-terminal-settings'
+import {
+  createHorcaTerminalSettingsSource,
+  type HorcaTerminalSettingsSource
+} from '../../../horca/terminal-backend/horca-terminal-settings'
 import { HerdrSshHostTransport } from './herdr-ssh-session'
 import { HerdrSocketTransport } from './herdr-socket-transport'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
@@ -34,10 +37,10 @@ import { resolveWslHerdrExecutable } from './herdr-wsl-executable'
 
 export function createLocalHerdrPtyProvider(
   fallback: IPtyProvider | undefined,
-  store: Store
+  store: Store,
+  terminalSettings: HorcaTerminalSettingsSource = createHorcaTerminalSettingsSource(store)
 ): HerdrPtyProvider {
   const transports = new Map<string, HerdrHostTransport>()
-  const terminalSettings = createHorcaTerminalSettingsSource(store)
   return new HerdrPtyProvider(
     (target) => {
       const hostId = target.identity.hostId
@@ -112,11 +115,11 @@ export function createSshHerdrPtyProvider(
   store: Store,
   connection: SshConnection,
   targetId: string,
-  hostPlatform?: RemoteHostPlatform
+  hostPlatform?: RemoteHostPlatform,
+  terminalSettings: HorcaTerminalSettingsSource = createHorcaTerminalSettingsSource(store)
 ): HerdrPtyProvider {
   const hostId = toSshExecutionHostId(targetId)
   const transports = new Map<string, HerdrHostTransport>()
-  const terminalSettings = createHorcaTerminalSettingsSource(store)
 
   return new HerdrPtyProvider(
     (target) => {
