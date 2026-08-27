@@ -67,6 +67,10 @@ import {
   getSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import {
+  composeTerminalBackendProvider,
+  type TerminalBackendComposition
+} from '../providers/terminal-backend-registry'
 import { notifyRemoteWorkspaceHandlers } from '../ipc/remote-workspace-events'
 import { PortScanner } from './ssh-port-scanner'
 import { isMainWindowVisible, onMainWindowBecameVisible } from '../window/main-window-visibility'
@@ -370,6 +374,8 @@ export class SshRelaySession {
   private readonly ptyConsumerClientInstanceId: string
   private ptyConsumerSessionState: SshPtyConsumerSessionState | null = null
   private activeCompatibilityAttachmentIds = new Set<string>()
+  private terminalBackendComposition: TerminalBackendComposition | null = null
+  private rawSshPtyProvider: SshPtyProvider | null = null
 
   constructor(
     readonly targetId: string,
@@ -1038,7 +1044,8 @@ export class SshRelaySession {
         if (this._state !== 'ready' || this.isDisposed()) {
           return null
         }
-        const current = getSshPtyProvider(this.targetId) as SshPtyProvider | undefined
+        // Why the raw provider: retry calls spawnWithoutTerminalRuntimeRepair on SshPtyProvider.
+        const current = this.rawSshPtyProvider
         // Why identity-checked: a reconnect that fell back to the same provider would retry
         // against the same unrepaired relay.
         return current && current !== requestingProvider ? current : null
@@ -1080,38 +1087,42 @@ export class SshRelaySession {
     this.wireUpRemoteOrcaCli(mux, connectionIncarnation)
 
     const providerGeneration = allocateSshPtyProviderGeneration()
-    const ptyProvider = new SshPtyProvider(
+    const rawPtyProvider = new SshPtyProvider(
       this.targetId,
       mux,
       this.remoteCliBridgeEnv ?? undefined,
       providerGeneration
     )
+    this.rawSshPtyProvider?.dispose()
+    this.rawSshPtyProvider = rawPtyProvider
     // Why optional-call: session tests register partial provider stubs, same as the pause adapter below.
-    ptyProvider.setTerminalUnavailableRecovery?.((cause) =>
-      this.recoverRemoteTerminalRuntime(ptyProvider, cause)
+    rawPtyProvider.setTerminalUnavailableRecovery?.((cause) =>
+      this.recoverRemoteTerminalRuntime(rawPtyProvider, cause)
     )
     const consumerOwnerState = this.activePtyConsumerOwner()
     if (consumerOwnerState) {
-      ptyProvider.setPtyDeliveryPauseAdapter?.(({ id, providerGeneration: generation, paused }) => {
-        if (
-          generation !== providerGeneration ||
-          this.activePtyProviderGeneration !== providerGeneration ||
-          this.mux !== mux
-        ) {
-          return
+      rawPtyProvider.setPtyDeliveryPauseAdapter?.(
+        ({ id, providerGeneration: generation, paused }) => {
+          if (
+            generation !== providerGeneration ||
+            this.activePtyProviderGeneration !== providerGeneration ||
+            this.mux !== mux
+          ) {
+            return
+          }
+          const sourceIdentity = this.sourceIdentityByRelayPtyId.get(id)
+          if (consumerOwnerState.outputFlowControl && !sourceIdentity) {
+            return
+          }
+          mux.notify('pty.setDeliveryPaused', {
+            id,
+            paused,
+            clientGeneration: consumerOwnerState.clientGeneration,
+            ownerGeneration: consumerOwnerState.ownerGeneration,
+            ...(sourceIdentity ? { deliveryToken: sourceIdentity.deliveryToken } : {})
+          })
         }
-        const sourceIdentity = this.sourceIdentityByRelayPtyId.get(id)
-        if (consumerOwnerState.outputFlowControl && !sourceIdentity) {
-          return
-        }
-        mux.notify('pty.setDeliveryPaused', {
-          id,
-          paused,
-          clientGeneration: consumerOwnerState.clientGeneration,
-          ownerGeneration: consumerOwnerState.ownerGeneration,
-          ...(sourceIdentity ? { deliveryToken: sourceIdentity.deliveryToken } : {})
-        })
-      })
+      )
     }
     this.sourceAckPublisherCleanup?.()
     this.sourceAckPublisherCleanup = null
@@ -1156,6 +1167,14 @@ export class SshRelaySession {
       )
     }
     this.activePtyProviderGeneration = providerGeneration
+    this.terminalBackendComposition?.dispose()
+    this.terminalBackendComposition = composeTerminalBackendProvider(rawPtyProvider, {
+      kind: 'ssh',
+      targetId: this.targetId,
+      connection: this.requireReadyConnection(),
+      hostPlatform: this.getHostPlatform() ?? undefined
+    })
+    const ptyProvider = this.terminalBackendComposition.provider as SshPtyProvider
     registerSshPtyProvider(this.targetId, ptyProvider)
     this.installPtyRecoveryNotifications(mux)
 
@@ -1684,10 +1703,10 @@ export class SshRelaySession {
       agentHookServer.clearStatusEntriesForConnection(this.targetId)
     }
 
-    const ptyProvider = getSshPtyProvider(this.targetId)
-    if (ptyProvider && 'dispose' in ptyProvider) {
-      ;(ptyProvider as { dispose: () => void }).dispose()
-    }
+    this.terminalBackendComposition?.dispose()
+    this.terminalBackendComposition = null
+    this.rawSshPtyProvider?.dispose()
+    this.rawSshPtyProvider = null
     const fsProvider = getSshFilesystemProvider(this.targetId)
     if (fsProvider && 'dispose' in fsProvider) {
       ;(fsProvider as { dispose: () => void }).dispose()
