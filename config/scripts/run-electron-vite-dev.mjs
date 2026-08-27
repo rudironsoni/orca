@@ -37,6 +37,8 @@ import {
 delete process.env.ELECTRON_RUN_AS_NODE
 
 const require = createRequire(import.meta.url)
+const { applyHorcaViteDistributionEnv } = require('../../src/shared/horca-vite-distribution.cjs')
+applyHorcaViteDistributionEnv(process.env)
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 const STABLE_NAME_FLAG = '--stable-name'
 const rawForwardedArgs = process.argv.slice(2)

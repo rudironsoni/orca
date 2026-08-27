@@ -4100,6 +4100,19 @@ private func isAuthorizedAgentPeer(_ pid: pid_t) -> Bool {
     return isTrustedOrcaApplication(parentPid)
 }
 
+// Why derived: the helper ships inside every distribution's app under the
+// bundle id "<owner app id>.computer-use" (config/scripts/build-computer-macos.mjs),
+// so the trusted owner comes from the helper's own identity — a downstream
+// build (e.g. com.rudironsoni.horca) must authorize its own main app, never
+// the other distribution's. Official Orca is the fallback for bare launches.
+private let trustedOwnerBundleId: String = {
+    let helperSuffix = ".computer-use"
+    if let ownBundleId = Bundle.main.bundleIdentifier, ownBundleId.hasSuffix(helperSuffix) {
+        return String(ownBundleId.dropLast(helperSuffix.count))
+    }
+    return "com.stablyai.orca"
+}()
+
 private func isTrustedOrcaApplication(_ pid: pid_t) -> Bool {
     guard let app = NSRunningApplication(processIdentifier: pid),
           let bundleId = app.bundleIdentifier
@@ -4107,9 +4120,10 @@ private func isTrustedOrcaApplication(_ pid: pid_t) -> Bool {
         return false
     }
     // Why: dev validation runs from per-worktree wrapper apps with stable
-    // Orca-owned bundle ids; the sidecar peer check must still authorize them.
-    return bundleId == "com.stablyai.orca" ||
-        bundleId.hasPrefix("com.stablyai.orca.dev.") ||
+    // owner-scoped dev bundle ids; the sidecar peer check must still authorize
+    // them. com.github.Electron covers unpackaged `pnpm dev` runs.
+    return bundleId == trustedOwnerBundleId ||
+        bundleId.hasPrefix(trustedOwnerBundleId + ".dev.") ||
         bundleId == "com.github.Electron"
 }
 
