@@ -1,0 +1,183 @@
+name: 'Horca: Sync Upstream'
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+
+concurrency:
+  group: horca-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.repository == 'rudironsoni/orca'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      skip: ${{ steps.state.outputs.skip }}
+      old_main: ${{ steps.state.outputs.old_main }}
+      upstream_sha: ${{ steps.state.outputs.upstream_sha }}
+      candidate_branch: ${{ steps.rebase.outputs.candidate_branch }}
+      candidate_sha: ${{ steps.rebase.outputs.candidate_sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Reconcile workflow state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while IFS=$'\t' read -r workflow_id workflow_path state; do
+            workflow_file=${workflow_path##*/}
+            if grep -Fxq "$workflow_file" config/horca/enabled-workflows.txt; then
+              if [ "$state" != active ]; then gh workflow enable "$workflow_id"; fi
+            elif [ "$state" = active ]; then
+              gh workflow disable "$workflow_id"
+            fi
+          done < <(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows" --jq '.workflows[] | [.id, .path, .state] | @tsv')
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/stablyai/orca.git
+          git fetch --no-prune-tags upstream main
+
+      - name: Inspect patch stack
+        id: state
+        run: |
+          old_main=$(git rev-parse HEAD)
+          upstream_sha=$(git rev-parse upstream/main)
+          old_base=$(git merge-base HEAD upstream/main)
+          echo "old_main=$old_main" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "old_base=$old_base" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if test -n "$(git rev-list --merges "$old_base..HEAD")"; then
+            echo '::error::Horca patch stack contains merge commits'
+            exit 1
+          fi
+          echo 'skip=false' >> "$GITHUB_OUTPUT"
+
+      - name: Rebase patch stack
+        id: rebase
+        if: steps.state.outputs.skip != 'true'
+        continue-on-error: true
+        env:
+          OLD_BASE: ${{ steps.state.outputs.old_base }}
+          OLD_MAIN: ${{ steps.state.outputs.old_main }}
+          UPSTREAM_SHA: ${{ steps.state.outputs.upstream_sha }}
+        run: |
+          candidate_branch="maintenance/rebase-${UPSTREAM_SHA:0:12}"
+          echo "candidate_branch=$candidate_branch" >> "$GITHUB_OUTPUT"
+          git config user.name 'Horca Maintenance'
+          git config user.email 'horca-maintenance@users.noreply.github.com'
+          git config commit.gpgsign false
+          git switch --detach "$OLD_MAIN"
+          if ! git rebase --onto upstream/main "$OLD_BASE"; then
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/sync-conflicts.txt"
+            git rev-parse REBASE_HEAD > "$RUNNER_TEMP/failed-commit.txt"
+            partial_sha=$(git rev-parse HEAD)
+            git range-diff "$OLD_BASE..$OLD_MAIN" "upstream/main..$partial_sha" \
+              > "$RUNNER_TEMP/partial-range-diff.txt" || true
+            git rebase --abort
+            git branch -f "$candidate_branch" "$partial_sha"
+            git push --force-with-lease origin "$candidate_branch"
+            exit 1
+          fi
+          candidate_sha=$(git rev-parse HEAD)
+          git branch -f "$candidate_branch" "$candidate_sha"
+          git push --force-with-lease origin "$candidate_branch"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Upload conflict report
+        if: steps.rebase.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: horca-sync-conflict-${{ steps.state.outputs.upstream_sha }}
+          path: |
+            ${{ runner.temp }}/sync-conflicts.txt
+            ${{ runner.temp }}/failed-commit.txt
+            ${{ runner.temp }}/partial-range-diff.txt
+          if-no-files-found: error
+
+      - name: Report rebase conflict
+        if: steps.rebase.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_BRANCH: ${{ steps.rebase.outputs.candidate_branch }}
+        run: |
+          conflicts=$(sed 's/^/- `/' "$RUNNER_TEMP/sync-conflicts.txt" | sed 's/$/`/')
+          failed_commit=$(cat "$RUNNER_TEMP/failed-commit.txt")
+          body=$(printf 'Automated rebase onto `stablyai/orca:main` failed.\n\nFailed commit: `%s`\nCandidate branch: `%s`\n\n%s\n\nThe workflow artifact contains the partial range-diff.' "$failed_commit" "$CANDIDATE_BRANCH" "$conflicts")
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "sync-conflict"' --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'sync-conflict: upstream main' --body "$body"
+          fi
+          exit 1
+
+  validate:
+    needs: candidate
+    if: needs.candidate.result == 'success' && needs.candidate.outputs.skip != 'true'
+    uses: ./.github/workflows/horca_ci.yml
+    with:
+      sha: ${{ needs.candidate.outputs.candidate_sha }}
+      upstream_sha: ${{ needs.candidate.outputs.upstream_sha }}
+      full: true
+    permissions:
+      contents: read
+
+  promote:
+    needs: [candidate, validate]
+    if: needs.candidate.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: horca-maintenance
+    steps:
+      - name: Create maintenance token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.HORCA_APP_ID }}
+          private-key: ${{ secrets.HORCA_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - name: Promote tested candidate
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          OLD_MAIN: ${{ needs.candidate.outputs.old_main }}
+          UPSTREAM_SHA: ${{ needs.candidate.outputs.upstream_sha }}
+          CANDIDATE_BRANCH: ${{ needs.candidate.outputs.candidate_branch }}
+          CANDIDATE_SHA: ${{ needs.candidate.outputs.candidate_sha }}
+        run: |
+          remote_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$remote_main" = "$OLD_MAIN"
+          git fetch origin "refs/heads/$CANDIDATE_BRANCH:refs/remotes/origin/$CANDIDATE_BRANCH"
+          test "$(git rev-parse "refs/remotes/origin/$CANDIDATE_BRANCH")" = "$CANDIDATE_SHA"
+          git cat-file -e "$UPSTREAM_SHA^{commit}"
+          git merge-base --is-ancestor "$UPSTREAM_SHA" "$CANDIDATE_SHA"
+          test -z "$(git rev-list --merges "$UPSTREAM_SHA..$CANDIDATE_SHA")"
+          git push --force-with-lease="refs/heads/main:$OLD_MAIN" origin \
+            "$CANDIDATE_SHA:refs/heads/main"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$CANDIDATE_SHA"
+          git push origin --delete "$CANDIDATE_BRANCH"
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "sync-conflict"' --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --comment "Resolved by autonomous rebase to $UPSTREAM_SHA."
+          fi
