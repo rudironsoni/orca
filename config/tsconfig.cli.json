@@ -4,6 +4,7 @@
     "../src/cli/**/*",
     "../src/shared/**/*",
     "../src/main/agent-state-file-reader.ts",
+    "../src/main/local-state-root.ts",
     "../src/main/agent-hooks/hook-stdin-contract.ts",
     "../src/main/agent-hooks/hook-post-command.ts",
     "../src/main/agent-hooks/hook-config-write-path.ts",
