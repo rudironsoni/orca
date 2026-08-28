@@ -58,6 +58,12 @@ jobs:
 
       - uses: ./.github/actions/install-node-dependencies
 
+      - name: Install Linux computer-use runtime
+        if: inputs.full == true
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gir1.2-atspi-2.0
+
       - name: Typecheck
         run: pnpm tc
 
