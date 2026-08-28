@@ -1,0 +1,420 @@
+{
+  "upstreamRef": "upstream/main",
+  "forkOnlyPrefixes": [
+    ".github/workflows/horca_",
+    "config/horca/",
+    "docs/horca/",
+    "resources/horca/",
+    "src/main/horca/",
+    "src/main/providers/multiplexer/herdr/",
+    "src/renderer/src/horca/",
+    "src/shared/horca/",
+    "src/main/providers/terminal-backend-registry",
+    "src/main/local-state-root",
+    "src/main/updater-distribution-gate",
+    "src/shared/distribution-",
+    "src/shared/horca-pairing",
+    "src/shared/horca-vite-distribution"
+  ],
+  "forkOnlyPaths": [
+    "config/electron-builder-downstream.cjs",
+    "config/linux/after-install-horca.sh",
+    "config/linux/after-remove-horca.sh",
+    "config/nsis/daemon-host-uninstall-horca.nsh",
+    "config/scripts/isolate-lefthook-hooks.ts",
+    "resources/linux/bin/horca"
+  ],
+  "deniedOverlayPrefixes": [
+    ".github/workflows/",
+    "src/renderer/src/i18n/locales/",
+    "tests/e2e/"
+  ],
+  "temporarySubsystems": ["claude-upstream-pr-16673"],
+  "overlays": [
+    {
+      "path": "src/main/claude-accounts/claude-account-service-login-process.test.ts",
+      "subsystem": "claude-upstream-pr-16673",
+      "reason": "Carry the exact upstream contribution patch until it lands",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
+    },
+    {
+      "path": "src/main/claude-accounts/claude-command-process.ts",
+      "subsystem": "claude-upstream-pr-16673",
+      "reason": "Carry the exact upstream contribution patch until it lands",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
+    },
+    {
+      "path": "src/main/claude-accounts/claude-login-session.ts",
+      "subsystem": "claude-upstream-pr-16673",
+      "reason": "Carry the exact upstream contribution patch until it lands",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
+    },
+    {
+      "path": "src/main/claude-accounts/keychain.test.ts",
+      "subsystem": "claude-upstream-pr-16673",
+      "reason": "Carry the exact upstream contribution patch until it lands",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
+    },
+    {
+      "path": "src/main/claude-accounts/keychain.ts",
+      "subsystem": "claude-upstream-pr-16673",
+      "reason": "Carry the exact upstream contribution patch until it lands",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
+    },
+    {
+      "path": "src/main/daemon/daemon-init.ts",
+      "subsystem": "terminal-backend-seam",
+      "reason": "Compose registered terminal backend adapters for local sessions",
+      "upstreamPr": null,
+      "dropWhen": "The generic terminal backend registry lands upstream"
+    },
+    {
+      "path": "src/main/index.ts",
+      "subsystem": "terminal-backend-seam",
+      "reason": "Initialize Horca-owned adapters through one downstream entry point",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream initialization hook"
+    },
+    {
+      "path": "src/main/providers/pty-provider-contract.ts",
+      "subsystem": "terminal-backend-seam",
+      "reason": "Expose generic provider capabilities without Herdr detection",
+      "upstreamPr": null,
+      "dropWhen": "Generic provider capabilities land upstream"
+    },
+    {
+      "path": "src/main/ssh/ssh-relay-session.ts",
+      "subsystem": "terminal-backend-seam",
+      "reason": "Compose registered terminal backend adapters for SSH sessions",
+      "upstreamPr": null,
+      "dropWhen": "The generic terminal backend registry lands upstream"
+    },
+    {
+      "path": "config/electron-builder.config.cjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Select the downstream builder wrapper only for Horca builds",
+      "upstreamPr": null,
+      "dropWhen": "Upstream supports an external distribution builder config"
+    },
+    {
+      "path": "config/scripts/build-computer-macos.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Build the native helper with the Horca bundle identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream native builds accept distribution identity inputs"
+    },
+    {
+      "path": "config/scripts/build-notification-status-macos.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Build the notification helper with the Horca bundle identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream native builds accept distribution identity inputs"
+    },
+    {
+      "path": "config/scripts/orca-dev.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use an isolated Horca development state directory",
+      "upstreamPr": null,
+      "dropWhen": "Upstream development launch accepts distribution state identity"
+    },
+    {
+      "path": "config/scripts/run-electron-vite-dev.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Pass the selected distribution into development builds",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a supported distribution build input"
+    },
+    {
+      "path": "config/scripts/run-electron-vite-targets-in-parallel.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Pass the selected distribution into parallel build targets",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a supported distribution build input"
+    },
+    {
+      "path": "electron.vite.config.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Define the compile-time distribution identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a supported distribution build input"
+    },
+    {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use Horca bundle identifiers for native permission attribution",
+      "upstreamPr": null,
+      "dropWhen": "The native helper reads distribution identity at build time"
+    },
+    {
+      "path": "native/windows-cli-launcher/OrcaCliLauncher.cs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Launch the Horca executable from the downstream CLI",
+      "upstreamPr": null,
+      "dropWhen": "The Windows launcher accepts executable identity at build time"
+    },
+    {
+      "path": "resources/darwin/bin/orca",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Launch Horca from the downstream public CLI",
+      "upstreamPr": null,
+      "dropWhen": "Packaging selects a fork-owned CLI launcher"
+    },
+    {
+      "path": "resources/win32/bin/orca.cmd",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Launch Horca from the downstream public CLI",
+      "upstreamPr": null,
+      "dropWhen": "Packaging selects a fork-owned CLI launcher"
+    },
+    {
+      "path": "src/main/bitbucket/credential-store.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca credentials under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/browser/browser-client-page-renderer-lifecycle.electron.test.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Verify browser process launch with downstream build constants",
+      "upstreamPr": null,
+      "dropWhen": "The test accepts distribution identity through a generic fixture"
+    },
+    {
+      "path": "src/main/browser/browser-route-egress-electron-launch.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Launch the correct downstream Electron executable",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its executable identity"
+    },
+    {
+      "path": "src/main/browser/browser-route-webrtc-egress.electron.test.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Verify browser route launch with downstream build constants",
+      "upstreamPr": null,
+      "dropWhen": "The test accepts distribution identity through a generic fixture"
+    },
+    {
+      "path": "src/main/cli/bundled-cli-launcher-path.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Resolve the fork-owned public CLI launcher",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its public CLI identity"
+    },
+    {
+      "path": "src/main/cli/cli-install-constants.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Install the fork-owned public CLI name",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its public CLI identity"
+    },
+    {
+      "path": "src/main/cli/cli-install-location.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use the Horca CLI installation marker",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its public CLI identity"
+    },
+    {
+      "path": "src/main/cli/windows-launcher-asset.test.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Verify the downstream Windows launcher asset",
+      "upstreamPr": null,
+      "dropWhen": "The test accepts distribution identity through a generic fixture"
+    },
+    {
+      "path": "src/main/computer/macos-computer-use-permissions.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Check permissions against the Horca native helper identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes native helper identity"
+    },
+    {
+      "path": "src/main/computer/macos-native-provider-paths.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Resolve the Horca native helper path",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes native helper identity"
+    },
+    {
+      "path": "src/main/daemon/daemon-host-relocation.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Relocate daemon hosts under the Horca identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes daemon host identity"
+    },
+    {
+      "path": "src/main/ipc/notification-system-settings-link.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Open system settings for the Horca bundle identifier",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes notification bundle identity"
+    },
+    {
+      "path": "src/main/jira/site-credential-store.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca credentials under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/keybindings/keybinding-file.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca keybindings under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/linear/linear-credential-paths.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca credentials under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/minimax/minimax-cookie-store.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca credentials under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/runtime/claude-agent-teams-shim-env.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Expose the correct downstream CLI to agent teams",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its public CLI identity"
+    },
+    {
+      "path": "src/main/runtime/windows-mobile-firewall.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Give Horca an independent Windows firewall rule",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external product identity"
+    },
+    {
+      "path": "src/main/speech/model-cache-path.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Give Horca an independent Windows speech model cache",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external product identity"
+    },
+    {
+      "path": "src/main/speech/openai-api-key-store.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep Horca credentials under its isolated local state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/startup/dev-instance-identity.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Give Horca development instances an independent OS identity",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external product identity"
+    },
+    {
+      "path": "src/main/tray/system-tray.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Display the selected distribution name in the system tray",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external product identity"
+    },
+    {
+      "path": "src/main/updater-test-harness.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep updater test state under the distribution state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/updater.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Disable the stock updater for downstream releases",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream updater policy"
+    },
+    {
+      "path": "src/main/window/createMainWindow.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Register the Horca deep-link protocol",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external protocol identity"
+    },
+    {
+      "path": "src/main/window/main-window-close-lifecycle.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Match only Horca daemon processes during shutdown",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes daemon process identity"
+    },
+    {
+      "path": "src/renderer/src/components/maintenance/update-card/UpdateCardStateContent.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Explain the downstream release update channel",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream updater policy"
+    },
+    {
+      "path": "src/renderer/src/components/maintenance/update-card/update-card-visibility.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Show update status for a disabled downstream updater",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream updater policy"
+    },
+    {
+      "path": "src/renderer/src/components/settings/GeneralUpdateSettingsSection.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Explain the downstream release update channel",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream updater policy"
+    },
+    {
+      "path": "src/renderer/src/web/web-pairing.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Generate Horca pairing deep links",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external protocol identity"
+    },
+    {
+      "path": "src/shared/orca-cli-command-name.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Expose the Horca public CLI name",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its public CLI identity"
+    },
+    {
+      "path": "src/shared/pairing.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Encode and accept Horca pairing deep links",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external protocol identity"
+    },
+    {
+      "path": "src/shared/skill-share-link.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Accept Horca skill share deep links",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes external protocol identity"
+    },
+    {
+      "path": "src/shared/update-status-types.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Represent the downstream updater policy across process boundaries",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a downstream updater policy"
+    },
+    {
+      "path": "src/types/build-constants.d.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Type the compile-time distribution selector",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes a supported distribution build input"
+    }
+  ]
+}
