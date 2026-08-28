@@ -8,8 +8,8 @@ People do not create or manage them.
 
 Each successful push to Horca `main` starts `Horca: Stable Release`. The
 workflow validates the exact source SHA, builds signed and notarized macOS DMGs,
-creates `v<orca-core>-horca.<N>` and publishes the GitHub release. The tap
-reconciles `Casks/horca.rb` at the start of every hour.
+creates `v<orca-core>-horca.<N>` and publishes the GitHub release. The Horca
+Maintenance App then dispatches an immediate update of `Casks/horca.rb`.
 
 Stable omits Windows until Horca has its own Windows signing certificate.
 
@@ -43,9 +43,10 @@ Stable and beta conflict, so uninstall one channel before installing the other.
 Release allocation is idempotent by source SHA. A rerun reuses an existing tag.
 If the GitHub release already exists, the workflow exits without rebuilding it.
 
-The tap checks both channels at `0 * * * *` and can also be run manually. It never selects a
-version by publication date, never downgrades a cask, and validates release
-checksums before it changes `main`.
+The tap also checks both channels at `0 * * * *` and can be run manually. The
+hourly run repairs a missed dispatch. The tap never selects a version by
+publication date, never downgrades a cask, and validates release checksums
+before it changes `main`.
 
 Required Orca repository secrets:
 
@@ -55,3 +56,5 @@ Required Orca repository secrets:
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`
 - `FORK_SYNC_PAT`, with contents access to `rudironsoni/orca`
+- `HORCA_APP_ID` and `HORCA_APP_PRIVATE_KEY` in the `horca-maintenance`
+  environment. The App installation needs access to `rudironsoni/homebrew-tap`.
