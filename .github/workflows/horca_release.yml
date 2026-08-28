@@ -19,7 +19,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: horca-release
+  group: horca-release-${{ inputs.channel || 'stable' }}
   cancel-in-progress: false
 
 jobs:
