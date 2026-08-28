@@ -1,10 +1,12 @@
-import { basename, win32 } from 'node:path'
+import { basename, resolve, win32 } from 'node:path'
 import type { DistributionIdentity } from '../../shared/distribution-identity'
 
 export function assertHorcaPackagedDistribution(args: {
   identity: DistributionIdentity
   isPackaged: boolean
   execPath: string
+  userDataPath?: string
+  expectedUserDataPath?: string
 }): void {
   if (!args.isPackaged) {
     return
@@ -18,4 +20,20 @@ export function assertHorcaPackagedDistribution(args: {
   if (args.identity.distribution === 'horca' && args.identity.stateRootDirName !== '.horca') {
     throw new Error('Horca package resolved an unsafe local state root')
   }
+  if (
+    args.identity.distribution === 'horca' &&
+    args.userDataPath &&
+    args.expectedUserDataPath &&
+    !areSamePath(args.userDataPath, args.expectedUserDataPath)
+  ) {
+    throw new Error(`Horca package resolved an unsafe Electron profile: ${args.userDataPath}`)
+  }
+}
+
+function areSamePath(left: string, right: string): boolean {
+  const normalizedLeft = resolve(left)
+  const normalizedRight = resolve(right)
+  return process.platform === 'win32'
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight
 }
