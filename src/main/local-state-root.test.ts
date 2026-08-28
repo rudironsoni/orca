@@ -6,15 +6,16 @@ import { getLocalStateRoot } from './local-state-root'
 const globalWithOverride = globalThis as { ORCA_DISTRIBUTION?: OrcaDistribution }
 
 afterEach(() => {
-  delete globalWithOverride.ORCA_DISTRIBUTION
+  globalWithOverride.ORCA_DISTRIBUTION = 'official'
 })
 
 describe('getLocalStateRoot', () => {
   it('uses ~/.orca when the official distribution is active', () => {
+    globalWithOverride.ORCA_DISTRIBUTION = 'official'
     expect(getLocalStateRoot('/home/test')).toBe(join('/home/test', '.orca'))
   })
 
-  it('uses ~/.horca when the horca distribution is active', () => {
+  it('uses ~/.horca when the Horca distribution is active', () => {
     globalWithOverride.ORCA_DISTRIBUTION = 'horca'
     expect(getLocalStateRoot('/home/test')).toBe(join('/home/test', '.horca'))
   })
