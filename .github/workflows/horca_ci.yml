@@ -57,6 +57,8 @@ jobs:
         run: node config/horca/scripts/check-overlay-policy.mjs
 
       - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: ${{ inputs.full && 'node' || 'none' }}
 
       - name: Install Linux computer-use runtime
         if: inputs.full == true
