@@ -9,6 +9,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { clampNumber } from '@/lib/terminal-theme'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { productCopy } from '../../horca/product-identity'
 
 type TerminalWindowSectionProps = {
   settings: GlobalSettings
@@ -140,10 +141,7 @@ export function TerminalWindowSection({
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.TerminalWindowSection.53ce336e15',
-                    'Restart Orca to apply the window blur change.'
-                  )}
+                  {productCopy('Restart Orca to apply the window blur change.')}
                 </p>
               </div>
               <Button

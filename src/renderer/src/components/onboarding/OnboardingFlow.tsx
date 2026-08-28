@@ -13,8 +13,9 @@ import { useOnboardingFlow } from './use-onboarding-flow'
 import { OnboardingSkipConfirmationDialog } from './OnboardingSkipConfirmationDialog'
 import { OnboardingFooter } from './OnboardingFooter'
 import { shouldRequestOnboardingSkipConfirmation } from './onboarding-dismiss-target'
-import logo from '../../../../../resources/logo.svg'
+import logo from '../../../../../resources/horca/logo.svg'
 import { translate } from '@/i18n/i18n'
+import { ACTIVE_PRODUCT_NAME, productCopy } from '../../horca/product-identity'
 
 const stepCopy = {
   agent: {
@@ -25,8 +26,7 @@ const stepCopy = {
       )
     },
     get subtitle() {
-      return translate(
-        'auto.components.onboarding.OnboardingFlow.322fc50a18',
+      return productCopy(
         "Orca works with every CLI agent. Choose the one you'll reach for most. Switch any time."
       )
     }
@@ -53,10 +53,7 @@ const stepCopy = {
       )
     },
     get subtitle() {
-      return translate(
-        'auto.components.onboarding.OnboardingFlow.ff92d15436',
-        'Orca will notify you when agents are done or need help.'
-      )
+      return productCopy('Orca will notify you when agents are done or need help.')
     }
   },
   integrations: {
@@ -213,10 +210,7 @@ export default function OnboardingFlow({
         <section
           ref={flow.setLifecycleRootRef}
           role="dialog"
-          aria-label={translate(
-            'auto.components.onboarding.OnboardingFlow.277ba45540',
-            'Orca onboarding'
-          )}
+          aria-label={`${ACTIVE_PRODUCT_NAME} onboarding`}
           aria-modal="true"
           data-onboarding-modal
           className={cn(
@@ -232,9 +226,7 @@ export default function OnboardingFlow({
                 aria-hidden="true"
                 className="h-7 w-auto shrink-0 invert dark:invert-0"
               />
-              <span>
-                {translate('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca')}
-              </span>
+              <span>{ACTIVE_PRODUCT_NAME}</span>
             </div>
 
             <div className="mt-10 flex items-center gap-2 transition-[margin-top] duration-[760ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none">
@@ -282,10 +274,7 @@ export default function OnboardingFlow({
             <div className="mt-8 shrink-0">
               {stepIndex === 0 && (
                 <div className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {translate(
-                    'auto.components.onboarding.OnboardingFlow.1b5e182e9f',
-                    'Welcome to Orca'
-                  )}
+                  {`Welcome to ${ACTIVE_PRODUCT_NAME}`}
                 </div>
               )}
               <h1 className="text-[34px] font-semibold leading-[1.15] tracking-tight text-foreground">
