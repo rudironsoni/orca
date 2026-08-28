@@ -13,6 +13,7 @@ function git(args, input) {
   const result = spawnSync('git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
     ...(input === undefined ? {} : { input })
   })
   if (result.status !== 0) {
@@ -39,7 +40,9 @@ if (mergeCommits) {
   throw new Error(`Patch stack contains merge commits:\n${mergeCommits}`)
 }
 
-const commits = git(['rev-list', '--reverse', `${base}..HEAD`]).split('\n').filter(Boolean)
+const commits = git(['rev-list', '--reverse', `${base}..HEAD`])
+  .split('\n')
+  .filter(Boolean)
 const patchIds = new Map(commits.map((commit) => [patchId(commit), commit]))
 for (const required of policy.requiredPatches) {
   if (!patchIds.has(required.patchId)) {
