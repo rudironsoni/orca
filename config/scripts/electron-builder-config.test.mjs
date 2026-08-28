@@ -213,7 +213,11 @@ describe('electron-builder config', () => {
         'out/package.json',
         'out/cli/**',
         'out/shared/**',
-        'out/main/claude-accounts/keychain.js'
+        'out/main/claude-accounts/keychain.js',
+        'out/main/codex-accounts/**',
+        'out/main/agent-state-file-reader.js',
+        'out/main/local-state-root.js',
+        'out/main/rolling-file-backup.js'
       ])
     )
   })
