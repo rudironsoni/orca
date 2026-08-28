@@ -1,0 +1,11 @@
+{
+  "upstreamRef": "upstream/main",
+  "requiredPatches": [
+    {
+      "name": "Claude Keychain SSO fix",
+      "patchId": "623594369f8cedca3605cb6e5f9e3ed788924685",
+      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
+      "dropWhen": "Upstream contains a patch-equivalent fix"
+    }
+  ]
+}
