@@ -45,6 +45,11 @@ export function verifyHorcaAsar(asarPath) {
     ['product name is Horca', /productName:\s*["']Horca["']/.test(shared)],
     ['state root is .horca', /stateRootDirName:\s*["']\.horca["']/.test(shared)],
     ['public CLI is horca', /publicCli:\s*["']horca["']/.test(shared)],
+    [
+      'Horca Electron profile is configured',
+      (main.match(/configureHorcaUserDataPath\(/g)?.length ?? 0) >= 2 &&
+        /setPath\(["']userData["']/.test(main)
+    ],
     ['Herdr provider is packaged', main.includes('HerdrPtyProvider')],
     ['Herdr settings are registered', main.includes('terminal-backends.json')],
     ['Herdr settings UI is packaged', renderer.includes('data-horca-settings')],
