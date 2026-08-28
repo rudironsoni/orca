@@ -6,20 +6,20 @@ import {
   createHorcaTerminalSettingsSource,
   horcaTerminalSettingsPath
 } from './terminal-backend/horca-terminal-settings'
+import { registerHorcaTerminalSettingsIpc } from './terminal-backend/horca-terminal-settings-ipc'
 
 export type HorcaRegistration = {
   dispose(): void
 }
 
-export function initializeHorca(store: Store, profileDataFile: string): HorcaRegistration {
+export function initializeHorca(store: Store): HorcaRegistration {
   setHerdrDesktopSurface(electronHerdrDesktopSurface)
-  const settings = createHorcaTerminalSettingsSource(
-    store,
-    horcaTerminalSettingsPath(profileDataFile)
-  )
+  const settings = createHorcaTerminalSettingsSource(store, horcaTerminalSettingsPath())
   const unregisterHerdr = registerHerdrTerminalBackend(store, settings)
+  const unregisterSettingsIpc = registerHorcaTerminalSettingsIpc(settings)
   return {
     dispose: () => {
+      unregisterSettingsIpc()
       unregisterHerdr()
       setHerdrDesktopSurface(null)
     }
