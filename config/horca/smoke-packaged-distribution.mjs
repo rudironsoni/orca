@@ -86,7 +86,7 @@ async function launch() {
   const port = await reservePort()
   const child = spawn(
     executablePath,
-    [`--user-data-dir=${userData}`, `--remote-debugging-port=${port}`, '--remote-allow-origins=*'],
+    [`--remote-debugging-port=${port}`, '--remote-allow-origins=*'],
     {
       env: launchEnvironment,
       stdio: ['ignore', 'ignore', 'pipe']
