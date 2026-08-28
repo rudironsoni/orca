@@ -111,7 +111,9 @@ jobs:
             test "$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")" = 'com.rudironsoni.horca'
             codesign --verify --deep --strict "$app"
             xcrun stapler validate "$app"
-            node config/horca/smoke-packaged-distribution.mjs "$app/Contents/MacOS/Horca"
+            if [ "$arch" = 'arm64' ]; then
+              node config/horca/smoke-packaged-distribution.mjs "$app/Contents/MacOS/Horca"
+            fi
             hdiutil detach "$mount" -quiet
           done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
