@@ -30,6 +30,7 @@ import { matchesRepositoryIdentitySearch } from './repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './RepositoryWorktreeDefaultsSection'
 import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
+import { HorcaProjectTerminalBackendSetting } from '../../horca/terminal-settings/HorcaProjectTerminalBackendSetting'
 export { getRepositoryPaneSearchEntries }
 export { matchesRepositoryIdentitySearch } from './repository-identity-search'
 
@@ -380,6 +381,15 @@ export function RepositoryPane({
           </>
         ) : null}
       </section>
+    ) : null,
+    project ? (
+      <HorcaProjectTerminalBackendSetting
+        key="horca-terminal-backend"
+        projectId={project.id}
+        projectName={project.displayName}
+        searchQuery={searchQuery}
+        forceVisible={forceFullPaneForRepoMatch}
+      />
     ) : null,
     hooksSection,
     !isFolder &&
