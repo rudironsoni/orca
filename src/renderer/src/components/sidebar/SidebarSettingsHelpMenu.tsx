@@ -14,7 +14,7 @@ import {
   Settings
 } from 'lucide-react'
 import { toast } from 'sonner'
-import logo from '../../../../../resources/logo.svg'
+import logo from '../../../../../resources/horca/logo.svg'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -34,6 +34,7 @@ import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import type * as SidebarFeedbackDialogModule from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
+import { productCopy } from '../../horca/product-identity'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
 // Why lazy: the feedback form is only reachable from this menu's own item, so it does not
@@ -346,10 +347,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleRestartOrca} disabled={isRestartingOrca}>
               <RotateCw className="size-3.5" />
-              {translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1',
-                'Restart Orca'
-              )}
+              {productCopy('Restart Orca')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
