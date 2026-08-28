@@ -243,6 +243,7 @@ jobs:
 
   tap:
     needs: publish
+    if: always() && needs.publish.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
