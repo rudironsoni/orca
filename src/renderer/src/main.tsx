@@ -19,11 +19,11 @@ import { applyDocumentTheme } from './lib/document-theme'
 import { installTypingLatencyDiagnostic } from './lib/typing-latency/diagnostic'
 import { shouldEnableReactGrab } from './lib/react-grab-dev-gate'
 import { I18nProvider } from './i18n/I18nProvider'
-import { translate } from './i18n/i18n'
 import { getOrCreateRendererRoot } from './lib/react-renderer-root'
 import { primeTerminalWebglAddon } from './lib/pane-manager/pane-webgl-renderer'
 import { SkillWarningPreviewLauncher } from './components/skills/SkillWarningPreviewLauncher'
 import { installBrowserClientPageRenderer } from './components/browser-pane/browser-client-page-renderer-installation'
+import { productCopy } from './horca/product-identity'
 
 recordRendererCrashBreadcrumb('renderer_bootstrap_started', { dev: import.meta.env.DEV })
 installRendererCrashDiagnostics()
@@ -57,9 +57,8 @@ function RendererRoot(): React.JSX.Element {
     <RecoverableRenderErrorBoundary
       boundaryId="app.root"
       surface="app-root"
-      title={translate('app.recoverableError.rootTitle', 'Orca hit a renderer error.')}
-      description={translate(
-        'app.recoverableError.rootDescription',
+      title={productCopy('Orca hit a renderer error.')}
+      description={productCopy(
         'The app shell could not finish rendering. Retry to remount it, or relaunch Orca if the error persists.'
       )}
     >
