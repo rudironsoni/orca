@@ -24,11 +24,7 @@
     "config/scripts/isolate-lefthook-hooks.ts",
     "resources/linux/bin/horca"
   ],
-  "deniedOverlayPrefixes": [
-    ".github/workflows/",
-    "src/renderer/src/i18n/locales/",
-    "tests/e2e/"
-  ],
+  "deniedOverlayPrefixes": [".github/workflows/", "src/renderer/src/i18n/locales/", "tests/e2e/"],
   "temporarySubsystems": ["claude-upstream-pr-16673"],
   "overlays": [
     {
@@ -415,6 +411,139 @@
       "reason": "Type the compile-time distribution selector",
       "upstreamPr": null,
       "dropWhen": "Upstream exposes a supported distribution build input"
+    },
+    {
+      "path": "config/scripts/electron-builder-config.test.mjs",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Verify the packaged downstream CLI runtime closure",
+      "upstreamPr": null,
+      "dropWhen": "Upstream packages the complete CLI runtime closure"
+    },
+    {
+      "path": "config/tsconfig.cli.json",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Compile the distribution-aware local state root for the public CLI",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "config/vitest.config.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep upstream tests on the official identity while Horca is the committed fallback",
+      "upstreamPr": null,
+      "dropWhen": "Upstream tests select distribution identity through a generic fixture"
+    },
+    {
+      "path": "src/main/agent-hooks/installer-utils.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep local managed hooks under the Horca state root",
+      "upstreamPr": null,
+      "dropWhen": "Upstream centralizes its local state root"
+    },
+    {
+      "path": "src/main/app-icon.ts",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Keep every packaged Horca window and Dock surface on the badged icon",
+      "upstreamPr": null,
+      "dropWhen": "Upstream supports downstream icon resources"
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "subsystem": "horca-terminal-settings",
+      "reason": "Expose the optional Horca terminal settings contract",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes downstream preload contributions"
+    },
+    {
+      "path": "src/preload/horca-terminal-settings-api.ts",
+      "subsystem": "horca-terminal-settings",
+      "reason": "Bridge the Horca-owned terminal settings IPC contract",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes downstream preload contributions"
+    },
+    {
+      "path": "src/preload/index.ts",
+      "subsystem": "horca-terminal-settings",
+      "reason": "Mount the Horca terminal settings preload API",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes downstream preload contributions"
+    },
+    {
+      "path": "src/renderer/index.html",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Set the packaged renderer document title to Horca",
+      "upstreamPr": null,
+      "dropWhen": "Upstream derives the document title from distribution identity"
+    },
+    {
+      "path": "src/renderer/popout.html",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Set the packaged popout document title to Horca",
+      "upstreamPr": null,
+      "dropWhen": "Upstream derives the document title from distribution identity"
+    },
+    {
+      "path": "src/renderer/src/app-shell/TitlebarLeftControls.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Render the active distribution name and badged logo in the title bar",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/components/Landing.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Render the badged Horca logo on the landing surface",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/components/onboarding/OnboardingFlow.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Render downstream product copy and the badged logo during onboarding",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/components/settings/RepositoryPane.tsx",
+      "subsystem": "horca-terminal-settings",
+      "reason": "Mount the Horca-owned project terminal backend setting",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes downstream settings contributions"
+    },
+    {
+      "path": "src/renderer/src/components/settings/TerminalPane.tsx",
+      "subsystem": "horca-terminal-settings",
+      "reason": "Mount the Horca-owned terminal backend settings section",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes downstream settings contributions"
+    },
+    {
+      "path": "src/renderer/src/components/settings/TerminalWindowSection.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use the active product name in local terminal window copy",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/components/settings/orca-logo-settings-icon.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Render the badged Horca logo in Settings",
+      "upstreamPr": null,
+      "dropWhen": "Upstream supports downstream icon resources"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarSettingsHelpMenu.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use Horca branding and product copy in the local app menu",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/main.tsx",
+      "subsystem": "horca-distribution-identity",
+      "reason": "Use the active product name in renderer recovery copy",
+      "upstreamPr": null,
+      "dropWhen": "Upstream renders its product identity through a generic provider"
     }
   ]
 }
