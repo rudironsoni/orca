@@ -26,4 +26,16 @@ describe('assertHorcaPackagedDistribution', () => {
       })
     ).not.toThrow()
   })
+
+  it('rejects the Orca Electron profile in a Horca package', () => {
+    expect(() =>
+      assertHorcaPackagedDistribution({
+        identity: DISTRIBUTION_IDENTITIES.horca,
+        isPackaged: true,
+        execPath: '/Applications/Horca.app/Contents/MacOS/Horca',
+        userDataPath: '/Users/rudi/.orca',
+        expectedUserDataPath: '/Users/rudi/.horca'
+      })
+    ).toThrow('Horca package resolved an unsafe Electron profile')
+  })
 })

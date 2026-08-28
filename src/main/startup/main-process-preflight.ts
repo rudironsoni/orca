@@ -65,6 +65,7 @@ import { desktopWorktreeWatcherRemoval } from '../ipc/filesystem-watcher'
 import { setDefaultProxySessionResolver } from '../network/proxy-settings'
 import { initDataPath, getCanonicalUserDataPath } from '../persistence'
 import { assertHorcaPackagedDistribution } from '../horca/assert-horca-packaged-distribution'
+import { configureHorcaUserDataPath } from '../horca/configure-horca-user-data'
 import { getDistributionIdentity } from '../../shared/distribution-identity'
 import { applyMacPressAndHoldDefaultAtStartup } from '../macos-press-and-hold-default'
 import { initSessionParseCachePersistence } from '../ai-vault/session-parse-cache-persistence'
@@ -168,6 +169,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   // it can only reach the main-process guard and breadcrumb store once this is registered.
   installMainProcessTreeKillGate()
   const isDev = is.dev
+  configureHorcaUserDataPath(isDev)
   configureDevUserDataPath(isDev)
   configureOrcaUserDataPathEnv()
   // Why these four lines are one step (#16761): the two above decide where userData lives, and
@@ -177,7 +179,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Safe this early: ElectronAppEnvironment holds no state and calls `app` lazily per accessor, so it
   // changes no timing, and initDataPath only joins strings.
   setAppEnvironment(new ElectronAppEnvironment())
-  // Why captured now: after the dev/E2E override above, and before app.setName('Orca') (whenReady)
+  // Why captured now: after Horca/dev/E2E profile selection, and before app.setName (whenReady)
   // changes how userData resolves on a case-sensitive filesystem. See persistence.ts:20-28.
   initDataPath()
   state.startupDiagnosticsEnabled = isStartupDiagnosticsEnabled()
@@ -196,7 +198,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Why the diff-cache counters ride along: a stamp the filesystem reports unstably makes the cache
   // look exactly like a cold start, and only the hit/miss/unprovable split tells the two apart.
   startMainThreadChurnProbe({ extraStats: () => ({ diffCache: settledDiffCache.stats() }) })
-  // Why: acquire AFTER configureDevUserDataPath — Electron derives lock identity from `userData`, so dev/packaged lock in separate namespaces.
+  // Why: acquire after distribution and dev profile selection. Electron derives lock identity from `userData`.
   // Why skip in dev: parallel `pnpm dev` from multiple worktrees would make the second exit silently; packaged keeps the lock (corruption PR #1326 / #1312).
   const bypass = shouldBypassSingleInstanceLock({ isDev, isServeMode: state.isServeMode })
   const skip = shouldSkipSingleInstanceLock({ isDev, isServeMode: state.isServeMode })
@@ -222,7 +224,11 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   assertHorcaPackagedDistribution({
     identity: getDistributionIdentity(),
     isPackaged: app.isPackaged,
-    execPath: process.execPath
+    execPath: process.execPath,
+    userDataPath: app.getPath('userData'),
+    expectedUserDataPath: process.env.ORCA_E2E_USER_DATA_DIR
+      ? undefined
+      : join(app.getPath('home'), getDistributionIdentity().stateRootDirName)
   })
   // Why first in this block: the accessor throws until installed and everything below may read a
   // credential. The constructor does not touch `safeStorage` — it resolves lazily per call — so
