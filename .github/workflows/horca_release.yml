@@ -212,15 +212,25 @@ jobs:
             git tag -a "$TAG" "$SHA" -m "Horca $VERSION"
             git push origin "$TAG"
           fi
-          args=(--draft --verify-tag --target "$SHA" --title "Horca $VERSION" --generate-notes)
-          if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
           release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
           if [ -z "$release_id" ]; then
-            gh release create "$TAG" "${args[@]}"
-            release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
+            release_id=$(gh api --method POST "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$TAG" -f target_commitish="$SHA" -f name="Horca $VERSION" \
+              -F draft=true -F prerelease="$PRERELEASE" -F generate_release_notes=true \
+              --jq '.id')
           fi
           test -n "$release_id"
-          gh release upload "$TAG" --clobber artifacts/*
+          for asset in artifacts/*; do
+            name=${asset##*/}
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" \
+              --jq ".[] | select(.name == \"$name\") | .id" | head -1)
+            if [ -n "$existing" ]; then
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$existing"
+            fi
+            gh api --hostname uploads.github.com --method POST \
+              "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' --input "$asset" >/dev/null
+          done
           latest=true
           if [ "$PRERELEASE" = true ]; then latest=false; fi
           gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
