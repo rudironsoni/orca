@@ -84,6 +84,7 @@ import { e2eApi } from './api/e2e-bridge'
 import { mobileApi } from './api/mobile-bridge'
 import { agentStatusApi } from './api/agent-status-bridge'
 import { speechApi } from './api/speech-bridge'
+import { createHorcaTerminalSettingsApi } from './horca-terminal-settings-api'
 
 installNativeFileDropHandlers()
 installBrowserFindListener()
@@ -99,6 +100,7 @@ const telemetryGetConsentStateApi: PreloadApi['telemetryGetConsentState'] = () =
   ipcRenderer.invoke('telemetry:getConsentState')
 
 const api = {
+  horcaTerminalSettings: createHorcaTerminalSettingsApi(ipcRenderer),
   app: appApi,
   orcaProfiles: orcaProfilesApi,
   platform: platformApi,
