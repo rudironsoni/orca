@@ -1,0 +1,215 @@
+name: 'Horca: Release'
+
+on:
+  push:
+    tags: ['v*-horca.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing v<core>-horca.<N>[-beta.<M>] tag'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: horca-release
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    if: github.repository == 'rudironsoni/orca'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      channel: ${{ steps.meta.outputs.channel }}
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - id: meta
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-horca\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "::error::invalid Horca release tag: $TAG"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *-beta.* ]]; then
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+            echo 'channel=beta' >> "$GITHUB_OUTPUT"
+          else
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+            echo 'channel=stable' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve immutable release source
+        id: source
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          sha=$(git rev-list -n 1 "$TAG")
+          test "$(git rev-parse HEAD)" = "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify signing inputs
+        run: node config/scripts/verify-macos-release-env.mjs
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Build signed and notarized DMGs
+        run: pnpm build:mac:release --publish never
+        env:
+          ORCA_DOWNSTREAM_BUILD: '1'
+          ORCA_LOCAL_BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Verify identity and signatures
+        run: |
+          for arch in arm64 x64; do
+            dmg="dist/horca-macos-$arch.dmg"
+            test -f "$dmg"
+            mount=$(hdiutil attach -nobrowse -readonly "$dmg" | grep -o '/Volumes/.*' | tail -1)
+            app="$mount/Horca.app"
+            test "$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")" = 'com.rudironsoni.horca'
+            codesign --verify --deep --strict "$app"
+            xcrun stapler validate "$app"
+            hdiutil detach "$mount" -quiet
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: horca-macos
+          path: dist/horca-macos-*.dmg
+          if-no-files-found: error
+
+  windows:
+    needs: metadata
+    if: needs.metadata.outputs.prerelease == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Horca
+        run: pnpm build:release
+        env:
+          ORCA_DOWNSTREAM_BUILD: '1'
+          ORCA_LOCAL_BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+      - name: Package unsigned installer
+        shell: pwsh
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish never
+        env:
+          ORCA_DOWNSTREAM_BUILD: '1'
+          ORCA_LOCAL_BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+      - name: Verify unsigned identity
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'dist\horca-windows-x64-setup.exe')) { exit 1 }
+          if (-not (Test-Path 'dist\win-unpacked\Horca.exe')) { exit 1 }
+          if ((Get-Item 'dist\win-unpacked\Horca.exe').VersionInfo.ProductName -ne 'Horca') { exit 1 }
+          if (-not (Test-Path 'dist\win-unpacked\resources\bin\horca.cmd')) { exit 1 }
+          if ((Get-AuthenticodeSignature 'dist\horca-windows-x64-setup.exe').Status -ne 'NotSigned') { exit 1 }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: horca-windows
+          path: dist/horca-windows-x64-setup.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [metadata, macos, windows]
+    if: >-
+      always() &&
+      needs.metadata.result == 'success' &&
+      needs.macos.result == 'success' &&
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: horca-*
+          path: artifacts
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+          PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --title "Horca $VERSION" --generate-notes)
+          assets=(artifacts/horca-macos-arm64.dmg artifacts/horca-macos-x64.dmg)
+          if [ "$PRERELEASE" = true ]; then
+            args+=(--prerelease)
+            assets+=("artifacts/horca-windows-x64-setup.exe#Horca Windows x64 installer (unsigned)")
+          fi
+          gh release create "$TAG" "${args[@]}" "${assets[@]}"
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: rudironsoni/homebrew-tap
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.FORK_SYNC_PAT }}
+
+      - name: Update Homebrew channel
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          CHANNEL: ${{ needs.metadata.outputs.channel }}
+        run: |
+          arm_sha=$(sha256sum artifacts/horca-macos-arm64.dmg | cut -d' ' -f1)
+          intel_sha=$(sha256sum artifacts/horca-macos-x64.dmg | cut -d' ' -f1)
+          token=horca
+          if [ "$CHANNEL" = beta ]; then token='horca@beta'; fi
+          node config/horca/scripts/render-homebrew-cask.mjs "$VERSION" "$arm_sha" "$intel_sha" "$CHANNEL" > "homebrew-tap/Casks/$token.rb"
+          git -C homebrew-tap config user.name 'Horca Release'
+          git -C homebrew-tap config user.email 'horca-release@users.noreply.github.com'
+          git -C homebrew-tap add "Casks/$token.rb"
+          if git -C homebrew-tap diff --cached --quiet; then exit 0; fi
+          git -C homebrew-tap commit -m "chore: update $token to $VERSION"
+          git -C homebrew-tap push
