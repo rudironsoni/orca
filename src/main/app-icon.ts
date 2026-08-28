@@ -8,14 +8,20 @@ import { app, BrowserWindow, nativeImage } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import classicIcon from '../../resources/icon.png?asset'
 import classicDevIcon from '../../resources/icon-dev.png?asset'
+import horcaClassicIcon from '../../resources/horca/build/icon.png?asset'
 import watercolorIcon from '../../resources/app-icons/orca-watercolor.png?asset'
 import watercolorMacDockIcon from '../../resources/app-icons/orca-watercolor.png?asset&asarUnpack'
 import blueIcon from '../../resources/app-icons/orca-blue.png?asset'
 import blueMacDockIcon from '../../resources/app-icons/orca-blue.png?asset&asarUnpack'
 import { normalizeAppIconId, type AppIconId } from '../shared/app-icon'
+import { getActiveDistribution } from '../shared/distribution-identity'
 
 const APP_ICON_PATHS = {
-  classic: is.dev ? classicDevIcon : classicIcon,
+  classic: is.dev
+    ? classicDevIcon
+    : getActiveDistribution() === 'horca'
+      ? horcaClassicIcon
+      : classicIcon,
   watercolor: watercolorIcon,
   blue: blueIcon
 } satisfies Record<AppIconId, string>
@@ -74,6 +80,9 @@ let macDockIconPersistenceGeneration = 0
 let macDockIconPersistenceQueue = Promise.resolve()
 
 export function getAppIconPath(value: unknown): string {
+  if (getActiveDistribution() === 'horca') {
+    return horcaClassicIcon
+  }
   return APP_ICON_PATHS[normalizeAppIconId(value)]
 }
 
@@ -270,7 +279,8 @@ export function persistMacDockIcon(value: unknown, options: PersistMacDockIconOp
     return
   }
   const execFile = options.execFile ?? defaultExecFile
-  const iconId = normalizeAppIconId(value)
+  const iconId =
+    getActiveDistribution() === 'horca' ? ('classic' as const) : normalizeAppIconId(value)
   const generation = ++macDockIconPersistenceGeneration
   enqueueMacDockIconPersistence(async () => {
     // Why: stale queued writes must not reapply an older Dock pin icon.
