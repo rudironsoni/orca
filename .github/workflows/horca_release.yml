@@ -227,9 +227,13 @@ jobs:
             if [ -n "$existing" ]; then
               gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$existing"
             fi
-            gh api --hostname uploads.github.com --method POST \
-              "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$name" \
-              -H 'Content-Type: application/octet-stream' --input "$asset" >/dev/null
+            curl --fail-with-body --silent --show-error \
+              -X POST -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'Content-Type: application/octet-stream' \
+              --data-binary "@$asset" \
+              "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$name" \
+              >/dev/null
           done
           latest=true
           if [ "$PRERELEASE" = true ]; then latest=false; fi
