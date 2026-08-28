@@ -64,6 +64,8 @@ import { setWorktreeWatcherRemoval } from '../ipc/worktree-watcher-removal'
 import { desktopWorktreeWatcherRemoval } from '../ipc/filesystem-watcher'
 import { setDefaultProxySessionResolver } from '../network/proxy-settings'
 import { initDataPath, getCanonicalUserDataPath } from '../persistence'
+import { assertHorcaPackagedDistribution } from '../horca/assert-horca-packaged-distribution'
+import { getDistributionIdentity } from '../../shared/distribution-identity'
 import { applyMacPressAndHoldDefaultAtStartup } from '../macos-press-and-hold-default'
 import { initSessionParseCachePersistence } from '../ai-vault/session-parse-cache-persistence'
 import { initOrcaProfilePaths } from '../orca-profiles/profile-index-store'
@@ -217,6 +219,11 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
     app.exit(SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE)
     return false
   }
+  assertHorcaPackagedDistribution({
+    identity: getDistributionIdentity(),
+    isPackaged: app.isPackaged,
+    execPath: process.execPath
+  })
   // Why first in this block: the accessor throws until installed and everything below may read a
   // credential. The constructor does not touch `safeStorage` — it resolves lazily per call — so
   // installing here changes no timing, in particular not the pre-ready Keychain service-name
