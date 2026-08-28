@@ -1,0 +1,23 @@
+name: 'Horca: Beta Release'
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Non-main branch name or exact 40-character commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  attestations: write
+  id-token: write
+  issues: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/horca_release.yml
+    with:
+      channel: beta
+      source_ref: ${{ inputs.source_ref }}
+    secrets: inherit
