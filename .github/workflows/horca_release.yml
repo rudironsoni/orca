@@ -214,9 +214,13 @@ jobs:
           fi
           args=(--draft --verify-tag --target "$SHA" --title "Horca $VERSION" --generate-notes)
           if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
-          if ! gh release view "$TAG" >/dev/null 2>&1; then gh release create "$TAG" "${args[@]}"; fi
+          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
+          if [ -z "$release_id" ]; then
+            gh release create "$TAG" "${args[@]}"
+            release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
+          fi
+          test -n "$release_id"
           gh release upload "$TAG" --clobber artifacts/*
-          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)
           latest=true
           if [ "$PRERELEASE" = true ]; then latest=false; fi
           gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
