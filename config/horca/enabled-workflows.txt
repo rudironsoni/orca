@@ -1,3 +1,4 @@
 horca_ci.yml
+horca_beta_release.yml
 horca_release.yml
 horca_sync.yml
