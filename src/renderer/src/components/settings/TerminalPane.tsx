@@ -23,6 +23,8 @@ import { TerminalInteractionSection } from './TerminalInteractionSection'
 import { TerminalRenderingSection } from './TerminalRenderingSection'
 import { TerminalSetupScriptSection } from './TerminalSetupScriptSection'
 import { TerminalWindowsShellSection } from './TerminalWindowsShellSection'
+import { HorcaTerminalBackendSection } from '../../horca/terminal-settings/HorcaTerminalBackendSection'
+import { matchesHorcaTerminalSettingsSearch } from '../../horca/terminal-settings/horca-terminal-settings-copy'
 
 type TerminalPaneProps = {
   settings: GlobalSettings
@@ -61,6 +63,9 @@ export function TerminalPane({
     showWindowsHostSettings && windowsShell === 'powershell.exe'
 
   const visibleSections = [
+    matchesHorcaTerminalSettingsSearch(searchQuery) ? (
+      <HorcaTerminalBackendSection key="horca-terminal-backend" />
+    ) : null,
     showWindowsHostSettings &&
     matchesSettingsSearch(searchQuery, getTerminalWindowsShellSearchEntry()) ? (
       <TerminalWindowsShellSection
