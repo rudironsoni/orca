@@ -105,6 +105,9 @@ function applyDownstreamDistribution(config) {
   }
 
   const identity = horcaIdentity()
+  config.directories = Object.assign({}, config.directories, {
+    buildResources: 'resources/horca/build'
+  })
   config.appId = identity.appId
   config.productName = identity.productName
   config.protocols = [{ name: identity.productName, schemes: [identity.protocol] }]
