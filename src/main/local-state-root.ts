@@ -11,10 +11,7 @@ import { getDistributionIdentity } from '../shared/distribution-identity'
  * each distribution encrypts with its own Keychain/DPAPI identity and would
  * corrupt the other's files by cross-writing them.
  *
- * Deliberately NOT routed through this root (shared on purpose):
- * - `~/.orca/agent-hooks` and its install lock: a cross-instance surface with
- *   its own registry + locking, already shared by dev/local/packaged
- *   instances; third-party agent configs embed these script paths.
+ * Deliberately NOT routed through this root:
  * - Per-repo `.orca/` directories: project metadata that must stay compatible
  *   across every client that opens the repo.
  * - Remote-host and WSL-guest `~/.orca*` paths: owned by the execution host's

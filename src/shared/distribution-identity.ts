@@ -16,8 +16,11 @@
  * substitutes `ORCA_DISTRIBUTION` ('horca' when ORCA_DOWNSTREAM_BUILD=1 is
  * set at build time, 'official' otherwise). Vitest and tsc-compiled entry
  * points skip the define pass, so those fall back to a
- * `globalThis.ORCA_DISTRIBUTION` override, then 'official'.
+ * `globalThis.ORCA_DISTRIBUTION` override, then the committed downstream
+ * build profile. Official builds come from upstream/main.
  */
+
+import { DOWNSTREAM_DISTRIBUTION } from './horca/distribution-build-profile'
 
 export type OrcaDistribution = 'official' | 'horca'
 
@@ -85,7 +88,7 @@ export function getActiveDistribution(): OrcaDistribution {
     return ORCA_DISTRIBUTION
   }
   const testOverride = (globalThis as { ORCA_DISTRIBUTION?: OrcaDistribution }).ORCA_DISTRIBUTION
-  return testOverride ?? 'official'
+  return testOverride ?? DOWNSTREAM_DISTRIBUTION
 }
 
 export function getDistributionIdentity(): DistributionIdentity {

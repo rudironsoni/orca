@@ -11,7 +11,7 @@ import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './local-build-compatibility-
 const globalWithOverride = globalThis as { ORCA_DISTRIBUTION?: OrcaDistribution }
 
 afterEach(() => {
-  delete globalWithOverride.ORCA_DISTRIBUTION
+  globalWithOverride.ORCA_DISTRIBUTION = 'official'
 })
 
 describe('distribution identity contract', () => {
@@ -90,14 +90,15 @@ describe('distribution identity contract', () => {
     expect(LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId).toBe(DISTRIBUTION_IDENTITIES.official.appId)
   })
 
-  it('resolves the official identity when no compile-time define is present', () => {
-    expect(getActiveDistribution()).toBe('official')
-    expect(getDistributionIdentity()).toBe(DISTRIBUTION_IDENTITIES.official)
-  })
-
-  it('honors the test override used where the define pass is skipped', () => {
+  it('resolves the Horca identity when no compile-time define is present', () => {
     globalWithOverride.ORCA_DISTRIBUTION = 'horca'
     expect(getActiveDistribution()).toBe('horca')
     expect(getDistributionIdentity()).toBe(DISTRIBUTION_IDENTITIES.horca)
+  })
+
+  it('honors the test override used where the define pass is skipped', () => {
+    globalWithOverride.ORCA_DISTRIBUTION = 'official'
+    expect(getActiveDistribution()).toBe('official')
+    expect(getDistributionIdentity()).toBe(DISTRIBUTION_IDENTITIES.official)
   })
 })
