@@ -1,7 +1,8 @@
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { Store } from '../../persistence'
+import { getLocalStateRoot } from '../../local-state-root'
 import {
   normalizeHerdrBinarySource,
   normalizeHerdrSessionName,
@@ -12,6 +13,11 @@ import {
   type TerminalBackendActivation,
   type TerminalBackendPreference
 } from '../../../shared/horca/terminal-backend'
+import type {
+  HorcaProjectTerminalSettingsUpdate,
+  HorcaTerminalDefaultsUpdate,
+  HorcaTerminalSettingsSnapshot
+} from '../../../shared/horca/terminal-settings-api'
 
 export type HorcaHerdrSettings = {
   binarySource: HerdrBinarySource
@@ -29,6 +35,13 @@ export type HorcaTerminalSettingsSource = {
   getHerdrSettings(hostId: ExecutionHostId): HorcaHerdrSettings
   getProjectSettings(projectId: string): HorcaProjectTerminalSettings
   commitHerdrActivation(projectId: string, hostId: ExecutionHostId): void
+  getSnapshot(): HorcaTerminalSettingsSnapshot
+  updateDefaults(update: HorcaTerminalDefaultsUpdate): HorcaTerminalSettingsSnapshot
+  updateProject(
+    projectId: string,
+    update: HorcaProjectTerminalSettingsUpdate
+  ): HorcaTerminalSettingsSnapshot
+  subscribe(listener: (snapshot: HorcaTerminalSettingsSnapshot) => void): () => void
 }
 
 type LegacyGlobalSettings = {
@@ -63,8 +76,8 @@ type HorcaSettingsFile = {
   >
 }
 
-export function horcaTerminalSettingsPath(profileDataFile: string): string {
-  return join(dirname(profileDataFile), 'horca-terminal-settings.json')
+export function horcaTerminalSettingsPath(homePath?: string): string {
+  return join(getLocalStateRoot(homePath), 'terminal-backends.json')
 }
 
 function readSettingsFile(path: string | undefined): HorcaSettingsFile | null {
@@ -80,6 +93,7 @@ function readSettingsFile(path: string | undefined): HorcaSettingsFile | null {
 }
 
 function writeSettingsFile(path: string, settings: HorcaSettingsFile): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temporary = `${path}.${process.pid}.tmp`
   writeFileSync(temporary, `${JSON.stringify({ ...settings, version: 1 }, null, 2)}\n`, {
     encoding: 'utf8',
@@ -92,6 +106,7 @@ export function createHorcaTerminalSettingsSource(
   store: Store,
   settingsFile?: string
 ): HorcaTerminalSettingsSource {
+  const listeners = new Set<(snapshot: HorcaTerminalSettingsSnapshot) => void>()
   const legacyProject = (projectId: string): LegacyProjectSettings | undefined => {
     const getProjects = (store as Partial<Pick<Store, 'getProjects'>>).getProjects
     return getProjects?.call(store).find((project) => project.id === projectId) as
@@ -109,15 +124,15 @@ export function createHorcaTerminalSettingsSource(
     }
   }
 
-  return {
+  const source: HorcaTerminalSettingsSource = {
     getDefaultBackend: () => {
       const file = readSettingsFile(settingsFile)
       if (file) {
-        return normalizeTerminalBackend(file.terminalBackendDefault ?? 'herdr')
+        return normalizeTerminalBackend(file.terminalBackendDefault ?? 'orca')
       }
       const legacy = store.getSettings() as unknown as LegacyGlobalSettings
       return settingsFile
-        ? normalizeTerminalBackend(legacy.terminalBackendDefault ?? 'herdr')
+        ? normalizeTerminalBackend(legacy.terminalBackendDefault ?? 'orca')
         : normalizeTerminalBackend(legacy.terminalBackendDefault)
     },
     getHerdrSettings: (hostId) => {
@@ -190,6 +205,97 @@ export function createHorcaTerminalSettingsSource(
           }
         }
       })
+      emit()
+    },
+    getSnapshot: () => {
+      const projects: HorcaTerminalSettingsSnapshot['projects'] = {}
+      for (const project of store.getProjects()) {
+        projects[project.id] = source.getProjectSettings(project.id)
+      }
+      const herdr = source.getHerdrSettings('local')
+      return {
+        defaults: {
+          defaultBackend: source.getDefaultBackend(),
+          binarySource: herdr.binarySource,
+          ...(herdr.defaultSessionName ? { defaultSessionName: herdr.defaultSessionName } : {})
+        },
+        projects
+      }
+    },
+    updateDefaults: (update) => {
+      if (!settingsFile) {
+        throw new Error('Horca terminal settings file is unavailable')
+      }
+      const file = readSettingsFile(settingsFile) ?? {}
+      const currentHerdr = file.herdr ?? {}
+      const defaultBackend =
+        update.defaultBackend === undefined
+          ? file.terminalBackendDefault
+          : normalizeTerminalBackend(update.defaultBackend)
+      const binarySource =
+        update.binarySource === undefined
+          ? currentHerdr.binarySource
+          : normalizeHerdrBinarySource(update.binarySource)
+      const defaultSessionName =
+        update.defaultSessionName === undefined
+          ? currentHerdr.defaultSessionName
+          : normalizeHerdrSessionName(update.defaultSessionName)
+      writeSettingsFile(settingsFile, {
+        ...file,
+        terminalBackendDefault: defaultBackend,
+        herdr: {
+          ...currentHerdr,
+          binarySource,
+          defaultSessionName
+        }
+      })
+      return emit()
+    },
+    updateProject: (projectId, update) => {
+      if (!settingsFile) {
+        throw new Error('Horca terminal settings file is unavailable')
+      }
+      if (!store.getProjects().some((project) => project.id === projectId)) {
+        throw new Error(`Unknown Horca project: ${projectId}`)
+      }
+      const file = readSettingsFile(settingsFile) ?? {}
+      const currentProject = file.projects?.[projectId] ?? {}
+      const preference =
+        update.preference === undefined
+          ? currentProject.preference
+          : update.preference === 'orca' || update.preference === 'herdr'
+            ? update.preference
+            : 'inherit'
+      const sessionName =
+        update.sessionName === undefined
+          ? currentProject.sessionName
+          : normalizeHerdrSessionName(update.sessionName)
+      writeSettingsFile(settingsFile, {
+        ...file,
+        projects: {
+          ...file.projects,
+          [projectId]: {
+            ...currentProject,
+            preference,
+            sessionName
+          }
+        }
+      })
+      return emit()
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
     }
   }
+
+  function emit(): HorcaTerminalSettingsSnapshot {
+    const snapshot = source.getSnapshot()
+    for (const listener of listeners) {
+      listener(snapshot)
+    }
+    return snapshot
+  }
+
+  return source
 }
