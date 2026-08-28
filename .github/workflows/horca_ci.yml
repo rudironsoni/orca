@@ -1,0 +1,89 @@
+name: 'Horca: CI'
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Exact candidate SHA to validate
+        required: true
+        type: string
+      upstream_sha:
+        description: Exact upstream SHA used to build the candidate
+        required: true
+        type: string
+      full:
+        description: Run maintenance build and Herdr integration checks
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: horca-ci-${{ inputs.sha || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: github.repository == 'rudironsoni/orca'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/stablyai/orca.git
+          git fetch --no-prune-tags upstream main
+
+      - name: Validate patch stack
+        env:
+          HORCA_REQUIRE_UPSTREAM_ANCESTOR: ${{ inputs.upstream_sha && '1' || '0' }}
+          HORCA_UPSTREAM_REF: ${{ inputs.upstream_sha || 'upstream/main' }}
+        run: node config/horca/scripts/check-patch-stack.mjs
+
+      - name: Enforce downstream ownership
+        env:
+          HORCA_UPSTREAM_REF: ${{ inputs.upstream_sha || 'upstream/main' }}
+        run: node config/horca/scripts/check-overlay-policy.mjs
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Typecheck
+        run: pnpm tc
+
+      - name: Lint changed code
+        run: pnpm run check:code-quality:changed -- upstream/main
+
+      - name: Test Horca boundaries
+        run: >-
+          pnpm exec vitest run --config config/vitest.config.ts
+          src/shared/distribution-identity.test.ts
+          src/shared/distribution-update-copy.test.ts
+          src/shared/horca
+          src/main/local-state-root.test.ts
+          src/main/updater-distribution-gate.test.ts
+          src/main/providers/terminal-backend-registry.test.ts
+          src/main/horca
+          src/main/providers/multiplexer/herdr
+          --exclude '**/*.integration.test.ts'
+          --exclude '**/*.probe.test.ts'
+
+      - name: Build downstream distribution
+        if: inputs.full == true
+        env:
+          ORCA_DOWNSTREAM_BUILD: '1'
+        run: pnpm run build:release
+
+      - name: Test pinned Herdr runtime
+        if: inputs.full == true
+        run: node config/horca/scripts/run-herdr-stock-integration.mjs
