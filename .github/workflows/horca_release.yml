@@ -1,16 +1,22 @@
-name: 'Horca: Release'
+name: 'Horca: Stable Release'
 
 on:
   push:
-    tags: ['v*-horca.*']
-  workflow_dispatch:
+    branches: [main]
+  workflow_call:
     inputs:
-      tag:
-        description: 'Existing v<core>-horca.<N>[-beta.<M>] tag'
+      channel:
         required: true
+        type: string
+      source_ref:
+        required: true
+        type: string
 
 permissions:
   contents: write
+  attestations: write
+  id-token: write
+  issues: write
 
 concurrency:
   group: horca-release
@@ -21,47 +27,39 @@ jobs:
     if: github.repository == 'rudironsoni/orca'
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-      version: ${{ steps.meta.outputs.version }}
-      prerelease: ${{ steps.meta.outputs.prerelease }}
-      channel: ${{ steps.meta.outputs.channel }}
-      sha: ${{ steps.source.outputs.sha }}
+      channel: ${{ steps.release.outputs.channel }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      published: ${{ steps.release.outputs.published }}
+      sha: ${{ steps.release.outputs.source_sha }}
+      tag: ${{ steps.release.outputs.tag }}
+      upstream_sha: ${{ steps.release.outputs.upstream_sha }}
+      upstream_version: ${{ steps.release.outputs.upstream_version }}
+      version: ${{ steps.release.outputs.version }}
     steps:
-      - id: meta
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-horca\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
-            echo "::error::invalid Horca release tag: $TAG"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          if [[ "$TAG" == *-beta.* ]]; then
-            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
-            echo 'channel=beta' >> "$GITHUB_OUTPUT"
-          else
-            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
-            echo 'channel=stable' >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ steps.meta.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Resolve immutable release source
-        id: source
+      - name: Resolve source and version
+        id: release
         env:
-          TAG: ${{ steps.meta.outputs.tag }}
-        run: |
-          sha=$(git rev-list -n 1 "$TAG")
-          test "$(git rev-parse HEAD)" = "$sha"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          CHANNEL: ${{ inputs.channel || 'stable' }}
+          SOURCE_REF: ${{ inputs.source_ref || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: node config/horca/scripts/prepare-release.mjs metadata
+
+  validation:
+    needs: metadata
+    if: needs.metadata.outputs.published != 'true'
+    uses: ./.github/workflows/horca_ci.yml
+    with:
+      sha: ${{ needs.metadata.outputs.sha }}
+      upstream_sha: ${{ needs.metadata.outputs.upstream_sha }}
+      full: true
 
   macos:
-    needs: metadata
+    needs: [metadata, validation]
+    if: needs.metadata.outputs.published != 'true'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -114,8 +112,8 @@ jobs:
           if-no-files-found: error
 
   windows:
-    needs: metadata
-    if: needs.metadata.outputs.prerelease == 'true'
+    needs: [metadata, validation]
+    if: needs.metadata.outputs.published != 'true' && needs.metadata.outputs.channel == 'beta'
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -159,57 +157,116 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [metadata, macos, windows]
+    needs: [metadata, validation, macos, windows]
     if: >-
-      always() &&
-      needs.metadata.result == 'success' &&
-      needs.macos.result == 'success' &&
-      (needs.windows.result == 'success' || needs.windows.result == 'skipped')
+      always() && needs.metadata.result == 'success' &&
+      (needs.metadata.outputs.published == 'true' ||
+       (needs.validation.result == 'success' && needs.macos.result == 'success' &&
+        (needs.windows.result == 'success' || needs.windows.result == 'skipped')))
     runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ needs.metadata.outputs.channel }}
+      sha: ${{ needs.metadata.outputs.sha }}
+      tag: ${{ needs.metadata.outputs.tag }}
+      version: ${{ needs.metadata.outputs.version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.sha }}
-          persist-credentials: false
+          fetch-depth: 0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.metadata.outputs.published != 'true'
         with:
           pattern: horca-*
           path: artifacts
           merge-multiple: true
-      - name: Publish GitHub release
+      - name: Build checksums and release manifest
+        if: needs.metadata.outputs.published != 'true'
+        env:
+          CHANNEL: ${{ needs.metadata.outputs.channel }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.sha }}
+          UPSTREAM_SHA: ${{ needs.metadata.outputs.upstream_sha }}
+          UPSTREAM_VERSION: ${{ needs.metadata.outputs.upstream_version }}
+        run: node config/horca/scripts/prepare-release.mjs manifest artifacts
+      - name: Attest release assets
+        if: needs.metadata.outputs.published != 'true'
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: artifacts/*
+      - name: Publish immutable source tag and release
+        if: needs.metadata.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
           VERSION: ${{ needs.metadata.outputs.version }}
+          SHA: ${{ needs.metadata.outputs.sha }}
           PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
         run: |
-          args=(--repo "$GITHUB_REPOSITORY" --title "Horca $VERSION" --generate-notes)
-          assets=(artifacts/horca-macos-arm64.dmg artifacts/horca-macos-x64.dmg)
-          if [ "$PRERELEASE" = true ]; then
-            args+=(--prerelease)
-            assets+=("artifacts/horca-windows-x64-setup.exe#Horca Windows x64 installer (unsigned)")
+          if git rev-parse "$TAG^{commit}" >/dev/null 2>&1; then
+            test "$(git rev-parse "$TAG^{commit}")" = "$SHA"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$TAG" "$SHA" -m "Horca $VERSION"
+            git push origin "$TAG"
           fi
-          gh release create "$TAG" "${args[@]}" "${assets[@]}"
+          args=(--draft --verify-tag --target "$SHA" --title "Horca $VERSION" --generate-notes)
+          if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then gh release create "$TAG" "${args[@]}"; fi
+          gh release upload "$TAG" --clobber artifacts/*
+          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)
+          latest=true
+          if [ "$PRERELEASE" = true ]; then latest=false; fi
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            -F draft=false -F prerelease="$PRERELEASE" -f make_latest="$latest"
 
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          repository: rudironsoni/homebrew-tap
-          path: homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.FORK_SYNC_PAT }}
-
-      - name: Update Homebrew channel
+  tap:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Dispatch Homebrew channel update
         env:
-          VERSION: ${{ needs.metadata.outputs.version }}
-          CHANNEL: ${{ needs.metadata.outputs.channel }}
+          GH_TOKEN: ${{ secrets.FORK_SYNC_PAT }}
+          CHANNEL: ${{ needs.publish.outputs.channel }}
+          TAG: ${{ needs.publish.outputs.tag }}
+          SOURCE_SHA: ${{ needs.publish.outputs.sha }}
         run: |
-          arm_sha=$(sha256sum artifacts/horca-macos-arm64.dmg | cut -d' ' -f1)
-          intel_sha=$(sha256sum artifacts/horca-macos-x64.dmg | cut -d' ' -f1)
-          token=horca
-          if [ "$CHANNEL" = beta ]; then token='horca@beta'; fi
-          node config/horca/scripts/render-homebrew-cask.mjs "$VERSION" "$arm_sha" "$intel_sha" "$CHANNEL" > "homebrew-tap/Casks/$token.rb"
-          git -C homebrew-tap config user.name 'Horca Release'
-          git -C homebrew-tap config user.email 'horca-release@users.noreply.github.com'
-          git -C homebrew-tap add "Casks/$token.rb"
-          if git -C homebrew-tap diff --cached --quiet; then exit 0; fi
-          git -C homebrew-tap commit -m "chore: update $token to $VERSION"
-          git -C homebrew-tap push
+          gh api --method POST repos/rudironsoni/homebrew-tap/dispatches \
+            -f event_type=horca-release-published \
+            -f "client_payload[channel]=$CHANNEL" \
+            -f "client_payload[tag]=$TAG" \
+            -f "client_payload[source_sha]=$SOURCE_SHA"
+      - name: Confirm Homebrew channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ needs.publish.outputs.channel }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          token=horca.rb
+          if [ "$CHANNEL" = beta ]; then token='horca@beta.rb'; fi
+          for attempt in $(seq 1 30); do
+            current=$(gh api "repos/rudironsoni/homebrew-tap/contents/Casks/$token" -H 'Accept: application/vnd.github.raw+json' 2>/dev/null || true)
+            if grep -q "version \"$VERSION\"" <<<"$current"; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::Homebrew $CHANNEL did not reach $VERSION"
+          exit 1
+      - name: Record release drift
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ needs.publish.outputs.channel }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: |
+          title="Horca release is ahead of the Homebrew tap"
+          body="Release $TAG ($CHANNEL) was published, but the tap did not confirm the same version. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh label create release-drift --color D93F0B --description 'Published release not confirmed in Homebrew' --force
+          issue=$(gh issue list --label release-drift --state open --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body" --label release-drift
+          fi
