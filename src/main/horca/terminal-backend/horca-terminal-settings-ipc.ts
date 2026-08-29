@@ -5,12 +5,14 @@ import {
   type HorcaTerminalDefaultsUpdate
 } from '../../../shared/horca/terminal-settings-api'
 import type { HorcaTerminalSettingsSource } from './horca-terminal-settings'
+import { readLocalHerdrHealth } from './horca-herdr-health'
 
 export function registerHorcaTerminalSettingsIpc(
   settings: HorcaTerminalSettingsSource
 ): () => void {
   const channels = HORCA_TERMINAL_SETTINGS_CHANNELS
   ipcMain.handle(channels.get, () => settings.getSnapshot())
+  ipcMain.handle(channels.health, () => readLocalHerdrHealth(settings))
   ipcMain.handle(channels.updateDefaults, (_event, update: HorcaTerminalDefaultsUpdate) =>
     settings.updateDefaults(update ?? {})
   )
@@ -33,6 +35,7 @@ export function registerHorcaTerminalSettingsIpc(
   return () => {
     unsubscribe()
     ipcMain.removeHandler(channels.get)
+    ipcMain.removeHandler(channels.health)
     ipcMain.removeHandler(channels.updateDefaults)
     ipcMain.removeHandler(channels.updateProject)
   }
