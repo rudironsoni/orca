@@ -48,13 +48,13 @@ hourly run repairs a missed dispatch. The tap never selects a version by
 publication date, never downgrades a cask, and validates release checksums
 before it changes `main`.
 
-Required Orca repository secrets:
+Required Horca repository secrets:
 
 - `MAC_CERTS`
 - `MAC_CERTS_PASSWORD`
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`
-- `FORK_SYNC_PAT`, with contents access to `rudironsoni/orca`
+- `FORK_SYNC_PAT`, with contents access to `rudironsoni/horca`
 - `HORCA_APP_ID` and `HORCA_APP_PRIVATE_KEY` in the `horca-maintenance`
   environment. The App installation needs access to `rudironsoni/homebrew-tap`.
