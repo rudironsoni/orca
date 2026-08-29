@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: 'Pre-resolved maintenance branch to validate and promote'
+        required: false
+        type: string
 
 permissions:
   actions: write
@@ -19,17 +24,26 @@ jobs:
     if: github.repository == 'rudironsoni/orca'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: horca-maintenance
     outputs:
       skip: ${{ steps.state.outputs.skip }}
       old_main: ${{ steps.state.outputs.old_main }}
       upstream_sha: ${{ steps.state.outputs.upstream_sha }}
-      candidate_branch: ${{ steps.rebase.outputs.candidate_branch }}
-      candidate_sha: ${{ steps.rebase.outputs.candidate_sha }}
+      candidate_branch: ${{ steps.state.outputs.candidate_branch || steps.rebase.outputs.candidate_branch }}
+      candidate_sha: ${{ steps.state.outputs.candidate_sha || steps.rebase.outputs.candidate_sha }}
     steps:
+      - name: Create maintenance token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.HORCA_APP_ID }}
+          private-key: ${{ secrets.HORCA_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
 
       - name: Reconcile workflow state
         env:
@@ -51,6 +65,8 @@ jobs:
 
       - name: Inspect patch stack
         id: state
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
         run: |
           old_main=$(git rev-parse HEAD)
           upstream_sha=$(git rev-parse upstream/main)
@@ -58,6 +74,19 @@ jobs:
           echo "old_main=$old_main" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
           echo "old_base=$old_base" >> "$GITHUB_OUTPUT"
+          if [ -n "$CANDIDATE_REF" ]; then
+            git check-ref-format --branch "$CANDIDATE_REF"
+            git fetch origin "refs/heads/$CANDIDATE_REF:refs/remotes/origin/$CANDIDATE_REF"
+            candidate_sha=$(git rev-parse "refs/remotes/origin/$CANDIDATE_REF")
+            git merge-base --is-ancestor upstream/main "$candidate_sha"
+            test -z "$(git rev-list --merges "upstream/main..$candidate_sha")"
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+            echo 'prepared=true' >> "$GITHUB_OUTPUT"
+            echo "candidate_branch=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+            echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'prepared=false' >> "$GITHUB_OUTPUT"
           if git merge-base --is-ancestor upstream/main HEAD; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
             exit 0
@@ -70,7 +99,7 @@ jobs:
 
       - name: Rebase patch stack
         id: rebase
-        if: steps.state.outputs.skip != 'true'
+        if: steps.state.outputs.skip != 'true' && steps.state.outputs.prepared != 'true'
         continue-on-error: true
         env:
           OLD_BASE: ${{ steps.state.outputs.old_base }}
