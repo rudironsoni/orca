@@ -32,8 +32,10 @@ import { HerdrSocketTransport } from './herdr-socket-transport'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 import { createHerdrSurfaceSync } from './herdr-surface-presentation'
-import { herdrRemoteCommandEnv, writeHerdrRemoteSshLaunch } from './herdr-remote-ssh'
 import { resolveWslHerdrExecutable } from './herdr-wsl-executable'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { getAppEnvironment } from '../../../../shared/app-environment'
 
 export function createLocalHerdrPtyProvider(
   fallback: IPtyProvider | undefined,
@@ -163,32 +165,18 @@ function createSshHerdrHostTransport(
   source: HerdrBinarySource,
   hostPlatform?: RemoteHostPlatform
 ): HerdrHostTransport {
-  const target = connection.getTarget()
-  const resolvedConfig = connection.getSystemSshResolvedConfig?.() ?? null
-  const systemSsh = connection.usesSystemSshTransport?.() === true
-  // Why: ssh2-only connections have no OpenSSH ControlMaster. Exec over the
-  // live SshConnection keeps passphrase and host-key state that a new hop
-  // would not see.
-  if (!systemSsh) {
-    const remoteExecutable = async () => resolveHerdrExecutable(source, hostPlatform?.os ?? 'linux')
-    return new HerdrSshHostTransport(connection, 15_000, remoteExecutable, hostPlatform)
+  if (hostPlatform?.os === 'win32') {
+    throw new HerdrRuntimeError(
+      'herdr_unsupported_remote_host',
+      'Herdr remote hosts must run Linux or macOS. Select the Orca backend for this Windows host.'
+    )
   }
-
-  const launch = writeHerdrRemoteSshLaunch({ target, resolvedConfig })
-  const executable = resolveHerdrExecutable(source)
-  return new HerdrCliHostTransport({
-    commandFor: (args) => ({
-      file: executable,
-      args: ['--remote', launch.dest, ...args],
-      env: herdrRemoteCommandEnv(launch)
-    }),
-    serverCommandFor: (sessionName) => ({
-      file: executable,
-      args: ['--remote', launch.dest, '--handoff', '--session', sessionName, 'server'],
-      env: herdrRemoteCommandEnv(launch, herdrServerEnvironment(undefined))
-    }),
-    onDisconnect: launch.cleanup
-  })
+  // Herdr 0.8.2 limits --remote to its interactive TUI launch. API subcommands
+  // are rejected, so programmatic pane control must stay on Orca's authenticated
+  // SSH execution boundary and run the remote Herdr CLI there.
+  const remoteExecutable = async () =>
+    resolveHerdrExecutable(source, hostPlatform?.os ?? 'linux', 'remote')
+  return new HerdrSshHostTransport(connection, 15_000, remoteExecutable, hostPlatform)
 }
 
 type HerdrSettings = {
@@ -219,7 +207,8 @@ export function resolveHerdrBinarySource(
 
 export function resolveHerdrExecutable(
   source: HerdrBinarySource,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  location: 'local' | 'remote' = 'local'
 ): string {
   if (source.kind === 'custom') {
     const customPath = source.path.trim()
@@ -227,6 +216,26 @@ export function resolveHerdrExecutable(
       throw new HerdrRuntimeError('herdr_unavailable', 'Custom Herdr path is empty')
     }
     return customPath
+  }
+  if (source.kind === 'managed' && location === 'local') {
+    const environmentOverride = process.env.ORCA_HERDR_BUNDLED_BINARY?.trim()
+    if (environmentOverride) {
+      return environmentOverride
+    }
+    const executableName = platform === 'win32' ? 'herdr.exe' : 'herdr'
+    const resourcesPath = process.resourcesPath
+    if (resourcesPath) {
+      const packagedPath = join(resourcesPath, 'herdr', executableName)
+      if (existsSync(packagedPath)) {
+        return packagedPath
+      }
+      if (getAppEnvironment().isPackaged()) {
+        throw new HerdrRuntimeError(
+          'herdr_unavailable',
+          `Bundled Herdr executable is missing: ${packagedPath}`
+        )
+      }
+    }
   }
   return platform === 'win32' ? 'herdr.exe' : 'herdr'
 }

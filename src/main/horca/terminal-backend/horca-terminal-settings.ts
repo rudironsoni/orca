@@ -1,9 +1,9 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { Store } from '../../persistence'
 import { getLocalStateRoot } from '../../local-state-root'
 import {
+  HORCA_FLOATING_PROJECT_ID,
   normalizeHerdrBinarySource,
   normalizeHerdrSessionName,
   normalizeTerminalBackend,
@@ -18,6 +18,10 @@ import type {
   HorcaTerminalDefaultsUpdate,
   HorcaTerminalSettingsSnapshot
 } from '../../../shared/horca/terminal-settings-api'
+import {
+  readHorcaTerminalSettingsFile as readSettingsFile,
+  writeHorcaTerminalSettingsFile as writeSettingsFile
+} from './horca-terminal-settings-file'
 
 export type HorcaHerdrSettings = {
   binarySource: HerdrBinarySource
@@ -58,48 +62,8 @@ type LegacyProjectSettings = {
   terminalBackendByHost?: Partial<Record<ExecutionHostId, unknown>>
 }
 
-type HorcaSettingsFile = {
-  version?: unknown
-  terminalBackendDefault?: unknown
-  herdr?: {
-    binarySource?: unknown
-    defaultSessionName?: unknown
-    hostBinarySources?: Partial<Record<ExecutionHostId, unknown>>
-  }
-  projects?: Record<
-    string,
-    {
-      preference?: unknown
-      sessionName?: unknown
-      activations?: Partial<Record<ExecutionHostId, unknown>>
-    }
-  >
-}
-
 export function horcaTerminalSettingsPath(homePath?: string): string {
   return join(getLocalStateRoot(homePath), 'terminal-backends.json')
-}
-
-function readSettingsFile(path: string | undefined): HorcaSettingsFile | null {
-  if (!path) {
-    return null
-  }
-  try {
-    const value = JSON.parse(readFileSync(path, 'utf8'))
-    return value && typeof value === 'object' ? (value as HorcaSettingsFile) : null
-  } catch {
-    return null
-  }
-}
-
-function writeSettingsFile(path: string, settings: HorcaSettingsFile): void {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-  const temporary = `${path}.${process.pid}.tmp`
-  writeFileSync(temporary, `${JSON.stringify({ ...settings, version: 1 }, null, 2)}\n`, {
-    encoding: 'utf8',
-    mode: 0o600
-  })
-  renameSync(temporary, path)
 }
 
 export function createHorcaTerminalSettingsSource(
@@ -107,6 +71,16 @@ export function createHorcaTerminalSettingsSource(
   settingsFile?: string
 ): HorcaTerminalSettingsSource {
   const listeners = new Set<(snapshot: HorcaTerminalSettingsSnapshot) => void>()
+  const defaultBackendForMissingFile = (): TerminalBackend => {
+    const legacy = store.getSettings() as unknown as LegacyGlobalSettings
+    if (legacy.terminalBackendDefault === 'orca' || legacy.terminalBackendDefault === 'herdr') {
+      return legacy.terminalBackendDefault
+    }
+    const onboarding = (
+      store as Partial<{ getOnboarding(): { closedAt?: number | null } }>
+    ).getOnboarding?.()
+    return onboarding?.closedAt != null ? 'orca' : 'herdr'
+  }
   const legacyProject = (projectId: string): LegacyProjectSettings | undefined => {
     const getProjects = (store as Partial<Pick<Store, 'getProjects'>>).getProjects
     return getProjects?.call(store).find((project) => project.id === projectId) as
@@ -128,11 +102,11 @@ export function createHorcaTerminalSettingsSource(
     getDefaultBackend: () => {
       const file = readSettingsFile(settingsFile)
       if (file) {
-        return normalizeTerminalBackend(file.terminalBackendDefault ?? 'orca')
+        return normalizeTerminalBackend(file.terminalBackendDefault ?? 'herdr')
       }
       const legacy = store.getSettings() as unknown as LegacyGlobalSettings
       return settingsFile
-        ? normalizeTerminalBackend(legacy.terminalBackendDefault ?? 'orca')
+        ? defaultBackendForMissingFile()
         : normalizeTerminalBackend(legacy.terminalBackendDefault)
     },
     getHerdrSettings: (hostId) => {
@@ -152,6 +126,7 @@ export function createHorcaTerminalSettingsSource(
     },
     getProjectSettings: (projectId) => {
       const project = projectSettings(projectId)
+      const file = readSettingsFile(settingsFile)
       const activations: Partial<Record<ExecutionHostId, TerminalBackendActivation>> = {}
       for (const [hostId, value] of Object.entries(project.activations)) {
         const activation = normalizeTerminalBackendActivation(value)
@@ -161,9 +136,14 @@ export function createHorcaTerminalSettingsSource(
       }
       return {
         preference:
-          project.preference === 'orca' || project.preference === 'herdr'
-            ? project.preference
-            : 'inherit',
+          projectId === HORCA_FLOATING_PROJECT_ID &&
+          (file?.floatingTerminalPreference === 'orca' ||
+            file?.floatingTerminalPreference === 'herdr' ||
+            file?.floatingTerminalPreference === 'inherit')
+            ? file.floatingTerminalPreference
+            : project.preference === 'orca' || project.preference === 'herdr'
+              ? project.preference
+              : 'inherit',
         sessionName: normalizeHerdrSessionName(project.sessionName),
         activations
       }
@@ -194,6 +174,7 @@ export function createHorcaTerminalSettingsSource(
       }
       writeSettingsFile(settingsFile, {
         ...file,
+        terminalBackendDefault: file.terminalBackendDefault ?? defaultBackendForMissingFile(),
         projects: {
           ...file.projects,
           [projectId]: {
@@ -217,6 +198,7 @@ export function createHorcaTerminalSettingsSource(
         defaults: {
           defaultBackend: source.getDefaultBackend(),
           binarySource: herdr.binarySource,
+          floatingPreference: source.getProjectSettings(HORCA_FLOATING_PROJECT_ID).preference,
           ...(herdr.defaultSessionName ? { defaultSessionName: herdr.defaultSessionName } : {})
         },
         projects
@@ -230,7 +212,7 @@ export function createHorcaTerminalSettingsSource(
       const currentHerdr = file.herdr ?? {}
       const defaultBackend =
         update.defaultBackend === undefined
-          ? file.terminalBackendDefault
+          ? (file.terminalBackendDefault ?? defaultBackendForMissingFile())
           : normalizeTerminalBackend(update.defaultBackend)
       const binarySource =
         update.binarySource === undefined
@@ -240,9 +222,16 @@ export function createHorcaTerminalSettingsSource(
         update.defaultSessionName === undefined
           ? currentHerdr.defaultSessionName
           : normalizeHerdrSessionName(update.defaultSessionName)
+      const floatingTerminalPreference =
+        update.floatingPreference === undefined
+          ? file.floatingTerminalPreference
+          : update.floatingPreference === 'orca' || update.floatingPreference === 'herdr'
+            ? update.floatingPreference
+            : 'inherit'
       writeSettingsFile(settingsFile, {
         ...file,
         terminalBackendDefault: defaultBackend,
+        floatingTerminalPreference,
         herdr: {
           ...currentHerdr,
           binarySource,
@@ -272,6 +261,7 @@ export function createHorcaTerminalSettingsSource(
           : normalizeHerdrSessionName(update.sessionName)
       writeSettingsFile(settingsFile, {
         ...file,
+        terminalBackendDefault: file.terminalBackendDefault ?? defaultBackendForMissingFile(),
         projects: {
           ...file.projects,
           [projectId]: {

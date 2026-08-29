@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { runProcess, spawnProcess } from '../../../../shared/child-process/run-process'
 import { buildWslExecArgs } from '../../../../shared/wsl-login-shell-command'
 import { resolveWslExecutablePath } from '../../../wsl/wsl-executable-path'
@@ -7,7 +6,8 @@ import type {
   HerdrHostTransport,
   HerdrResponse,
   HerdrTerminalController,
-  HerdrTerminalControlOptions
+  HerdrTerminalControlOptions,
+  HerdrTransportEvent
 } from './herdr-runtime-contract'
 import {
   assertHerdrSchemaCompatible,
@@ -15,7 +15,6 @@ import {
   HerdrRuntimeError,
   unwrapHerdrResponse
 } from './herdr-runtime-contract'
-import { herdrStockCliArgs } from './herdr-stock-cli-args'
 import { ensureStockHerdrSession, type HerdrListedSession } from './herdr-stock-session'
 import {
   createHerdrSessionControlController,
@@ -23,6 +22,10 @@ import {
   herdrSessionControlArgs,
   herdrSessionControlStreamFromProcess
 } from './herdr-session-control'
+import { HerdrCliEventPoller } from './herdr-cli-event-polling'
+import { herdrStockCliInvocation } from './herdr-stock-cli-invocation'
+
+export { herdrStockCliInvocation } from './herdr-stock-cli-invocation'
 
 export type HerdrCommand = { file: string; args: string[]; env?: NodeJS.ProcessEnv }
 export type HerdrCommandFactory = (herdrArgs: string[]) => HerdrCommand | Promise<HerdrCommand>
@@ -178,72 +181,6 @@ export class HerdrCliSessionManager {
   }
 }
 
-export type HerdrStockCliInvocation = {
-  args: string[]
-  parse: (stdout: string) => HerdrResponse<unknown>
-}
-
-export function herdrStockCliInvocation(
-  sessionName: string,
-  method: string,
-  rawParams: unknown
-): HerdrStockCliInvocation {
-  const args = ['--session', sessionName, ...herdrStockCliArgs(method, rawParams)]
-
-  switch (method) {
-    case 'pane.read':
-    case 'agent.read':
-      return {
-        args,
-        parse: (stdout) => ({
-          id: randomUUID(),
-          result: { read: { text: stdout, revision: 0 } }
-        })
-      }
-    case 'workspace.report_metadata':
-    case 'pane.send_keys':
-    case 'pane.send_text':
-    case 'pane.report_metadata':
-    case 'pane.report_agent':
-    case 'pane.report_agent_session':
-    case 'pane.release_agent':
-    case 'pane.close':
-    case 'pane.rename':
-    case 'pane.focus':
-    case 'agent.rename':
-    case 'agent.focus':
-    case 'agent.start':
-    case 'agent.prompt':
-    case 'agent.send_keys':
-    case 'workspace.close':
-    case 'workspace.focus':
-    case 'tab.close':
-    case 'tab.focus':
-    case 'worktree.remove':
-    case 'server.live_handoff':
-      return okInvocation(args)
-    default:
-      return jsonInvocation(args)
-  }
-}
-
-function jsonInvocation(args: string[]): HerdrStockCliInvocation {
-  return {
-    args,
-    parse: (stdout) => JSON.parse(stdout.trim()) as HerdrResponse<unknown>
-  }
-}
-
-function okInvocation(args: string[]): HerdrStockCliInvocation {
-  return {
-    args,
-    parse: (stdout) =>
-      stdout.trim()
-        ? (JSON.parse(stdout.trim()) as HerdrResponse<unknown>)
-        : { id: randomUUID(), result: { type: 'ok' } }
-  }
-}
-
 export type HerdrCliHostTransportOptions = {
   commandFor: HerdrCommandFactory
   serverCommandFor?: (sessionName: string) => HerdrCommand | Promise<HerdrCommand>
@@ -254,6 +191,8 @@ export type HerdrCliHostTransportOptions = {
 
 export class HerdrCliHostTransport implements HerdrHostTransport {
   private readonly sessionManager: HerdrCliSessionManager
+  private readonly eventListeners = new Set<(event: HerdrTransportEvent) => void>()
+  private readonly eventPoller: HerdrCliEventPoller
 
   constructor(private readonly options: HerdrCliHostTransportOptions) {
     this.sessionManager = new HerdrCliSessionManager({
@@ -262,10 +201,19 @@ export class HerdrCliHostTransport implements HerdrHostTransport {
       timeoutMs: options.timeoutMs,
       wslDistro: options.wslDistro
     })
+    this.eventPoller = new HerdrCliEventPoller(
+      (sessionName) => this.request(sessionName, 'session.snapshot', {}),
+      (event) => {
+        for (const listener of this.eventListeners) {
+          listener(event)
+        }
+      }
+    )
   }
 
   async ensureSession(sessionName: string): Promise<void> {
     await this.sessionManager.ensureSession(sessionName)
+    this.eventPoller.start(sessionName)
   }
 
   async request<T>(
@@ -303,7 +251,14 @@ export class HerdrCliHostTransport implements HerdrHostTransport {
     return createHerdrSessionControlController(command)
   }
 
+  onEvent(listener: (event: HerdrTransportEvent) => void): () => void {
+    this.eventListeners.add(listener)
+    return () => this.eventListeners.delete(listener)
+  }
+
   async disconnect(): Promise<void> {
+    this.eventPoller.disconnect()
+    this.eventListeners.clear()
     this.options.onDisconnect?.()
   }
 }

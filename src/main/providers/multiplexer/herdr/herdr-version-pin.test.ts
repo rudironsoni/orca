@@ -26,7 +26,8 @@ describe('herdr release version pin', () => {
       'herdr-linux-aarch64': expect.stringMatching(/^[a-f0-9]{64}$/),
       'herdr-linux-x86_64': expect.stringMatching(/^[a-f0-9]{64}$/),
       'herdr-macos-aarch64': expect.stringMatching(/^[a-f0-9]{64}$/),
-      'herdr-macos-x86_64': expect.stringMatching(/^[a-f0-9]{64}$/)
+      'herdr-macos-x86_64': expect.stringMatching(/^[a-f0-9]{64}$/),
+      'herdr-windows-x86_64.zip': expect.stringMatching(/^[a-f0-9]{64}$/)
     })
   })
 })
