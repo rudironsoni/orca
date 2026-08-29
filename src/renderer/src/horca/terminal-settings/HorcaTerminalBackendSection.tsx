@@ -6,13 +6,31 @@ import {
 } from '@/components/settings/SettingsFormControls'
 import { horcaTerminalSettingsCopy } from './horca-terminal-settings-copy'
 import { useHorcaTerminalSettings } from './use-horca-terminal-settings'
+import { useEffect, useState } from 'react'
+import type { HorcaHerdrHealth } from '../../../../shared/horca/terminal-settings-api'
 
 export function HorcaTerminalBackendSection(): React.JSX.Element | null {
   const { snapshot, updateDefaults } = useHorcaTerminalSettings()
-  if (!snapshot) {
+  const [health, setHealth] = useState<HorcaHerdrHealth | null>(null)
+  const defaults = snapshot?.defaults
+  useEffect(() => {
+    if (defaults?.defaultBackend !== 'herdr') {
+      setHealth(null)
+      return
+    }
+    let active = true
+    void window.api.horcaTerminalSettings?.getHerdrHealth().then((next) => {
+      if (active) {
+        setHealth(next)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [defaults?.binarySource, defaults?.defaultBackend])
+  if (!snapshot || !defaults) {
     return null
   }
-  const defaults = snapshot.defaults
   return (
     <section className="space-y-3" data-horca-settings="terminal-backend">
       <SettingsSubsectionHeader
@@ -38,61 +56,105 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
           }
         />
         <SettingsRow
-          label={horcaTerminalSettingsCopy.binarySource}
-          description={horcaTerminalSettingsCopy.binarySourceDescription}
+          label="Floating terminal"
+          description="Choose a backend for floating terminals, or inherit the default."
           control={
             <SettingsSegmentedControl
-              ariaLabel="Herdr executable source"
-              value={defaults.binarySource.kind}
+              ariaLabel="Floating terminal backend"
+              value={defaults.floatingPreference}
               onChange={(value) =>
                 void updateDefaults({
-                  binarySource:
-                    value === 'custom'
-                      ? { kind: 'custom', path: '/usr/local/bin/herdr' }
-                      : { kind: 'system' }
+                  floatingPreference: value === 'orca' || value === 'herdr' ? value : 'inherit'
                 })
               }
               options={[
-                { value: 'system', label: 'From PATH' },
-                { value: 'custom', label: 'Custom' }
+                { value: 'inherit', label: 'Inherit' },
+                { value: 'orca', label: 'Orca' },
+                { value: 'herdr', label: 'Herdr' }
               ]}
             />
           }
         />
-        {defaults.binarySource.kind === 'custom' ? (
-          <SettingsRow
-            label={horcaTerminalSettingsCopy.customPath}
-            description={horcaTerminalSettingsCopy.binarySourceDescription}
-            control={
-              <Input
-                aria-label="Custom Herdr executable path"
-                className="w-72"
-                value={defaults.binarySource.path}
-                onChange={(event) =>
-                  void updateDefaults({
-                    binarySource: { kind: 'custom', path: event.target.value }
-                  })
-                }
-              />
-            }
-          />
-        ) : null}
-        <SettingsRow
-          label={horcaTerminalSettingsCopy.sessionName}
-          description={horcaTerminalSettingsCopy.sessionNameDescription}
-          control={
-            <Input
-              aria-label="Shared Herdr session name"
-              className="w-72"
-              maxLength={64}
-              placeholder="orca"
-              value={defaults.defaultSessionName ?? ''}
-              onChange={(event) =>
-                void updateDefaults({ defaultSessionName: event.target.value || null })
+        {defaults.defaultBackend === 'herdr' ? (
+          <>
+            <SettingsRow
+              label="Herdr status"
+              description="The Herdr executable used for local terminals."
+              control={
+                <span
+                  className={
+                    health?.status === 'unavailable'
+                      ? 'max-w-72 text-right text-xs text-destructive'
+                      : 'max-w-72 text-right text-xs text-muted-foreground'
+                  }
+                >
+                  {health?.status === 'ready'
+                    ? `Ready, ${health.version}`
+                    : (health?.error ?? 'Checking…')}
+                </span>
               }
             />
-          }
-        />
+            <SettingsRow
+              label={horcaTerminalSettingsCopy.binarySource}
+              description={horcaTerminalSettingsCopy.binarySourceDescription}
+              control={
+                <SettingsSegmentedControl
+                  ariaLabel="Herdr executable source"
+                  value={defaults.binarySource.kind}
+                  onChange={(value) =>
+                    void updateDefaults({
+                      binarySource:
+                        value === 'custom'
+                          ? { kind: 'custom', path: '/usr/local/bin/herdr' }
+                          : value === 'system'
+                            ? { kind: 'system' }
+                            : { kind: 'managed' }
+                    })
+                  }
+                  options={[
+                    { value: 'managed', label: 'Bundled' },
+                    { value: 'system', label: 'From PATH' },
+                    { value: 'custom', label: 'Custom' }
+                  ]}
+                />
+              }
+            />
+            {defaults.binarySource.kind === 'custom' ? (
+              <SettingsRow
+                label={horcaTerminalSettingsCopy.customPath}
+                description={horcaTerminalSettingsCopy.binarySourceDescription}
+                control={
+                  <Input
+                    aria-label="Custom Herdr executable path"
+                    className="w-72"
+                    value={defaults.binarySource.path}
+                    onChange={(event) =>
+                      void updateDefaults({
+                        binarySource: { kind: 'custom', path: event.target.value }
+                      })
+                    }
+                  />
+                }
+              />
+            ) : null}
+            <SettingsRow
+              label={horcaTerminalSettingsCopy.sessionName}
+              description={horcaTerminalSettingsCopy.sessionNameDescription}
+              control={
+                <Input
+                  aria-label="Shared Herdr session name"
+                  className="w-72"
+                  maxLength={64}
+                  placeholder="orca"
+                  value={defaults.defaultSessionName ?? ''}
+                  onChange={(event) =>
+                    void updateDefaults({ defaultSessionName: event.target.value || null })
+                  }
+                />
+              }
+            />
+          </>
+        ) : null}
       </div>
     </section>
   )

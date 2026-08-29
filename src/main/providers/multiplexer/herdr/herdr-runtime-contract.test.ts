@@ -40,8 +40,12 @@ describe('stock Herdr compatibility', () => {
     )
   })
 
-  it.each([HERDR_PROTOCOL_VERSION - 1, HERDR_PROTOCOL_VERSION + 1, 0, 1.5])(
-    'rejects schema protocol %s instead of accepting a different protocol',
+  it('accepts a newer protocol when its schema retains the required surface', () => {
+    expect(() => assertHerdrSchemaCompatible(schema(HERDR_PROTOCOL_VERSION + 1))).not.toThrow()
+  })
+
+  it.each([HERDR_PROTOCOL_VERSION - 1, 0, 1.5])(
+    'rejects unsupported schema protocol %s',
     (protocol) => {
       expect(() => assertHerdrSchemaCompatible(schema(protocol))).toThrow(
         `requires Herdr protocol ${HERDR_PROTOCOL_VERSION}`

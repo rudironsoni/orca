@@ -1,4 +1,7 @@
-import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
+import type {
+  TerminalLayoutSnapshot,
+  TerminalPaneLayoutNode
+} from '../../../../shared/terminal-tab-types'
 import type { HerdrProjectHostGraph } from './ensure-herdr-workspace'
 import { collectLeafIds, orcaPaneBinding, paneBindingMapKey } from './herdr-binding-metadata'
 import type { HerdrPaneLayoutSnapshot, HerdrSessionSnapshot } from './herdr-runtime-contract'
@@ -134,52 +137,107 @@ function focusedPaneId(snapshot: HerdrSessionSnapshot): string | null {
 }
 
 function sameLayout(left: HerdrPaneLayoutSnapshot, right: HerdrPaneLayoutSnapshot): boolean {
-  return JSON.stringify(left.splits) === JSON.stringify(right.splits)
+  return (
+    JSON.stringify(left.panes) === JSON.stringify(right.panes) &&
+    JSON.stringify(left.splits) === JSON.stringify(right.splits) &&
+    left.focused_pane_id === right.focused_pane_id &&
+    left.zoomed === right.zoomed
+  )
 }
 
 export function herdrLayoutToOrcaLayout(
   layout: HerdrPaneLayoutSnapshot,
   identities: Map<string, HerdrOrcaLeafIdentity>
 ): TerminalLayoutSnapshot | null {
-  const leaves = layout.panes
-    .map((pane) => identities.get(pane.pane_id)?.leafId)
-    .filter((leafId): leafId is string => Boolean(leafId))
-  if (leaves.length === 0) {
+  const panes = layout.panes.flatMap((pane) => {
+    const leafId = identities.get(pane.pane_id)?.leafId
+    return leafId ? [{ leafId, rect: pane.rect }] : []
+  })
+  if (panes.length === 0 || panes.length !== layout.panes.length) {
     return null
   }
-  if (leaves.length > 2) {
+  const root = herdrPanesToOrcaTree(panes, layout.splits ?? [])
+  if (!root) {
     return null
   }
-  if (leaves.length === 1 || !layout.splits?.[0]) {
+  const firstLeafId = panes[0].leafId
+  if (panes.length === 1) {
     return {
-      root: { type: 'leaf', leafId: leaves[0] },
-      activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? leaves[0],
+      root,
+      activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId,
       expandedLeafId: layout.zoomed
-        ? (identities.get(layout.focused_pane_id ?? '')?.leafId ?? leaves[0])
+        ? (identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId)
         : null
     }
   }
-  const split = layout.splits[0]
-  const direction = split.direction === 'down' ? 'horizontal' : 'vertical'
-  const ordered = [...layout.panes].sort((a, b) =>
-    direction === 'vertical' ? a.rect.x - b.rect.x : a.rect.y - b.rect.y
-  )
-  const first = identities.get(ordered[0]?.pane_id ?? '')?.leafId
-  const second = identities.get(ordered[1]?.pane_id ?? '')?.leafId
-  if (!first || !second) {
-    return null
-  }
   return {
-    root: {
-      type: 'split',
-      direction,
-      ratio: split.ratio,
-      first: { type: 'leaf', leafId: first },
-      second: { type: 'leaf', leafId: second }
-    },
-    activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? first,
+    root,
+    activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId,
     expandedLeafId: layout.zoomed
       ? (identities.get(layout.focused_pane_id ?? '')?.leafId ?? null)
       : null
   }
+}
+
+type BoundPane = {
+  leafId: string
+  rect: { x: number; y: number; width: number; height: number }
+}
+
+function herdrPanesToOrcaTree(
+  panes: BoundPane[],
+  splits: NonNullable<HerdrPaneLayoutSnapshot['splits']>,
+  usedSplitIds = new Set<string>()
+): TerminalPaneLayoutNode | null {
+  if (panes.length === 1) {
+    return { type: 'leaf', leafId: panes[0].leafId }
+  }
+  const candidates = splits
+    .filter(
+      (split) =>
+        !usedSplitIds.has(split.id) && panes.every((pane) => paneCenterInsideRect(pane, split.rect))
+    )
+    .sort(
+      (left, right) => right.rect.width * right.rect.height - left.rect.width * left.rect.height
+    )
+  for (const split of candidates) {
+    const boundary =
+      split.direction === 'right'
+        ? split.rect.x + split.rect.width * split.ratio
+        : split.rect.y + split.rect.height * split.ratio
+    const first = panes.filter((pane) => paneCenter(pane, split.direction) <= boundary)
+    const second = panes.filter((pane) => paneCenter(pane, split.direction) > boundary)
+    if (first.length === 0 || second.length === 0) {
+      continue
+    }
+    const nextUsed = new Set(usedSplitIds).add(split.id)
+    const firstNode = herdrPanesToOrcaTree(first, splits, nextUsed)
+    const secondNode = herdrPanesToOrcaTree(second, splits, nextUsed)
+    if (!firstNode || !secondNode) {
+      continue
+    }
+    return {
+      type: 'split',
+      direction: split.direction === 'down' ? 'horizontal' : 'vertical',
+      ratio: Math.min(0.95, Math.max(0.05, split.ratio)),
+      first: firstNode,
+      second: secondNode
+    }
+  }
+  return null
+}
+
+function paneCenter(pane: BoundPane, direction: 'right' | 'down'): number {
+  return direction === 'right'
+    ? pane.rect.x + pane.rect.width / 2
+    : pane.rect.y + pane.rect.height / 2
+}
+
+function paneCenterInsideRect(
+  pane: BoundPane,
+  rect: { x: number; y: number; width: number; height: number }
+): boolean {
+  const x = pane.rect.x + pane.rect.width / 2
+  const y = pane.rect.y + pane.rect.height / 2
+  return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height
 }

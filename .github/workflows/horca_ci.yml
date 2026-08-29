@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ inputs.sha || github.sha }}
+          ref: ${{ inputs.sha || github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -83,6 +83,8 @@ jobs:
           src/main/providers/terminal-backend-registry.test.ts
           src/main/horca
           src/main/providers/multiplexer/herdr
+          config/scripts/horca-electron-builder-downstream.test.mjs
+          config/scripts/horca-verify-packaged-distribution.test.mjs
           --exclude '**/*.integration.test.ts'
           --exclude '**/*.probe.test.ts'
 

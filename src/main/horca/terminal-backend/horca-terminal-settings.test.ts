@@ -18,9 +18,10 @@ function makeSettingsPath(): string {
   return horcaTerminalSettingsPath(directory)
 }
 
-function makeStore(projectIds: string[] = []): Store {
+function makeStore(projectIds: string[] = [], onboardingClosedAt: number | null = null): Store {
   return {
     getSettings: () => ({}),
+    getOnboarding: () => ({ closedAt: onboardingClosedAt }),
     getProjects: () => projectIds.map((id) => ({ id }))
   } as unknown as Store
 }
@@ -37,12 +38,12 @@ afterEach(() => {
 })
 
 describe('Horca terminal settings', () => {
-  it('defaults Horca profiles to Orca without changing Orca settings', () => {
+  it('defaults fresh Horca profiles to managed Herdr without changing Orca settings', () => {
     const source = createHorcaTerminalSettingsSource(makeStore(), makeSettingsPath())
 
-    expect(source.getDefaultBackend()).toBe('orca')
+    expect(source.getDefaultBackend()).toBe('herdr')
     expect(source.getHerdrSettings('local')).toEqual({
-      binarySource: { kind: 'system' },
+      binarySource: { kind: 'managed' },
       defaultSessionName: undefined
     })
   })
@@ -79,6 +80,16 @@ describe('Horca terminal settings', () => {
     })
   })
 
+  it('preserves Orca for an upgraded profile without a sidecar choice', () => {
+    const settingsPath = makeSettingsPath()
+    const source = createHorcaTerminalSettingsSource(makeStore(['folder'], 1), settingsPath)
+
+    expect(source.getDefaultBackend()).toBe('orca')
+    source.updateProject('folder', { preference: 'herdr' })
+    expect(source.getDefaultBackend()).toBe('orca')
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8')).terminalBackendDefault).toBe('orca')
+  })
+
   it('updates defaults and project settings in the Horca sidecar', () => {
     const settingsPath = makeSettingsPath()
     const source = createHorcaTerminalSettingsSource(makeStore(['folder']), settingsPath)
@@ -88,19 +99,21 @@ describe('Horca terminal settings', () => {
     source.updateDefaults({
       defaultBackend: 'orca',
       binarySource: { kind: 'custom', path: '/opt/bin/herdr' },
-      defaultSessionName: 'shared'
+      defaultSessionName: 'shared',
+      floatingPreference: 'inherit'
     })
     const snapshot = source.updateProject('folder', { preference: 'herdr' })
 
     expect(snapshot.defaults).toEqual({
       defaultBackend: 'orca',
       binarySource: { kind: 'custom', path: '/opt/bin/herdr' },
-      defaultSessionName: 'shared'
+      defaultSessionName: 'shared',
+      floatingPreference: 'inherit'
     })
     expect(snapshot.projects.folder.preference).toBe('herdr')
     expect(snapshots).toHaveLength(2)
     expect(JSON.parse(readFileSync(settingsPath, 'utf8'))).toMatchObject({
-      version: 1,
+      version: 2,
       terminalBackendDefault: 'orca',
       herdr: {
         binarySource: { kind: 'custom', path: '/opt/bin/herdr' },
