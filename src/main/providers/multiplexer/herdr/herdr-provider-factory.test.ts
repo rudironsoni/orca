@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getDefaultSettings } from '../../../../shared/constants'
@@ -23,6 +21,7 @@ vi.mock('./herdr-wsl-executable', () => ({
   clearWslHerdrExecutableCache: vi.fn()
 }))
 import type { SshConnection } from '../../../ssh/ssh-connection'
+import { getRemoteHostPlatform } from '../../../ssh/ssh-remote-platform'
 
 function makeStore(settings: ReturnType<typeof getDefaultSettings>): Store {
   return { getSettings: () => settings } as unknown as Store
@@ -190,7 +189,7 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
 })
 
 describe('createSshHerdrPtyProvider', () => {
-  it('routes system SSH through herdr --remote on the Orca host', () => {
+  it('runs remote Herdr API commands through the authenticated SSH connection', () => {
     const settings: TestSettings = {
       ...getDefaultSettings('/tmp'),
       terminalBackendDefault: 'herdr'
@@ -220,42 +219,7 @@ describe('createSshHerdrPtyProvider', () => {
       identity: { hostId: 'ssh:box' },
       project: { id: 'project-1' }
     })
-    expect(transport).toBeInstanceOf(HerdrCliHostTransport)
-    const options = (
-      transport as unknown as {
-        options: {
-          commandFor(args: string[]): { file: string; args: string[]; env?: NodeJS.ProcessEnv }
-          serverCommandFor(sessionName: string): {
-            file: string
-            args: string[]
-            env?: NodeJS.ProcessEnv
-          }
-        }
-      }
-    ).options
-    const command = options.commandFor(['workspace', 'list'])
-    expect(command.args.slice(0, 2)).toEqual(['--remote', 'workbox'])
-    expect(command.env?.HERDR_CONFIG_PATH).toBeTruthy()
-    expect(readFileSync(command.env?.HERDR_CONFIG_PATH ?? '', 'utf8')).toContain(
-      'manage_ssh_config = false'
-    )
-    const shimDir = command.env?.PATH?.split(delimiter)[0]
-    expect(shimDir).toContain('orca-herdr-remote')
-    if (process.platform !== 'win32') {
-      const shim = readFileSync(join(shimDir ?? '', 'ssh'), 'utf8')
-      expect(shim).toContain('ControlMaster=no')
-      expect(shim).toContain('ControlPath=')
-    }
-    expect(options.serverCommandFor('orca').args).toEqual([
-      '--remote',
-      'workbox',
-      '--handoff',
-      '--session',
-      'orca',
-      'server'
-    ])
-    provider.dispose()
-    expect(existsSync(shimDir ?? '')).toBe(false)
+    expect(transport).toBeInstanceOf(HerdrSshHostTransport)
   })
 
   it('execs over the live connection when the host is ssh2-only', () => {
@@ -285,6 +249,33 @@ describe('createSshHerdrPtyProvider', () => {
       project: { id: 'project-1' }
     })
     expect(transport).toBeInstanceOf(HerdrSshHostTransport)
+  })
+
+  it('rejects a Windows remote host with an actionable backend error', () => {
+    const settings: TestSettings = { ...getDefaultSettings('/tmp') }
+    const connection = {
+      getTarget: () => targetConnection,
+      usesSystemSshTransport: () => true
+    } as unknown as SshConnection
+    const provider = createSshHerdrPtyProvider(
+      undefined,
+      makeStore(settings),
+      connection,
+      'box',
+      getRemoteHostPlatform('win32-x64')
+    )
+    const transportForTarget = (
+      provider as unknown as {
+        transportForTarget(target: {
+          identity: { hostId: string }
+          project: { id: string }
+        }): HerdrHostTransport
+      }
+    ).transportForTarget
+
+    expect(() =>
+      transportForTarget({ identity: { hostId: 'ssh:box' }, project: { id: 'project-1' } })
+    ).toThrow('Select the Orca backend for this Windows host')
   })
 
   it('installs imported-surface presentation callbacks for SSH', () => {

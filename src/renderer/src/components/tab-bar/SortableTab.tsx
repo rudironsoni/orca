@@ -24,6 +24,7 @@ import { TAB_CONTAINER_WIDTH_CLASSES, TAB_LABEL_WIDTH_CLASSES } from './tab-widt
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
 import { TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
+import { Badge } from '@/components/ui/badge'
 import {
   isTerminalTabActivityLive,
   resolveTerminalTabActivityStatus,
@@ -176,6 +177,7 @@ export default function SortableTab({
   const closeShortcut = useOptionalShortcutLabel('tab.close')
   const closeLabel = translate('auto.components.tab.bar.SortableTab.95db5f2f7d', 'Close tab')
   const tabTitle = tab.customTitle ?? tab.title
+  const isHerdrTerminal = tab.ptyId?.startsWith('herdr:') === true
   const tabRoot = (
     <div
       ref={setNodeRef}
@@ -186,6 +188,7 @@ export default function SortableTab({
       // Why: DOM attribute lets E2E assert real selection state; a store-only check would miss render breaks (PR #1186 shipped in #1193).
       data-active={isActive ? 'true' : 'false'}
       data-agent-activity-status={activityStatus}
+      data-terminal-backend={isHerdrTerminal ? 'herdr' : 'orca'}
       {...attributes}
       {...dragListeners}
       // Why: subtle amber wash flags unread activity at a glance, layered over the active highlight so it still reads selected.
@@ -236,6 +239,11 @@ export default function SortableTab({
         showUnreadActivity={showUnreadActivity}
         isActive={isActive}
       />
+      {isHerdrTerminal && !isEditing ? (
+        <Badge variant="outline" className="mr-1 px-1 py-0 font-normal">
+          Herdr
+        </Badge>
+      ) : null}
       {isPinned && !isEditing && (
         <Pin className="mr-1 size-3 shrink-0 text-muted-foreground" aria-hidden />
       )}

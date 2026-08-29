@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { localHerdrCommand } from './herdr-cli-session'
 
 const { runProcessMock, spawnProcessMock } = vi.hoisted(() => ({
@@ -14,6 +14,10 @@ vi.mock('../../../../shared/child-process/run-process', () => ({
 beforeEach(() => {
   runProcessMock.mockReset()
   spawnProcessMock.mockReset()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 type MockChild = EventEmitter & {
@@ -48,6 +52,31 @@ async function loadTransport() {
 }
 
 describe('HerdrCliHostTransport', () => {
+  it('polls CLI snapshots and emits only real snapshot changes', async () => {
+    vi.useFakeTimers()
+    const transport = await loadTransport()
+    const request = vi.spyOn(transport, 'request')
+    request
+      .mockResolvedValueOnce({ id: 'first', result: { panes: [{ pane_id: 'p1' }] } })
+      .mockResolvedValueOnce({ id: 'second', result: { panes: [{ pane_id: 'p1' }] } })
+      .mockResolvedValueOnce({ id: 'third', result: { panes: [{ pane_id: 'p2' }] } })
+    const events: string[] = []
+    transport.onEvent((event) => events.push(event.event))
+
+    ;(
+      transport as unknown as { eventPoller: { start(sessionName: string): void } }
+    ).eventPoller.start('main')
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(events).toEqual([])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(events).toEqual(['session.snapshot_changed'])
+
+    await transport.disconnect()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(request).toHaveBeenCalledTimes(3)
+  })
+
   it('parses a JSON response from herdr stdout', async () => {
     const transport = await loadTransport()
     runProcessMock.mockResolvedValue({

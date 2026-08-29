@@ -187,8 +187,8 @@ function projectHerdrActivation(
       worktrees = [
         {
           id: worktreeId,
-          path: opts.cwd || homedir(),
-          displayName: `Floating ${tabId}`
+          path: hostId === LOCAL_EXECUTION_HOST_ID ? homedir() : '',
+          displayName: 'Horca Floating Terminal'
         }
       ]
     } else {
