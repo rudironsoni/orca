@@ -169,6 +169,12 @@ vi.mock('@/components/ui/input', () => ({
   }
 }))
 
+vi.mock('@/components/ui/badge', () => ({
+  Badge: function Badge(props: { children?: unknown }) {
+    return { type: 'Badge', props }
+  }
+}))
+
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: function Tooltip(props: { children?: unknown }) {
     return { type: 'Tooltip', props }
@@ -223,26 +229,29 @@ type ReactElementLike = {
   props: Record<string, unknown>
 }
 
-function makeTerminalTab() {
+function makeTerminalTab(ptyId?: string) {
   return {
     id: 'terminal-tab-1',
     title: 'Runtime terminal title',
     customTitle: null,
     type: 'terminal',
     worktreeId: 'wt-1',
-    createdAt: 0
+    createdAt: 0,
+    ptyId
   }
 }
 
 async function renderSortableTab({
-  onSetCustomTitle = vi.fn()
+  onSetCustomTitle = vi.fn(),
+  ptyId
 }: {
   onSetCustomTitle?: (tabId: string, title: string | null) => void
+  ptyId?: string
 } = {}): Promise<unknown> {
   reactHookRuntime.index = 0
   const module = await import('./SortableTab')
   return module.default({
-    tab: makeTerminalTab() as never,
+    tab: makeTerminalTab(ptyId) as never,
     unifiedTabId: 'terminal-tab-1',
     groupId: 'group-1',
     tabCount: 1,
@@ -403,5 +412,16 @@ describe('SortableTab rename shortcut signal', () => {
     pressInputKey(input, 'Enter')
 
     expect(onSetCustomTitle).toHaveBeenCalledWith('terminal-tab-1', '日本語 terminal')
+  })
+
+  it('labels a Herdr-backed terminal tab', async () => {
+    storeState.renamingTabId = null
+    const rendered = expandNode(await renderSortableTab({ ptyId: 'herdr:encoded' }))
+    const roots = findElementsByType(rendered, 'div')
+
+    expect(
+      roots.find((element) => element.props['data-terminal-backend'] === 'herdr')
+    ).toBeDefined()
+    expect(findElementsByType(rendered, 'Badge')).toHaveLength(1)
   })
 })

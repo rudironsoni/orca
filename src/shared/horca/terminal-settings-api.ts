@@ -10,13 +10,23 @@ export const HORCA_TERMINAL_SETTINGS_CHANNELS = {
   get: 'horca:terminal-settings:get',
   updateDefaults: 'horca:terminal-settings:update-defaults',
   updateProject: 'horca:terminal-settings:update-project',
-  changed: 'horca:terminal-settings:changed'
+  changed: 'horca:terminal-settings:changed',
+  health: 'horca:terminal-settings:health'
 } as const
+
+export type HorcaHerdrHealth = {
+  status: 'ready' | 'unavailable'
+  source: HerdrBinarySource
+  executable?: string
+  version?: string
+  error?: string
+}
 
 export type HorcaTerminalDefaultsSnapshot = {
   defaultBackend: TerminalBackend
   binarySource: HerdrBinarySource
   defaultSessionName?: string
+  floatingPreference: TerminalBackendPreference
 }
 
 export type HorcaProjectTerminalSettingsSnapshot = {
@@ -34,6 +44,7 @@ export type HorcaTerminalDefaultsUpdate = {
   defaultBackend?: TerminalBackend
   binarySource?: HerdrBinarySource
   defaultSessionName?: string | null
+  floatingPreference?: TerminalBackendPreference
 }
 
 export type HorcaProjectTerminalSettingsUpdate = {
@@ -49,4 +60,5 @@ export type HorcaTerminalSettingsApi = {
     update: HorcaProjectTerminalSettingsUpdate
   ): Promise<HorcaTerminalSettingsSnapshot>
   subscribe(listener: (snapshot: HorcaTerminalSettingsSnapshot) => void): () => void
+  getHerdrHealth(): Promise<HorcaHerdrHealth>
 }

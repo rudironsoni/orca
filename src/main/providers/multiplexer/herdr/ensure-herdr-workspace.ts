@@ -109,7 +109,7 @@ export async function ensureStockHerdrWorkspace(
     root_pane: HerdrPane
   }>(
     await transport.request(sessionName, 'workspace.create', {
-      cwd: worktree.path,
+      cwd: worktree.path || undefined,
       label: worktree.displayName || basename(worktree.path),
       focus: false
     })

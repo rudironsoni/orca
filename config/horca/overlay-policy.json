@@ -21,7 +21,9 @@
     "config/linux/after-install-horca.sh",
     "config/linux/after-remove-horca.sh",
     "config/nsis/daemon-host-uninstall-horca.nsh",
+    "config/scripts/horca-electron-builder-downstream.test.mjs",
     "config/scripts/horca-sync-workflow.test.mjs",
+    "config/scripts/horca-verify-packaged-distribution.test.mjs",
     "config/scripts/isolate-lefthook-hooks.ts",
     "resources/linux/bin/horca"
   ],
@@ -503,6 +505,20 @@
       "reason": "Use the active product name in local terminal window copy",
       "upstreamPr": null,
       "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/SortableTab.rename-shortcut.test.tsx",
+      "subsystem": "terminal-backend-presentation-seam",
+      "reason": "Verify the terminal backend badge on a Herdr-backed tab",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes generic terminal backend presentation metadata"
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/SortableTab.tsx",
+      "subsystem": "terminal-backend-presentation-seam",
+      "reason": "Show the active terminal backend on terminal tabs",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes generic terminal backend presentation metadata"
     },
     {
       "path": "src/renderer/src/components/settings/orca-logo-settings-icon.tsx",

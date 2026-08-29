@@ -1,7 +1,9 @@
 'use strict'
 
+const { execFileSync } = require('node:child_process')
 const { chmodSync, existsSync, symlinkSync, lstatSync, unlinkSync } = require('node:fs')
 const { join, resolve } = require('node:path')
+const { Arch } = require('builder-util')
 
 // Why a post-processor instead of inlining identity through electron-builder.config.cjs:
 // that file churns on every packaging tweak, and leftover Horca hunks are what
@@ -99,6 +101,41 @@ function wrapAfterPack(originalAfterPack, identity) {
   }
 }
 
+function wrapBeforePack(originalBeforePack) {
+  return async (context) => {
+    if (typeof originalBeforePack === 'function') {
+      await originalBeforePack(context)
+    }
+    const architecture = Arch[context.arch]
+    if (architecture !== 'x64' && architecture !== 'arm64') {
+      throw new Error(`No bundled Herdr build for ${context.electronPlatformName}/${architecture}`)
+    }
+    execFileSync(
+      process.execPath,
+      [
+        resolve(__dirname, 'horca', 'scripts', 'download-herdr-release.mjs'),
+        '--platform',
+        context.electronPlatformName,
+        '--arch',
+        architecture,
+        '--stage',
+        resolve(__dirname, '..', 'out', 'horca-herdr', architecture)
+      ],
+      { stdio: 'inherit' }
+    )
+  }
+}
+
+function addBundledHerdr(resources) {
+  if (!Array.isArray(resources)) {
+    return
+  }
+  resources.push({
+    from: 'out/horca-herdr/${arch}',
+    to: 'herdr'
+  })
+}
+
 function applyDownstreamDistribution(config) {
   if (!isDownstreamBuild()) {
     return config
@@ -123,6 +160,7 @@ function applyDownstreamDistribution(config) {
     delete config.win.signtoolOptions
     rewriteResourceDest(config.win.extraResources, 'orca.cmd', `bin/${identity.publicCli}.cmd`)
     rewriteResourceDest(config.win.extraResources, 'orca.exe', `bin/${identity.publicCli}.exe`)
+    addBundledHerdr(config.win.extraResources)
   }
 
   if (config.nsis) {
@@ -134,6 +172,7 @@ function applyDownstreamDistribution(config) {
     rewriteUsageDescriptions(config.mac.extendInfo, identity.productName)
     rewriteResourceDest(config.mac.extraResources, 'bin/orca', `bin/${identity.publicCli}`)
     rewriteComputerUseHelper(config.mac.extraResources, identity.productName)
+    addBundledHerdr(config.mac.extraResources)
   }
 
   if (config.dmg) {
@@ -154,6 +193,7 @@ function applyDownstreamDistribution(config) {
       'linux/bin/orca-ide',
       `bin/${identity.publicCli}`
     )
+    addBundledHerdr(config.linux.extraResources)
     if (Array.isArray(config.linux.extraResources)) {
       for (const resource of config.linux.extraResources) {
         if (
@@ -186,6 +226,7 @@ function applyDownstreamDistribution(config) {
   }
 
   config.publish = null
+  config.beforePack = wrapBeforePack(config.beforePack)
   config.afterPack = wrapAfterPack(config.afterPack, identity)
   return config
 }
