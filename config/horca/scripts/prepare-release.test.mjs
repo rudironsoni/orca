@@ -27,7 +27,7 @@ test('writes a verifiable beta release manifest', () => {
       UPSTREAM_SHA: 'b'.repeat(40),
       UPSTREAM_VERSION: '1.4.178-rc.2',
       GITHUB_SERVER_URL: 'https://github.com',
-      GITHUB_REPOSITORY: 'rudironsoni/orca',
+      GITHUB_REPOSITORY: 'rudironsoni/horca',
       GITHUB_RUN_ID: '123'
     }
   })
