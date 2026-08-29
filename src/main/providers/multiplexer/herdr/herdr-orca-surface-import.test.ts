@@ -95,7 +95,7 @@ describe('collectUnboundHerdrSurfaces', () => {
     expect(surfaces).toEqual([])
   })
 
-  it('refuses an ownerless multi-pane tab rather than dropping sibling panes', () => {
+  it('imports every pane from an ownerless multi-pane tab', () => {
     const workspaceBinding = orcaWorkspaceBinding(project.id, worktree)
     const surfaces = collectUnboundHerdrSurfaces(
       'orca',
@@ -118,7 +118,12 @@ describe('collectUnboundHerdrSurfaces', () => {
       new Map()
     )
 
-    expect(surfaces).toEqual([])
+    expect(surfaces).toHaveLength(2)
+    expect(surfaces.map((surface) => surface.paneId)).toEqual(['w1:p1', 'w1:p2'])
+    expect(surfaces[1]).toMatchObject({
+      tabId: surfaces[0].tabId,
+      splitFromLeafId: surfaces[0].leafId
+    })
   })
 
   it('does not import a materialized leaf tab when the worktree already has an Orca tab', () => {
@@ -320,7 +325,7 @@ describe('collectUnboundHerdrSurfaces', () => {
 })
 
 describe('herdrLayoutToOrcaLayout', () => {
-  it('keeps the existing layout when a Herdr layout has more than two panes', () => {
+  it('rebuilds a recursive layout with more than two panes', () => {
     expect(
       herdrLayoutToOrcaLayout(
         {
@@ -354,6 +359,22 @@ describe('herdrLayoutToOrcaLayout', () => {
           ['pane-3', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-3' }]
         ])
       )
-    ).toBeNull()
+    ).toEqual({
+      root: {
+        type: 'split',
+        direction: 'vertical',
+        ratio: 0.5,
+        first: { type: 'leaf', leafId: 'leaf-1' },
+        second: {
+          type: 'split',
+          direction: 'horizontal',
+          ratio: 0.5,
+          first: { type: 'leaf', leafId: 'leaf-2' },
+          second: { type: 'leaf', leafId: 'leaf-3' }
+        }
+      },
+      activeLeafId: 'leaf-1',
+      expandedLeafId: null
+    })
   })
 })

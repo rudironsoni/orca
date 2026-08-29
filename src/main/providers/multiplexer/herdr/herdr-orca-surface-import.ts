@@ -92,20 +92,26 @@ function collectUnboundTabSurfaces(
     }
   }
   if (!owner) {
-    if (unbound.length !== 1 || panes.length !== 1) {
+    if (unbound.length === 0 || unbound.length !== panes.length) {
       return []
     }
-    const root = unbound[0]
-    const leafId = randomUUID()
     const tabId = randomUUID()
-    return [
-      surfaceFor(graph, worktreeId, tabId, leafId, root, tab.label, undefined, snapshot, tab.tab_id)
-    ]
+    const rootLeafId = randomUUID()
+    return unbound.map((pane, index) =>
+      surfaceFor(
+        graph,
+        worktreeId,
+        tabId,
+        index === 0 ? rootLeafId : randomUUID(),
+        pane,
+        tab.label,
+        index === 0 ? undefined : rootLeafId,
+        snapshot,
+        tab.tab_id
+      )
+    )
   }
   if (unbound.length === 0) {
-    return []
-  }
-  if (unbound.length > 1) {
     return []
   }
   return unbound.map((pane) => {

@@ -336,13 +336,13 @@ describe('Herdr PTY target resolution', () => {
     expect(target?.graph.worktrees).toHaveLength(1)
     expect(target?.graph.worktrees[0]).toMatchObject({
       id: FLOATING_TERMINAL_WORKTREE_ID,
-      path: '/tmp'
+      path: homedir()
     })
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID]).toHaveLength(1)
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID][0].id).toBe('floating-tab')
   })
 
-  it('uses the host home directory when a floating terminal has no cwd', async () => {
+  it('uses the host home directory for the shared floating workspace', async () => {
     const store = {
       getSettings: () => ({ terminalBackendDefault: 'herdr' }),
       getProjects: () => [],
@@ -350,12 +350,27 @@ describe('Herdr PTY target resolution', () => {
       getWorkspaceSession: () => ({ tabsByWorktree: {}, terminalLayoutsByTabId: {} })
     } as unknown as Store
 
-    const target = await createLocalHerdrPtyTargetResolver(store)(
-      { ...floatingSpawnOptions(), cwd: '' },
+    const target = await createLocalHerdrPtyTargetResolver(store)(floatingSpawnOptions(), null)
+
+    expect(target?.graph.worktrees[0]?.path).toBe(homedir())
+    expect(target?.graph.worktrees[0]?.displayName).toBe('Horca Floating Terminal')
+  })
+
+  it('lets the remote Herdr server choose its home for the floating workspace', async () => {
+    const store = {
+      getSettings: () => ({ terminalBackendDefault: 'herdr' }),
+      getProjects: () => [],
+      getRepo: () => undefined,
+      getWorktreeMeta: () => ({ hostId: 'ssh:box' }),
+      getWorkspaceSession: () => ({ tabsByWorktree: {}, terminalLayoutsByTabId: {} })
+    } as unknown as Store
+
+    const target = await createHerdrPtyTargetResolver(store, 'ssh:box')(
+      floatingSpawnOptions(),
       null
     )
 
-    expect(target?.graph.worktrees[0]?.path).toBe(homedir())
+    expect(target?.graph.worktrees[0]?.path).toBe('')
   })
 
   it('resolves spawn identity from the persisted identity when opts carry none', async () => {

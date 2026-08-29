@@ -4,11 +4,24 @@ import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 const executablePath = resolve(process.argv[2] ?? '')
 if (!existsSync(executablePath)) {
   throw new Error(`Packaged Horca executable does not exist: ${executablePath}`)
+}
+
+const resourcesPath =
+  process.platform === 'darwin'
+    ? resolve(dirname(executablePath), '..', 'Resources')
+    : join(dirname(executablePath), 'resources')
+const bundledHerdr = join(
+  resourcesPath,
+  'herdr',
+  process.platform === 'win32' ? 'herdr.exe' : 'herdr'
+)
+if (!existsSync(bundledHerdr)) {
+  throw new Error(`Packaged Herdr executable does not exist: ${bundledHerdr}`)
 }
 
 const smokeTmpRoot = process.platform === 'darwin' ? '/tmp' : tmpdir()
@@ -165,7 +178,15 @@ try {
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByText('Terminal', { exact: true }).first().click()
   await page.locator('[data-horca-settings="terminal-backend"]').waitFor({ state: 'visible' })
+  if ((await page.getByLabel('Shared Herdr session name').count()) !== 0) {
+    throw new Error('Herdr settings were visible before Herdr was selected')
+  }
   await page.getByRole('radio', { name: 'Herdr', exact: true }).first().click()
+  await page.getByLabel('Shared Herdr session name').waitFor({ state: 'visible' })
+  const health = await page.evaluate(() => window.api.horcaTerminalSettings?.getHerdrHealth())
+  if (health?.status !== 'ready' || health.executable !== bundledHerdr) {
+    throw new Error(`Packaged Herdr health check failed: ${JSON.stringify(health)}`)
+  }
   const settingsFile = join(home, '.horca', 'terminal-backends.json')
   await waitForFile(settingsFile)
   if (!existsSync(settingsFile)) {
@@ -186,7 +207,7 @@ try {
       rows: 24,
       cwd,
       env: { ORCA_PANE_KEY: `horca-packaged-smoke:${leafId}` },
-      command: 'printf HORCA_HERDR_SMOKE',
+      command: 'printf HORCA_HERDR_SMOKE; sleep 5',
       worktreeId: 'global-floating-terminal',
       tabId: 'horca-packaged-smoke',
       leafId
@@ -196,6 +217,14 @@ try {
   if (!herdrPtyId.startsWith('herdr:')) {
     throw new Error(`Packaged terminal did not use Herdr: ${herdrPtyId}`)
   }
+  await page.evaluate((ptyId) => window.api.pty.setPtyDeliveryInterest(ptyId, true), herdrPtyId)
+  await page.waitForFunction(
+    async (ptyId) =>
+      (await window.api.pty.getMainBufferSnapshot(ptyId))?.data.includes('HORCA_HERDR_SMOKE'),
+    herdrPtyId,
+    { timeout: 15_000 }
+  )
+  await page.evaluate((ptyId) => window.api.pty.setPtyDeliveryInterest(ptyId, false), herdrPtyId)
   await page.evaluate((ptyId) => window.api.pty.kill(ptyId), herdrPtyId)
   await stop(application)
   application = await launch()
@@ -214,7 +243,7 @@ try {
 } finally {
   await stop(application)
   try {
-    execFileSync('herdr', ['session', 'stop', herdrSessionName, '--json'], {
+    execFileSync(bundledHerdr, ['session', 'stop', herdrSessionName, '--json'], {
       env: launchEnvironment,
       stdio: 'ignore',
       timeout: 10_000

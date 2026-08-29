@@ -48,7 +48,9 @@ export function herdrStockCliArgs(method: string, rawParams: unknown): string[] 
         requiredString(params.workspace_id, 'workspace_id'),
         '--source',
         requiredString(params.source, 'source'),
-        ...tokenFlags(params.tokens)
+        ...tokenFlags(params.tokens),
+        ...optionalFlag('--ttl-ms', params.ttl_ms),
+        ...optionalFlag('--seq', params.seq)
       ]
     case 'workspace.close':
       return ['workspace', 'close', requiredString(params.workspace_id, 'workspace_id')]
