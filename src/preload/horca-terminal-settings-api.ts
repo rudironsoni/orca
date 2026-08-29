@@ -11,6 +11,7 @@ export function createHorcaTerminalSettingsApi(
   const channels = HORCA_TERMINAL_SETTINGS_CHANNELS
   return {
     getSnapshot: () => ipc.invoke(channels.get),
+    getHerdrHealth: () => ipc.invoke(channels.health),
     updateDefaults: (update) => ipc.invoke(channels.updateDefaults, update),
     updateProject: (projectId, update) => ipc.invoke(channels.updateProject, projectId, update),
     subscribe: (callback) => {
