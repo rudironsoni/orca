@@ -17,6 +17,7 @@ import type { HerdrProjectHostGraph } from './ensure-herdr-workspace'
 const RECONCILE_EVENT_DEBOUNCE_MS = 150
 
 const RECONCILE_EVENT_KINDS = new Set([
+  'session.snapshot_changed',
   'workspace.created',
   'workspace.updated',
   'workspace.metadata_updated',

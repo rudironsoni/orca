@@ -98,10 +98,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Verify identity and signatures
         run: |
-          herdr_binary=$(node config/horca/scripts/download-herdr-release.mjs)
-          mkdir -p "$RUNNER_TEMP/horca-herdr-bin"
-          ln -sf "$herdr_binary" "$RUNNER_TEMP/horca-herdr-bin/herdr"
-          export PATH="$RUNNER_TEMP/horca-herdr-bin:$PATH"
           node config/horca/verify-packaged-distribution.mjs dist
           for arch in arm64 x64; do
             dmg="dist/horca-macos-$arch.dmg"

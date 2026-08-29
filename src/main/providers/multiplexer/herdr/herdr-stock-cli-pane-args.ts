@@ -31,8 +31,6 @@ export function herdrStockCliPaneArgs(method: string, params: JsonRecord): strin
       ]
     case 'pane.get':
       return ['pane', 'get', requiredString(params.pane_id, 'pane_id')]
-    case 'pane.focus':
-      return ['pane', 'focus', requiredString(params.pane_id, 'pane_id')]
     case 'pane.list':
       return ['pane', 'list', ...optionalFlag('--workspace', params.workspace_id)]
     case 'pane.current':
@@ -84,7 +82,7 @@ export function herdrStockCliPaneArgs(method: string, params: JsonRecord): strin
         ...tokenFlags(params.tokens),
         ...optionalFlag('--title', params.title),
         ...optionalFlag('--display-agent', params.display_agent),
-        ...optionalFlag('--ttl', params.ttl_ms),
+        ...optionalFlag('--ttl-ms', params.ttl_ms),
         ...optionalFlag('--seq', params.seq),
         ...(params.clear_title ? ['--clear-title'] : []),
         ...(params.clear_display_agent ? ['--clear-display-agent'] : []),

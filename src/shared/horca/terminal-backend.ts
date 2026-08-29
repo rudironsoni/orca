@@ -2,7 +2,12 @@ export type TerminalBackend = 'orca' | 'herdr'
 
 export type TerminalBackendPreference = 'inherit' | TerminalBackend
 
-export type HerdrBinarySource = { kind: 'system' } | { kind: 'custom'; path: string }
+export type HerdrBinarySource =
+  | { kind: 'managed' }
+  | { kind: 'system' }
+  | { kind: 'custom'; path: string }
+
+export const HORCA_FLOATING_PROJECT_ID = 'orca-global'
 
 /** Shared stock herdr session name for Orca-managed terminals when no
  *  per-project override is set. Users can edit or clear it. */
@@ -30,9 +35,12 @@ export function normalizeTerminalBackend(value: unknown): TerminalBackend {
 
 export function normalizeHerdrBinarySource(value: unknown): HerdrBinarySource {
   if (!value || typeof value !== 'object') {
-    return { kind: 'system' }
+    return { kind: 'managed' }
   }
   const candidate = value as { kind?: unknown; path?: unknown }
+  if (candidate.kind === 'managed') {
+    return { kind: 'managed' }
+  }
   if (candidate.kind === 'system') {
     return { kind: 'system' }
   }
@@ -42,8 +50,7 @@ export function normalizeHerdrBinarySource(value: unknown): HerdrBinarySource {
       return { kind: 'custom', path }
     }
   }
-  // Persisted experimental "managed" values migrate to the stock PATH binary.
-  return { kind: 'system' }
+  return { kind: 'managed' }
 }
 
 export type TerminalBackendActivation =
