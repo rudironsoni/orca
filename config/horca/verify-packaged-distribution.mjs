@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { extractFile, listPackage } from '@electron/asar'
 
 function findAppAsars(directory) {
@@ -62,6 +62,30 @@ export function verifyHorcaAsar(asarPath) {
   return checks.map(([label]) => label)
 }
 
+export function verifyHorcaResources(asarPath) {
+  const resourcesDir = dirname(asarPath)
+  const herdrDirectory = join(resourcesDir, 'herdr')
+  const hasWindowsHerdr = existsSync(join(herdrDirectory, 'herdr.exe'))
+  const hasHerdr = existsSync(join(herdrDirectory, 'herdr')) || hasWindowsHerdr
+  const checks = [
+    ['bundled Herdr executable is packaged', hasHerdr],
+    ...(hasWindowsHerdr
+      ? [
+          [
+            'Herdr ConPTY runtime is packaged',
+            existsSync(join(herdrDirectory, 'conpty', 'conpty.dll')) &&
+              existsSync(join(herdrDirectory, 'conpty', 'herdr-conpty.json'))
+          ]
+        ]
+      : [])
+  ]
+  const failures = checks.filter(([, passed]) => !passed).map(([label]) => label)
+  if (failures.length > 0) {
+    throw new Error(`${basename(asarPath)} failed Horca resource checks: ${failures.join(', ')}`)
+  }
+  return checks.map(([label]) => label)
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const distributionDirectory = resolve(process.argv[2] ?? 'dist')
   if (!existsSync(distributionDirectory)) {
@@ -72,7 +96,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     throw new Error(`No app.asar found under ${distributionDirectory}`)
   }
   for (const asarPath of asars) {
-    const checks = verifyHorcaAsar(asarPath)
+    const checks = [...verifyHorcaAsar(asarPath), ...verifyHorcaResources(asarPath)]
     console.log(`Verified ${asarPath}: ${checks.join(', ')}`)
   }
 }

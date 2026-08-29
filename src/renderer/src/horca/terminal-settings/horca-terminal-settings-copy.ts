@@ -4,7 +4,7 @@ export const horcaTerminalSettingsCopy = {
   defaultBackend: 'Default backend',
   defaultBackendDescription: 'New projects use this backend until you choose another one.',
   binarySource: 'Herdr executable',
-  binarySourceDescription: 'Use Herdr from PATH or an absolute executable path.',
+  binarySourceDescription: 'Use the bundled Herdr, PATH, or an absolute executable path.',
   customPath: 'Custom Herdr path',
   sessionName: 'Shared Herdr session',
   sessionNameDescription: 'Clear this value to use project-based Herdr session names.',

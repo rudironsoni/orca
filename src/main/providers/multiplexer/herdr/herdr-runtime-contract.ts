@@ -169,10 +169,10 @@ export function assertHerdrSchemaCompatible(schema: HerdrApiSchema): void {
       `Orca requires Herdr API schema ${HERDR_SCHEMA_VERSION}; received ${schema.schema_version}`
     )
   }
-  if (schema.protocol !== HERDR_PROTOCOL_VERSION) {
+  if (schema.protocol < HERDR_PROTOCOL_VERSION) {
     throw new HerdrRuntimeError(
       'herdr_incompatible',
-      `Orca requires Herdr protocol ${HERDR_PROTOCOL_VERSION}; received ${schema.protocol}`
+      `Orca requires Herdr protocol ${HERDR_PROTOCOL_VERSION} or newer; received ${schema.protocol}`
     )
   }
   const missing = REQUIRED_HERDR_METHODS.filter(
