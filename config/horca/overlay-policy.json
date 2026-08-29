@@ -21,6 +21,7 @@
     "config/linux/after-install-horca.sh",
     "config/linux/after-remove-horca.sh",
     "config/nsis/daemon-host-uninstall-horca.nsh",
+    "config/scripts/horca-sync-workflow.test.mjs",
     "config/scripts/isolate-lefthook-hooks.ts",
     "resources/linux/bin/horca"
   ],
@@ -173,27 +174,6 @@
       "reason": "Keep Horca credentials under its isolated local state root",
       "upstreamPr": null,
       "dropWhen": "Upstream centralizes its local state root"
-    },
-    {
-      "path": "src/main/browser/browser-client-page-renderer-lifecycle.electron.test.ts",
-      "subsystem": "horca-distribution-identity",
-      "reason": "Verify browser process launch with downstream build constants",
-      "upstreamPr": null,
-      "dropWhen": "The test accepts distribution identity through a generic fixture"
-    },
-    {
-      "path": "src/main/browser/browser-route-egress-electron-launch.ts",
-      "subsystem": "horca-distribution-identity",
-      "reason": "Launch the correct downstream Electron executable",
-      "upstreamPr": null,
-      "dropWhen": "Upstream centralizes its executable identity"
-    },
-    {
-      "path": "src/main/browser/browser-route-webrtc-egress.electron.test.ts",
-      "subsystem": "horca-distribution-identity",
-      "reason": "Verify browser route launch with downstream build constants",
-      "upstreamPr": null,
-      "dropWhen": "The test accepts distribution identity through a generic fixture"
     },
     {
       "path": "src/main/cli/bundled-cli-launcher-path.ts",
