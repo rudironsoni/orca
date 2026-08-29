@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   candidate:
-    if: github.repository == 'rudironsoni/orca'
+    if: github.repository == 'rudironsoni/horca'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: horca-maintenance
