@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { createBootstrapFatalExitBanner } from './config/build-plugins/bootstrap-fatal-exit-banner'
 import { createPlainNodeEntryGuardPlugin } from './config/build-plugins/plain-node-entry-guard'
 import { applyHorcaViteDistributionEnv } from './src/shared/horca-vite-distribution'
+import { createDistributionTranslationCatalogPlugin } from './src/shared/horca/distribution-translation-catalog-plugin'
 import packageJson from './package.json' with { type: 'json' }
 
 const BUNDLED_MAIN_DEPENDENCIES = new Set([
@@ -63,9 +64,8 @@ const ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL =
 // src/shared/distribution-identity.json. Official builds and every other path
 // substitute 'official', leaving upstream behavior unchanged.
 applyHorcaViteDistributionEnv(process.env)
-const ORCA_DISTRIBUTION_LITERAL = JSON.stringify(
-  process.env.ORCA_DOWNSTREAM_BUILD === '1' ? 'horca' : 'official'
-)
+const orcaDistribution = process.env.ORCA_DOWNSTREAM_BUILD === '1' ? 'horca' : 'official'
+const ORCA_DISTRIBUTION_LITERAL = JSON.stringify(orcaDistribution)
 
 function createStartupDiagnosticsBanner(chunkName: string): string {
   return `
@@ -202,6 +202,7 @@ function createMainBootstrapPlugin() {
 
 export const electronViteConfig: UserConfig = {
   main: {
+    plugins: [createDistributionTranslationCatalogPlugin(orcaDistribution)],
     build: {
       // Why: 'esbuild' makes rolldown disable its own minifier and re-print every
       // chunk through esbuild, which is undeclared here and only resolves via
@@ -318,7 +319,7 @@ export const electronViteConfig: UserConfig = {
         '@': resolve('src/renderer/src')
       }
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [createDistributionTranslationCatalogPlugin(orcaDistribution), react(), tailwindcss()],
     worker: {
       format: 'es'
     },
