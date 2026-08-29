@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   verify:
-    if: github.repository == 'rudironsoni/orca'
+    if: github.repository == 'rudironsoni/horca'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
