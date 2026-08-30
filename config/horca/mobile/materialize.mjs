@@ -8,7 +8,14 @@ const outputRoot = join(repoRoot, 'out', 'horca-mobile')
 const mobileOutput = join(outputRoot, 'mobile')
 const downstreamPatches = [
   join(import.meta.dirname, 'ghostty-port.patch'),
-  join(import.meta.dirname, 'horca-branding.patch')
+  join(import.meta.dirname, 'horca-branding.patch'),
+  join(import.meta.dirname, 'ios-scene-lifecycle.patch')
+]
+const downstreamFiles = [
+  {
+    source: join(import.meta.dirname, 'ios-scene-lifecycle.js'),
+    destination: join(mobileOutput, 'plugins', 'ios-scene-lifecycle.js')
+  }
 ]
 
 function trackedFiles(prefix) {
@@ -39,6 +46,10 @@ if (dirname(outputRoot) !== join(repoRoot, 'out') || !outputRoot.endsWith(`${sep
 rmSync(outputRoot, { recursive: true, force: true })
 copyTracked('mobile')
 copyTracked('src/shared')
+for (const file of downstreamFiles) {
+  mkdirSync(dirname(file.destination), { recursive: true })
+  cpSync(file.source, file.destination)
+}
 for (const patch of downstreamPatches) {
   execFileSync(
     'git',

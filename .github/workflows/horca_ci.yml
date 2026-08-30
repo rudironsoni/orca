@@ -113,6 +113,7 @@ jobs:
 
       - name: Materialize Horca mobile
         run: |
+          node --test config/horca/mobile/ios-scene-lifecycle.test.mjs
           node config/horca/mobile/materialize.mjs
           node config/horca/mobile/verify-materialized.mjs
 
