@@ -89,12 +89,17 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
     expect(resolveWslHerdrExecutable).toHaveBeenCalled()
   })
 
-  it('routes the herdr backend to the stock socket transport by default', () => {
+  it('routes the Herdr backend to the shared Horca session by default', () => {
     const settings: TestSettings = {
       ...getDefaultSettings('/tmp'),
       terminalBackendDefault: 'herdr'
     }
-    expect(localTransport(settings)).toBeInstanceOf(HerdrSocketTransport)
+    const transport = localTransport(settings) as HerdrSocketTransport
+
+    expect(transport).toBeInstanceOf(HerdrSocketTransport)
+    expect((transport as unknown as { options: { sessionName: string } }).options.sessionName).toBe(
+      'horca'
+    )
   })
 
   it('routes the herdr backend to the stock socket transport when the runtime is stock', () => {
