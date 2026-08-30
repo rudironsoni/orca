@@ -1,0 +1,460 @@
+diff --git c/mobile/app.json i/mobile/app.json
+index af30d7bbb7..f70e3e7075 100644
+--- c/mobile/app.json
++++ i/mobile/app.json
+@@ -83,15 +83,15 @@
+       [
+         "expo-camera",
+         {
+-          "cameraPermission": "Allow Orca to use the camera for QR code scanning.",
+-          "microphonePermission": "Allow Orca to use your microphone for voice dictation sent to your paired desktop for transcription.",
++          "cameraPermission": "Allow Horca to use the camera for QR code scanning.",
++          "microphonePermission": "Allow Horca to use your microphone for voice dictation sent to your paired desktop for transcription.",
+           "recordAudioAndroid": false
+         }
+       ],
+       [
+         "expo-image-picker",
+         {
+-          "photosPermission": "Allow Orca to attach photos from your library to a terminal session on your paired desktop."
++          "photosPermission": "Allow Horca to attach photos from your library to a terminal session on your paired desktop."
+         }
+       ],
+       [
+diff --git c/mobile/fastlane/Appfile i/mobile/fastlane/Appfile
+index 318a617681..23bf0d1cff 100644
+--- c/mobile/fastlane/Appfile
++++ i/mobile/fastlane/Appfile
+@@ -1,2 +1,2 @@
+-app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.stably.orca.mobile")
++app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.rudironsoni.horca")
+ team_id(ENV["APPLE_TEAM_ID"])
+diff --git c/mobile/fastlane/Fastfile i/mobile/fastlane/Fastfile
+index bcca6026b8..eda02c256a 100644
+--- c/mobile/fastlane/Fastfile
++++ i/mobile/fastlane/Fastfile
+@@ -1,4 +1,4 @@
+-# Orca Mobile iOS release lane.
++# Horca Mobile iOS release lane.
+ #
+ # Builds the prebuilt iOS workspace, signs it with the distribution identity
+ # imported into the CI keychain plus an explicit App Store provisioning profile
+@@ -25,12 +25,12 @@ MOBILE_ROOT = File.expand_path("..", __dir__)
+ # Why: fastlane executes lanes from mobile/fastlane even when GitHub Actions
+ # starts in mobile/, so release file paths must be rooted at the mobile app.
+ APP_CONFIG_PATH = File.join(MOBILE_ROOT, "app.json")
+-WORKSPACE = File.join(MOBILE_ROOT, "ios", "Orca.xcworkspace")
++WORKSPACE = File.join(MOBILE_ROOT, "ios", "Horca.xcworkspace")
+ BUILD_OUTPUT_DIRECTORY = File.join(MOBILE_ROOT, "build")
+-SCHEME = "Orca"
+-BUNDLE_ID = "com.stably.orca.mobile"
++SCHEME = "Horca"
++BUNDLE_ID = "com.rudironsoni.horca"
+ TESTFLIGHT_GROUPS = ["peeps"].freeze
+-DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Mobile updates and fixes.".freeze
++DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Horca Mobile updates and fixes.".freeze
+ TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS = 20 * 60
+ 
+ # App Store version states in which the version "train" is terminally closed to
+@@ -177,10 +177,10 @@ platform :ios do
+     config.fetch("expo").fetch("ios")["buildNumber"] = build_number.to_s
+     write_mobile_app_config(config)
+ 
+-    UI.message("Prepared Orca Mobile iOS #{version} (#{build_number})")
++    UI.message("Prepared Horca Mobile iOS #{version} (#{build_number})")
+   end
+ 
+-  desc "Build, sign, and upload Orca Mobile to App Store Connect / TestFlight"
++  desc "Build, sign, and upload Horca Mobile to App Store Connect / TestFlight"
+   lane :build_and_upload do
+     api_key = app_store_connect_api_key_from_env
+ 
+@@ -217,7 +217,7 @@ platform :ios do
+         },
+       },
+       output_directory: BUILD_OUTPUT_DIRECTORY,
+-      output_name: "Orca.ipa",
++      output_name: "Horca.ipa",
+       clean: true,
+     )
+ 
+@@ -274,7 +274,7 @@ platform :ios do
+     )
+   end
+ 
+-  desc "Build, upload, and distribute Orca Mobile to external TestFlight testers"
++  desc "Build, upload, and distribute Horca Mobile to external TestFlight testers"
+   lane :release do
+     build_and_upload
+ 
+diff --git c/mobile/app/_layout.tsx i/mobile/app/_layout.tsx
+index 9080cdedcf..da70dc9752 100644
+--- c/mobile/app/_layout.tsx
++++ i/mobile/app/_layout.tsx
+@@ -44,7 +44,7 @@ export default function RootLayout() {
+     void recoverMobileRelayPairing()
+   }, [])
+ 
+-  // Why: route `orca://pair?...` deep links to the confirm screen so
++  // Why: route `horca://pair?...` deep links to the confirm screen so
+   // the same pairing flow runs whether the link arrived via QR scan,
+   // paste, AirDrop, Messages, or `xcrun simctl openurl`. getInitialURL
+   // covers cold-start (link tapped while app was closed); the listener
+@@ -54,7 +54,7 @@ export default function RootLayout() {
+       const code = extractPairingCodeFromUrl(url)
+       if (code) {
+         // Why: Android camera launches can leave Expo Router's unmatched
+-        // `orca://pair` route underneath this screen; replacing keeps cancel
++        // `horca://pair` route underneath this screen; replacing keeps cancel
+         // and edge-back from revealing the router error page.
+         router.replace({ pathname: '/pair-confirm', params: { code } })
+       }
+diff --git c/mobile/app/about.tsx i/mobile/app/about.tsx
+index 70a1effa44..64789b95f5 100644
+--- c/mobile/app/about.tsx
++++ i/mobile/app/about.tsx
+@@ -51,7 +51,7 @@ export default function AboutScreen() {
+ 
+       <View style={styles.brand}>
+         <OrcaLogo size={28} />
+-        <Text style={styles.brandName}>Orca</Text>
++        <Text style={styles.brandName}>Horca</Text>
+         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
+       </View>
+ 
+diff --git c/mobile/app/h/[hostId]/session/[worktreeId].tsx i/mobile/app/h/[hostId]/session/[worktreeId].tsx
+index f69ea63205..b2eede96e5 100644
+--- c/mobile/app/h/[hostId]/session/[worktreeId].tsx
++++ i/mobile/app/h/[hostId]/session/[worktreeId].tsx
+@@ -2557,7 +2557,7 @@ export default function SessionScreen() {
+     void (async () => {
+       const reportActivationOutcome = (response: RpcSuccess | null): void => {
+         if (!disposed && response && headlessActivationNeedsHostRenderer(response.result)) {
+-          showToast('Open Orca on the host to wake sleeping agents.', 3000)
++          showToast('Open Horca on the host to wake sleeping agents.', 3000)
+         }
+       }
+       if (client && created !== '1' && !isFloatingWorkspaceRoute) {
+diff --git c/mobile/app/h/[hostId]/tasks.tsx i/mobile/app/h/[hostId]/tasks.tsx
+index 6b3b5196f2..49fefd58fa 100644
+--- c/mobile/app/h/[hostId]/tasks.tsx
++++ i/mobile/app/h/[hostId]/tasks.tsx
+@@ -3804,7 +3804,7 @@ export default function MobileTasksScreen() {
+           return
+         }
+         if (explicitView && explicitView.layout !== 'TABLE_LAYOUT') {
+-          throw new Error("Orca doesn't support this GitHub Project layout yet.")
++          throw new Error("Horca doesn't support this GitHub Project layout yet.")
+         }
+         if (!explicitView && !rememberedView) {
+           // Why: desktop asks which Project view to open the first time a project
+@@ -10309,7 +10309,7 @@ export default function MobileTasksScreen() {
+         onSelect={(viewId) => {
+           const view = githubProjectViews.find((candidate) => candidate.id === viewId)
+           if (view && view.layout !== 'TABLE_LAYOUT') {
+-            setGithubProjectError("Orca doesn't support this GitHub Project layout yet.")
++            setGithubProjectError("Horca doesn't support this GitHub Project layout yet.")
+             return
+           }
+           if (pendingGitHubProjectViewSelection) {
+diff --git c/mobile/app/mobile-onboarding.tsx i/mobile/app/mobile-onboarding.tsx
+index 50957a465f..32e2bdf538 100644
+--- c/mobile/app/mobile-onboarding.tsx
++++ i/mobile/app/mobile-onboarding.tsx
+@@ -144,7 +144,7 @@ function MobileOnboardingFlow({
+     <SafeAreaView style={styles.container}>
+       <View style={styles.brandRow}>
+         <OrcaLogo size={22} />
+-        <Text style={styles.brandName}>Orca</Text>
++        <Text style={styles.brandName}>Horca</Text>
+         {steps.length > 1 ? (
+           <View
+             accessible
+diff --git c/mobile/app/pair-scan.tsx i/mobile/app/pair-scan.tsx
+index 61e99f19f2..ef6d8539ce 100644
+--- c/mobile/app/pair-scan.tsx
++++ i/mobile/app/pair-scan.tsx
+@@ -251,7 +251,7 @@ export default function PairScanScreen() {
+           visible={pasteVisible}
+           title="Paste pairing code"
+           message="Copy the code shown under the QR on your computer."
+-          placeholder="orca://pair?code=... or paste the code"
++          placeholder="horca://pair?code=... or paste the code"
+           onSubmit={handlePasteSubmit}
+           onCancel={() => setPasteVisible(false)}
+         />
+@@ -266,7 +266,7 @@ export default function PairScanScreen() {
+       </Pressable>
+ 
+       <View style={styles.steps}>
+-        <Step number={1} text="Open Orca on your computer" />
++        <Step number={1} text="Open Horca on your computer" />
+         <Step number={2} text="Go to Settings → Mobile" />
+         <Step number={3} text="Scan the QR code" />
+       </View>
+@@ -349,7 +349,7 @@ export default function PairScanScreen() {
+         visible={pasteVisible}
+         title="Paste pairing code"
+         message="Copy the code shown under the QR on your computer."
+-        placeholder="orca://pair?code=... or paste the code"
++        placeholder="horca://pair?code=... or paste the code"
+         onSubmit={handlePasteSubmit}
+         onCancel={() => setPasteVisible(false)}
+       />
+diff --git c/mobile/src/home/MobileHomeEmptyState.tsx i/mobile/src/home/MobileHomeEmptyState.tsx
+index eda2496094..9cd107cf17 100644
+--- c/mobile/src/home/MobileHomeEmptyState.tsx
++++ i/mobile/src/home/MobileHomeEmptyState.tsx
+@@ -4,7 +4,7 @@ import { colors, radii, spacing } from '../theme/mobile-theme'
+ 
+ const ONBOARDING_STEPS = [
+   {
+-    title: 'Open Orca desktop',
++    title: 'Open Horca desktop',
+     desc: 'Go to Settings → Mobile and generate a pairing QR code.'
+   },
+   {
+diff --git c/mobile/src/home/MobileHomeTopBar.tsx i/mobile/src/home/MobileHomeTopBar.tsx
+index ac6d800c7f..186d92604a 100644
+--- c/mobile/src/home/MobileHomeTopBar.tsx
++++ i/mobile/src/home/MobileHomeTopBar.tsx
+@@ -10,7 +10,7 @@ export function MobileHomeTopBar({ onOpenSettings }: { onOpenSettings: () => voi
+         <View style={styles.logoMark}>
+           <OrcaLogo size={18} />
+         </View>
+-        <Text style={styles.brandName}>Orca</Text>
++        <Text style={styles.brandName}>Horca</Text>
+       </View>
+       <Pressable
+         style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+diff --git c/mobile/src/components/HostProtocolGate.test.ts i/mobile/src/components/HostProtocolGate.test.ts
+index 44a2265ccb..14c349829a 100644
+--- c/mobile/src/components/HostProtocolGate.test.ts
++++ i/mobile/src/components/HostProtocolGate.test.ts
+@@ -98,7 +98,7 @@ describe('HostProtocolGate', () => {
+     }
+     renderer = await renderGate()
+     const output = renderedText(renderer)
+-    expect(output).toContain('Update Orca Mobile')
++    expect(output).toContain('Update Horca Mobile')
+     expect(output).toContain('Open App Store')
+     expect(output).not.toContain('HostContent')
+   })
+@@ -112,8 +112,8 @@ describe('HostProtocolGate', () => {
+     }
+     renderer = await renderGate()
+     const output = renderedText(renderer)
+-    expect(output).toContain('Update Orca Mobile')
+-    expect(output).toContain('Update Orca Mobile from GitHub Releases')
++    expect(output).toContain('Update Horca Mobile')
++    expect(output).toContain('Update Horca Mobile from GitHub Releases')
+     expect(output).toContain('Open GitHub Releases')
+     expect(output).not.toContain('mobile app store')
+     expect(output).not.toContain('HostContent')
+@@ -131,7 +131,7 @@ describe('HostProtocolGate', () => {
+     }
+     renderer = await renderGate()
+     const output = renderedText(renderer)
+-    expect(output).toContain('Update Orca on your computer')
++    expect(output).toContain('Update Horca on your computer')
+     expect(output).toContain('Open GitHub Releases')
+     expect(output).not.toContain('HostContent')
+   })
+@@ -215,7 +215,7 @@ describe('HostProtocolGate', () => {
+     })
+ 
+     const output = renderedText(renderer)
+-    expect(output).toContain('Update Orca Mobile')
++    expect(output).toContain('Update Horca Mobile')
+     expect(output).not.toContain('HostContent')
+   })
+ 
+diff --git c/mobile/src/components/ProtocolBlockScreen.tsx i/mobile/src/components/ProtocolBlockScreen.tsx
+index ed8fc2bcdd..dd75efc4ce 100644
+--- c/mobile/src/components/ProtocolBlockScreen.tsx
++++ i/mobile/src/components/ProtocolBlockScreen.tsx
+@@ -21,10 +21,10 @@ export function ProtocolBlockScreen({ verdict }: Props) {
+     ? { label: mobileUpdateTarget.label, url: mobileUpdateTarget.url }
+     : { label: 'Open GitHub Releases', url: RELEASES_URL }
+ 
+-  const title = isMobileTooOld ? 'Update Orca Mobile' : 'Update Orca on your computer'
++  const title = isMobileTooOld ? 'Update Horca Mobile' : 'Update Horca on your computer'
+   const body = isMobileTooOld
+-    ? `This desktop needs a newer Orca Mobile app. Update Orca Mobile from ${mobileUpdateTarget.storeName}, then try this host again.`
+-    : 'This paired desktop app is too old for your current Orca Mobile app. Update Orca on your computer, then try this host again.'
++    ? `This desktop needs a newer Horca Mobile app. Update Horca Mobile from ${mobileUpdateTarget.storeName}, then try this host again.`
++    : 'This paired desktop app is too old for your current Horca Mobile app. Update Horca on your computer, then try this host again.'
+   const recoveryNote =
+     'Already updated? Go back to Hosts and refresh the connection. If this message stays, remove this host and pair it again.'
+ 
+diff --git c/mobile/src/diagnostics/connection-diagnostics-report.test.ts i/mobile/src/diagnostics/connection-diagnostics-report.test.ts
+index 35a1425165..18521cb87a 100644
+--- c/mobile/src/diagnostics/connection-diagnostics-report.test.ts
++++ i/mobile/src/diagnostics/connection-diagnostics-report.test.ts
+@@ -26,7 +26,7 @@ describe('buildConnectionDiagnosticsReport', () => {
+       nowMs: NOW
+     })
+ 
+-    expect(report).toContain('App: Orca Mobile 0.0.29 · ios 26.5.1')
++    expect(report).toContain('App: Horca Mobile 0.0.29 · ios 26.5.1')
+     expect(report).toContain('Host Orca version: 1.4.191')
+     expect(report).toContain('Endpoint: 100.65.9.106:6768 (Tailscale)')
+     expect(report).toContain('State: reconnecting (reconnect attempts: 12)')
+diff --git c/mobile/src/diagnostics/connection-diagnostics-report.ts i/mobile/src/diagnostics/connection-diagnostics-report.ts
+index 0507b44349..029672c6de 100644
+--- c/mobile/src/diagnostics/connection-diagnostics-report.ts
++++ i/mobile/src/diagnostics/connection-diagnostics-report.ts
+@@ -39,9 +39,9 @@ export function buildConnectionDiagnosticsReport(args: {
+     entries
+   })
+   const lines: string[] = []
+-  lines.push('Orca Mobile connection diagnostics')
++  lines.push('Horca Mobile connection diagnostics')
+   lines.push(`Generated: ${new Date(now).toISOString()}`)
+-  lines.push(`App: Orca Mobile ${args.appVersion} · ${args.platform}`)
++  lines.push(`App: Horca Mobile ${args.appVersion} · ${args.platform}`)
+   const desktopAppVersion = normalizeHostAppVersion(args.desktopAppVersion)
+   lines.push(`Host Orca version: ${desktopAppVersion ?? 'unknown'}`)
+   lines.push(`Host: ${redactConnectionLogText(args.hostName)}`)
+diff --git c/mobile/src/diagnostics/connection-diagnostics-submission.test.ts i/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
+index f2977b6055..e1857ceb96 100644
+--- c/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
++++ i/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
+@@ -35,7 +35,7 @@ describe('submitConnectionDiagnostics', () => {
+ 
+   it('preserves the newest complete events when bounding a UTF-8 report', () => {
+     const report = [
+-      'Orca Mobile connection diagnostics',
++      'Horca Mobile connection diagnostics',
+       'State: reconnecting',
+       '',
+       'Recent connection history (3 events, oldest first):',
+@@ -54,7 +54,7 @@ describe('submitConnectionDiagnostics', () => {
+ 
+   it('retains a bounded form of the newest event when that event exceeds the budget', () => {
+     const report = [
+-      'Orca Mobile connection diagnostics',
++      'Horca Mobile connection diagnostics',
+       'State: reconnecting',
+       '',
+       'Recent connection history (2 events, oldest first):',
+diff --git c/mobile/src/transport/pairing.ts i/mobile/src/transport/pairing.ts
+index d330f1834f..d5e50cfb50 100644
+--- c/mobile/src/transport/pairing.ts
++++ i/mobile/src/transport/pairing.ts
+@@ -22,7 +22,7 @@ export function decodePairingUrl(url: string): PairingOffer | null {
+ // accept the same URL shapes.
+ export function extractPairingCodeFromUrl(url: string): string | null {
+   const trimmed = url.trim()
+-  const match = /^orca:\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
++  const match = /^(?:horca|orca):\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
+   if (!match) {
+     return null
+   }
+@@ -49,7 +49,7 @@ export function extractPairingCodeFromUrl(url: string): string | null {
+   return null
+ }
+ 
+-// Why: accept either an `orca://pair?...` URL or the bare base64
++// Why: accept either Horca or upstream Orca pairing URLs, or the bare base64
+ // string so the paste-pair flow can take whichever the user actually
+ // copied from desktop.
+ export function parsePairingCode(input: string): PairingOffer | null {
+@@ -58,7 +58,7 @@ export function parsePairingCode(input: string): PairingOffer | null {
+     return null
+   }
+   try {
+-    if (/^orca:\/\//i.test(trimmed)) {
++    if (/^(?:horca|orca):\/\//i.test(trimmed)) {
+       return decodePairingUrl(trimmed)
+     }
+     return decodePairingBase64(trimmed)
+diff --git c/mobile/src/transport/pairing.test.ts i/mobile/src/transport/pairing.test.ts
+index 9b7b751436..75d1f77586 100644
+--- c/mobile/src/transport/pairing.test.ts
++++ i/mobile/src/transport/pairing.test.ts
+@@ -24,6 +24,7 @@ describe('pairing deep links', () => {
+ 
+   it('extracts the pairing code from a query param', () => {
+     expect(extractPairingCodeFromUrl('orca://pair?code=abc123')).toBe('abc123')
++    expect(extractPairingCodeFromUrl('horca://pair?code=abc123')).toBe('abc123')
+   })
+ 
+   it('accepts scanner casing and surrounding whitespace', () => {
+@@ -60,6 +61,7 @@ describe('pairing deep links', () => {
+     const code = encodeOffer()
+ 
+     expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
++    expect(parsePairingCode(`horca://pair?code=${code}`)).toEqual(offer)
+     expect(parsePairingCode(code)).toEqual(offer)
+   })
+ 
+diff --git c/mobile/src/session/mobile-session-startup-source.test.ts i/mobile/src/session/mobile-session-startup-source.test.ts
+index 7f089b5bcf..6170c3ceea 100644
+--- c/mobile/src/session/mobile-session-startup-source.test.ts
++++ i/mobile/src/session/mobile-session-startup-source.test.ts
+@@ -126,7 +126,7 @@ describe('mobile session startup', () => {
+       startupEffect.indexOf('await ensureSessionTabs()')
+     )
+     expect(startupEffect).toContain('headlessActivationNeedsHostRenderer(response.result)')
+-    expect(startupEffect).toContain("showToast('Open Orca on the host to wake sleeping agents.'")
++    expect(startupEffect).toContain("showToast('Open Horca on the host to wake sleeping agents.'")
+   })
+ 
+   it('fails runtime capability gates closed before probing a replacement client', () => {
+diff --git c/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx i/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
+index 4f1d9ecf65..db16aced18 100644
+--- c/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
++++ i/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
+@@ -280,7 +280,7 @@ export function MobileAgentSessionHistoryPanel({
+         <View style={styles.state}>
+           <Text style={styles.stateTitle}>Agent Session History Unavailable</Text>
+           <Text style={styles.stateText}>
+-            Update Orca on this host to browse agent session history.
++            Update Horca on this host to browse agent session history.
+           </Text>
+         </View>
+       ) : screenState.kind === 'error' ? (
+diff --git c/mobile/src/mobile-release/prepare-android-release-script.test.ts i/mobile/src/mobile-release/prepare-android-release-script.test.ts
+index 668b4689bb..c15946b7c3 100644
+--- c/mobile/src/mobile-release/prepare-android-release-script.test.ts
++++ i/mobile/src/mobile-release/prepare-android-release-script.test.ts
+@@ -49,7 +49,7 @@ describe('prepare Android release script', () => {
+       }
+     })
+ 
+-    expect(output).toContain('Prepared Orca Mobile Android 0.0.22 (4)')
++    expect(output).toContain('Prepared Horca Mobile Android 0.0.22 (4)')
+     expect(output).toContain('Release tag: mobile-android-v0.0.22')
+     expect(readFileSync(configPath, 'utf8')).toBe(contents)
+   })
+diff --git c/mobile/scripts/prepare-android-release.mjs i/mobile/scripts/prepare-android-release.mjs
+index e318d7c600..70f3c10b05 100644
+--- c/mobile/scripts/prepare-android-release.mjs
++++ i/mobile/scripts/prepare-android-release.mjs
+@@ -93,6 +93,6 @@ writeOutput('android_version_code', String(currentVersionCode))
+ writeOutput('tag', tag)
+ writeOutput('publish_release', publishRelease ? 'true' : 'false')
+ 
+-console.log(`Prepared Orca Mobile Android ${currentVersion} (${currentVersionCode})`)
++console.log(`Prepared Horca Mobile Android ${currentVersion} (${currentVersionCode})`)
+ console.log(`Release tag: ${tag}`)
+ console.log(`Publish GitHub Release: ${publishRelease ? 'yes' : 'no'}`)
+diff --git c/mobile/scripts/repro-mobile-foreground-stall.sh i/mobile/scripts/repro-mobile-foreground-stall.sh
+index 5fc0e05cc6..c98eb58e2f 100755
+--- c/mobile/scripts/repro-mobile-foreground-stall.sh
++++ i/mobile/scripts/repro-mobile-foreground-stall.sh
+@@ -26,11 +26,11 @@ set -euo pipefail
+ UDID="${1:?simulator udid}"
+ PORT="${2:?port of the paired host, from the [net] logs}"
+ LOG="${3:-/tmp/orca-emulator-boot.log}"
+-BUNDLE_ID=com.stably.orca.mobile
++BUNDLE_ID=com.rudironsoni.horca
+ # Long enough for the tiered backoff to reach its 30s/60s tail.
+ ESCALATE_SECONDS=200
+ 
+-APP=$(pgrep -f "CoreSimulator.*Orca.app/Orca" | head -1)
++APP=$(pgrep -f "CoreSimulator.*Horca.app/Horca" | head -1)
+ DESK=$(pgrep -f "serve-mobile-pairing" | head -1)
+ : "${APP:?mobile app is not running in the simulator}"
+ : "${DESK:?headless desktop runtime is not running}"
