@@ -1,25 +1,16 @@
 import type { TerminalPaneLayoutNode } from '../terminal-tab-types'
+import { DEFAULT_HERDR_SESSION_NAME } from './terminal-backend'
 
 export type HerdrSessionProject = {
   id: string
   herdrSessionName?: string
 }
 
-function sessionHash(value: string): string {
-  let hash = 0x811c9dc5
-  for (const character of value) {
-    hash ^= character.codePointAt(0) ?? 0
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0')
-}
-
 /**
- * Resolves the stock herdr session for a project.
+ * Resolves the stock Herdr session for a project.
  *
- * Priority: an explicit per-project override wins; otherwise the shared Orca
- * default (`sharedName`, typically `orca`) is used so every project reconciles
- * into one session; otherwise a stable per-project name is derived.
+ * Priority: an explicit per-project override wins; otherwise every project
+ * reconciles into the configured shared session or the Horca default.
  */
 export function herdrSessionNameForProject(
   project: HerdrSessionProject,
@@ -31,7 +22,7 @@ export function herdrSessionNameForProject(
   if (sharedName?.trim()) {
     return sharedName.trim()
   }
-  return `orca-${sessionHash(project.id)}`
+  return DEFAULT_HERDR_SESSION_NAME
 }
 
 export function firstTerminalLeafId(root: TerminalPaneLayoutNode | null): string | null {

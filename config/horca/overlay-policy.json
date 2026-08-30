@@ -101,11 +101,18 @@
       "dropWhen": "Upstream supports an external distribution builder config"
     },
     {
+      "path": "config/packaged-runtime-node-modules.cjs",
+      "subsystem": "horca-packaging-compatibility",
+      "reason": "Classify node protocol modules as built-ins during downstream package verification",
+      "upstreamPr": null,
+      "dropWhen": "Upstream package verification ignores every node protocol specifier"
+    },
+    {
       "path": "config/scripts/build-computer-macos.mjs",
       "subsystem": "horca-distribution-identity",
-      "reason": "Build the native helper with the Horca bundle identity",
+      "reason": "Build the native helper with the Horca identity and isolated architecture outputs",
       "upstreamPr": null,
-      "dropWhen": "Upstream native builds accept distribution identity inputs"
+      "dropWhen": "Upstream native builds accept distribution identity inputs and resolve Swift output paths dynamically"
     },
     {
       "path": "config/scripts/build-notification-status-macos.mjs",
@@ -397,9 +404,9 @@
     {
       "path": "config/scripts/electron-builder-config.test.mjs",
       "subsystem": "horca-distribution-identity",
-      "reason": "Verify the packaged downstream CLI runtime closure",
+      "reason": "Verify the downstream runtime closure and Node built-in classification",
       "upstreamPr": null,
-      "dropWhen": "Upstream packages the complete CLI runtime closure"
+      "dropWhen": "Upstream packages the complete CLI runtime closure and recognizes node protocol built-ins"
     },
     {
       "path": "config/tsconfig.cli.json",
