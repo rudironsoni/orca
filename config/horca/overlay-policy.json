@@ -66,7 +66,7 @@
       "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
     },
     {
-      "path": "src/main/daemon/daemon-init.ts",
+      "path": "src/main/daemon/daemon-provider-state.ts",
       "subsystem": "terminal-backend-seam",
       "reason": "Compose registered terminal backend adapters for local sessions",
       "upstreamPr": null,
