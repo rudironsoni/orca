@@ -37,12 +37,21 @@ createHelperApp()
 
 function buildUniversalBinary() {
   const builtBinaries = universalTriples.map((triple) => {
-    run('swift', ['build', '-c', 'release', '--package-path', packagePath, '--triple', triple])
-    const tripleBinary = path.join(
-      packagePath,
-      '.build',
-      triple,
+    const scratchPath = path.join(packagePath, '.build', triple)
+    const buildArgs = [
+      'build',
+      '-c',
       'release',
+      '--package-path',
+      packagePath,
+      '--scratch-path',
+      scratchPath,
+      '--triple',
+      triple
+    ]
+    run('swift', buildArgs)
+    const tripleBinary = path.join(
+      runForOutput('swift', [...buildArgs, '--show-bin-path']),
       'orca-computer-use-macos'
     )
     return thinToTriple(tripleBinary, triple)
@@ -130,6 +139,20 @@ function run(command, args) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
+}
+
+function runForOutput(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit']
+  })
+  if (result.signal) {
+    process.kill(process.pid, result.signal)
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1)
+  }
+  return result.stdout.trim()
 }
 
 function infoPlist() {

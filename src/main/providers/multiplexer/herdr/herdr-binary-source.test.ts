@@ -3,8 +3,12 @@ import { normalizeHerdrBinarySource } from '../../../../shared/horca/terminal-ba
 import { resolveHerdrExecutable } from './herdr-provider-factory'
 
 describe('stock Herdr binary source', () => {
-  it('defaults missing settings to the bundled managed binary', () => {
-    expect(normalizeHerdrBinarySource(undefined)).toEqual({ kind: 'managed' })
+  it('defaults missing and invalid settings to Herdr from PATH', () => {
+    expect(normalizeHerdrBinarySource(undefined)).toEqual({ kind: 'system' })
+    expect(normalizeHerdrBinarySource({ kind: 'invalid' })).toEqual({ kind: 'system' })
+  })
+
+  it('preserves an explicit bundled binary choice', () => {
     expect(normalizeHerdrBinarySource({ kind: 'managed' })).toEqual({ kind: 'managed' })
   })
 
