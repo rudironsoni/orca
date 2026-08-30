@@ -3,6 +3,7 @@ import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { Store } from '../../persistence'
 import { getLocalStateRoot } from '../../local-state-root'
 import {
+  DEFAULT_HERDR_SESSION_NAME,
   HORCA_FLOATING_PROJECT_ID,
   normalizeHerdrBinarySource,
   normalizeHerdrSessionName,
@@ -76,10 +77,7 @@ export function createHorcaTerminalSettingsSource(
     if (legacy.terminalBackendDefault === 'orca' || legacy.terminalBackendDefault === 'herdr') {
       return legacy.terminalBackendDefault
     }
-    const onboarding = (
-      store as Partial<{ getOnboarding(): { closedAt?: number | null } }>
-    ).getOnboarding?.()
-    return onboarding?.closedAt != null ? 'orca' : 'herdr'
+    return 'herdr'
   }
   const legacyProject = (projectId: string): LegacyProjectSettings | undefined => {
     const getProjects = (store as Partial<Pick<Store, 'getProjects'>>).getProjects
@@ -102,16 +100,14 @@ export function createHorcaTerminalSettingsSource(
     getDefaultBackend: () => {
       const file = readSettingsFile(settingsFile)
       if (file) {
-        return normalizeTerminalBackend(file.terminalBackendDefault ?? 'herdr')
+        return file.terminalBackendDefault === 'orca' ? 'orca' : 'herdr'
       }
-      const legacy = store.getSettings() as unknown as LegacyGlobalSettings
-      return settingsFile
-        ? defaultBackendForMissingFile()
-        : normalizeTerminalBackend(legacy.terminalBackendDefault)
+      return defaultBackendForMissingFile()
     },
     getHerdrSettings: (hostId) => {
       const file = readSettingsFile(settingsFile)
       const legacy = store.getSettings() as unknown as LegacyGlobalSettings
+      const configuredSessionName = file ? file.herdr?.defaultSessionName : legacy.herdrSessionName
       return {
         binarySource: normalizeHerdrBinarySource(
           file?.herdr?.hostBinarySources?.[hostId] ??
@@ -119,9 +115,8 @@ export function createHorcaTerminalSettingsSource(
             legacy.hostSettingOverrides?.[hostId]?.herdrBinarySource ??
             legacy.herdrBinarySource
         ),
-        defaultSessionName: normalizeHerdrSessionName(
-          file?.herdr?.defaultSessionName ?? legacy.herdrSessionName
-        )
+        defaultSessionName:
+          normalizeHerdrSessionName(configuredSessionName) ?? DEFAULT_HERDR_SESSION_NAME
       }
     },
     getProjectSettings: (projectId) => {

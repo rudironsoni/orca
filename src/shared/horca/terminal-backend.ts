@@ -9,9 +9,9 @@ export type HerdrBinarySource =
 
 export const HORCA_FLOATING_PROJECT_ID = 'orca-global'
 
-/** Shared stock herdr session name for Orca-managed terminals when no
- *  per-project override is set. Users can edit or clear it. */
-export const DEFAULT_HERDR_SESSION_NAME = 'orca'
+/** Shared stock Herdr session name for Horca-managed terminals when no
+ *  per-project override is set. */
+export const DEFAULT_HERDR_SESSION_NAME = 'horca'
 
 /** Max length for a herdr session name; on macOS the name feeds the Herdr
  *  unix socket path, so oversized values are rejected to avoid the sun_path
@@ -35,7 +35,7 @@ export function normalizeTerminalBackend(value: unknown): TerminalBackend {
 
 export function normalizeHerdrBinarySource(value: unknown): HerdrBinarySource {
   if (!value || typeof value !== 'object') {
-    return { kind: 'managed' }
+    return { kind: 'system' }
   }
   const candidate = value as { kind?: unknown; path?: unknown }
   if (candidate.kind === 'managed') {
@@ -50,7 +50,7 @@ export function normalizeHerdrBinarySource(value: unknown): HerdrBinarySource {
       return { kind: 'custom', path }
     }
   }
-  return { kind: 'managed' }
+  return { kind: 'system' }
 }
 
 export type TerminalBackendActivation =

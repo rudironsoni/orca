@@ -8,8 +8,8 @@ describe('Herdr session identity', () => {
     ).toBe('shared-session')
   })
 
-  it('uses the shared Orca default when no per-project override is set', () => {
-    expect(herdrSessionNameForProject({ id: 'Project 1' }, 'orca')).toBe('orca')
+  it('uses the shared Horca default when no per-project override is set', () => {
+    expect(herdrSessionNameForProject({ id: 'Project 1' }, 'horca')).toBe('horca')
     expect(herdrSessionNameForProject({ id: 'Project 1' }, ' shared-session ')).toBe(
       'shared-session'
     )
@@ -17,22 +17,16 @@ describe('Herdr session identity', () => {
 
   it('prefers the per-project override over the shared default', () => {
     expect(
-      herdrSessionNameForProject({ id: 'Project 1', herdrSessionName: 'custom' }, 'orca')
+      herdrSessionNameForProject({ id: 'Project 1', herdrSessionName: 'custom' }, 'horca')
     ).toBe('custom')
   })
 
-  it('derives a stable stock Herdr session name when no name is configured', () => {
-    const name = herdrSessionNameForProject({ id: 'Project 1' })
-    expect(name).toBe('orca-ea135471')
-    expect(herdrSessionNameForProject({ id: 'Project 1' })).toBe(name)
-    expect(name.length).toBeLessThanOrEqual(13)
-    expect(herdrSessionNameForProject({ id: `${'project-'.repeat(20)}a` })).not.toBe(
-      herdrSessionNameForProject({ id: `${'project-'.repeat(20)}b` })
-    )
+  it('uses the Horca session when no name is configured', () => {
+    expect(herdrSessionNameForProject({ id: 'Project 1' })).toBe('horca')
   })
 
-  it('ignores a blank shared default so per-project derivation still applies', () => {
-    expect(herdrSessionNameForProject({ id: 'Project 1' }, '   ')).toMatch(/^orca-[a-f0-9]{8}$/)
+  it('uses the Horca session when the shared value is blank', () => {
+    expect(herdrSessionNameForProject({ id: 'Project 1' }, '   ')).toBe('horca')
   })
 
   it('translates Orca split axes exactly', () => {
