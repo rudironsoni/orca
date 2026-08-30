@@ -33,27 +33,52 @@ diff --git c/mobile/app.json i/mobile/app.json
 index d5a420cc74..2d250740c9 100644
 --- c/mobile/app.json
 +++ i/mobile/app.json
-@@ -7,12 +7,6 @@
+@@ -1,26 +1,20 @@
+ {
+   "expo": {
+-    "name": "Orca",
+-    "slug": "orca-mobile",
++    "name": "Horca",
++    "slug": "horca-mobile",
+     "version": "0.0.47",
+     "orientation": "default",
      "icon": "./assets/icon.png",
      "userInterfaceStyle": "automatic",
-     "scheme": "orca",
+-    "scheme": "orca",
 -    "newArchEnabled": true,
 -    "splash": {
 -      "image": "./assets/splash-icon.png",
 -      "resizeMode": "contain",
 -      "backgroundColor": "#111111"
 -    },
++    "scheme": "horca",
      "ios": {
        "supportsTablet": true,
-       "bundleIdentifier": "com.stably.orca.mobile",
-@@ -71,7 +65,6 @@
+-      "bundleIdentifier": "com.stably.orca.mobile",
++      "bundleIdentifier": "com.rudironsoni.horca",
+       "buildNumber": "1",
+       "infoPlist": {
+-        "NSLocalNetworkUsageDescription": "Orca connects to the desktop app on your LAN.",
+-        "NSMicrophoneUsageDescription": "Allow Orca to record voice dictation and transcribe it on your paired desktop.",
+-        "NSPhotoLibraryUsageDescription": "Allow Orca to attach photos from your library to a terminal session on your paired desktop.",
++        "NSLocalNetworkUsageDescription": "Horca connects to the desktop app on your LAN.",
++        "NSMicrophoneUsageDescription": "Allow Horca to record voice dictation and transcribe it on your paired desktop.",
++        "NSPhotoLibraryUsageDescription": "Allow Horca to attach photos from your library to a terminal session on your paired desktop.",
+         "NSAppTransportSecurity": {
+           "NSAllowsLocalNetworking": true,
+           "NSExceptionDomains": {
+@@ -71,10 +65,9 @@
          "foregroundImage": "./assets/adaptive-icon.png",
          "backgroundColor": "#111111"
        },
 -      "usesCleartextTraffic": true,
        "allowBackup": false,
        "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
-       "package": "com.stably.orca.mobile",
+-      "package": "com.stably.orca.mobile",
++      "package": "com.rudironsoni.horca",
+       "versionCode": 15
+     },
+     "plugins": [
 @@ -105,10 +98,12 @@
          "expo-build-properties",
          {
@@ -944,6 +969,13 @@ diff --git c/mobile/package.json i/mobile/package.json
 index 9c3c4d4c0d..b49e43df2e 100644
 --- c/mobile/package.json
 +++ i/mobile/package.json
+@@ -1,5 +1,5 @@
+ {
+-  "name": "orca-mobile",
++  "name": "horca-mobile",
+   "version": "0.0.1",
+   "private": true,
+   "main": "expo-router/entry",
 @@ -7,7 +7,7 @@
      "start": "node scripts/start-expo.mjs",
      "android": "expo run:android",
