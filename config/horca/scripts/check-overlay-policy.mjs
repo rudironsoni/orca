@@ -138,7 +138,13 @@ for (const path of staleOverlays) {
   failures.push(`Stale overlay ledger entry: ${path}`)
 }
 
-const upstreamDiff = runGit(['diff', '--unified=0', `${upstreamRef}...HEAD`])
+const upstreamOverlayPaths = changes
+  .filter((change) => !isForkOnly(change.path))
+  .map((change) => change.path)
+const upstreamDiff =
+  upstreamOverlayPaths.length === 0
+    ? ''
+    : runGit(['diff', '--unified=0', `${upstreamRef}...HEAD`, '--', ...upstreamOverlayPaths])
 const modifiedUpstreamHunks = upstreamDiff
   .split('\n')
   .filter((line) => line.startsWith('@@ ')).length
@@ -148,7 +154,7 @@ const herdrReferences = runGit(
     'grep',
     '-l',
     '-E',
-    "from ['\"][^'\"]*herdr|import\\(['\"][^'\"]*herdr",
+    'from [\'"][^\'"]*herdr|import\\([\'"][^\'"]*herdr',
     'HEAD',
     '--',
     'src',
