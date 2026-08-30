@@ -51,8 +51,8 @@ export function HorcaProjectTerminalBackendSetting(props: {
               }
               options={[
                 { value: 'inherit', label: 'Inherit' },
-                { value: 'orca', label: 'Orca' },
-                { value: 'herdr', label: 'Herdr' }
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
