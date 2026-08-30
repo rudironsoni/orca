@@ -49,8 +49,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                 void updateDefaults({ defaultBackend: value === 'herdr' ? 'herdr' : 'orca' })
               }
               options={[
-                { value: 'orca', label: 'Orca' },
-                { value: 'herdr', label: 'Herdr' }
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
@@ -69,8 +69,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
               }
               options={[
                 { value: 'inherit', label: 'Inherit' },
-                { value: 'orca', label: 'Orca' },
-                { value: 'herdr', label: 'Herdr' }
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
@@ -112,8 +112,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                     })
                   }
                   options={[
-                    { value: 'managed', label: 'Bundled' },
                     { value: 'system', label: 'From PATH' },
+                    { value: 'managed', label: 'Bundled' },
                     { value: 'custom', label: 'Custom' }
                   ]}
                 />
@@ -145,7 +145,7 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                   aria-label="Shared Herdr session name"
                   className="w-72"
                   maxLength={64}
-                  placeholder="orca"
+                  placeholder="horca"
                   value={defaults.defaultSessionName ?? ''}
                   onChange={(event) =>
                     void updateDefaults({ defaultSessionName: event.target.value || null })

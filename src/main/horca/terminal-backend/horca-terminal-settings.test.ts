@@ -18,9 +18,13 @@ function makeSettingsPath(): string {
   return horcaTerminalSettingsPath(directory)
 }
 
-function makeStore(projectIds: string[] = [], onboardingClosedAt: number | null = null): Store {
+function makeStore(
+  projectIds: string[] = [],
+  onboardingClosedAt: number | null = null,
+  settings: Record<string, unknown> = {}
+): Store {
   return {
-    getSettings: () => ({}),
+    getSettings: () => settings,
     getOnboarding: () => ({ closedAt: onboardingClosedAt }),
     getProjects: () => projectIds.map((id) => ({ id }))
   } as unknown as Store
@@ -38,13 +42,13 @@ afterEach(() => {
 })
 
 describe('Horca terminal settings', () => {
-  it('defaults fresh Horca profiles to managed Herdr without changing Orca settings', () => {
+  it('defaults fresh Horca profiles to PATH Herdr in the shared Horca session', () => {
     const source = createHorcaTerminalSettingsSource(makeStore(), makeSettingsPath())
 
     expect(source.getDefaultBackend()).toBe('herdr')
     expect(source.getHerdrSettings('local')).toEqual({
-      binarySource: { kind: 'managed' },
-      defaultSessionName: undefined
+      binarySource: { kind: 'system' },
+      defaultSessionName: 'horca'
     })
   })
 
@@ -80,14 +84,40 @@ describe('Horca terminal settings', () => {
     })
   })
 
-  it('preserves Orca for an upgraded profile without a sidecar choice', () => {
+  it('defaults an upgraded profile without a choice to Herdr', () => {
     const settingsPath = makeSettingsPath()
     const source = createHorcaTerminalSettingsSource(makeStore(['folder'], 1), settingsPath)
 
-    expect(source.getDefaultBackend()).toBe('orca')
+    expect(source.getDefaultBackend()).toBe('herdr')
     source.updateProject('folder', { preference: 'herdr' })
+    expect(source.getDefaultBackend()).toBe('herdr')
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8')).terminalBackendDefault).toBe('herdr')
+  })
+
+  it('preserves an explicit legacy Orca choice', () => {
+    const source = createHorcaTerminalSettingsSource(
+      makeStore([], 1, { terminalBackendDefault: 'orca' }),
+      makeSettingsPath()
+    )
+
     expect(source.getDefaultBackend()).toBe('orca')
-    expect(JSON.parse(readFileSync(settingsPath, 'utf8')).terminalBackendDefault).toBe('orca')
+  })
+
+  it('uses the Horca session after the shared value is cleared', () => {
+    const settingsPath = makeSettingsPath()
+    const source = createHorcaTerminalSettingsSource(
+      makeStore([], 1, { herdrSessionName: 'legacy-session' }),
+      settingsPath
+    )
+
+    source.updateDefaults({ defaultSessionName: 'team' })
+    const snapshot = source.updateDefaults({ defaultSessionName: null })
+
+    expect(snapshot.defaults.defaultSessionName).toBe('horca')
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8')).herdr.defaultSessionName).toBeUndefined()
+
+    writeFileSync(settingsPath, JSON.stringify({ herdr: { defaultSessionName: '   ' } }))
+    expect(source.getHerdrSettings('local').defaultSessionName).toBe('horca')
   })
 
   it('updates defaults and project settings in the Horca sidecar', () => {
