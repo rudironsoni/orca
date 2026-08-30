@@ -6,6 +6,7 @@ const repoRoot = resolve(import.meta.dirname, '..', '..', '..')
 const mobileRoot = resolve(repoRoot, 'out', 'horca-mobile', 'mobile')
 const required = [
   'packages/libghostty-terminal/package.json',
+  'plugins/ios-scene-lifecycle.js',
   'src/terminal/terminal-state.ts',
   'patches/react-native@0.86.3.patch'
 ]
@@ -40,6 +41,9 @@ if (
 }
 if (packageJson.name !== 'horca-mobile') {
   throw new Error('Materialized Horca mobile package name is incorrect')
+}
+if (!expoConfig.plugins?.includes('./plugins/ios-scene-lifecycle.js')) {
+  throw new Error('Materialized Horca mobile does not enable the iOS scene lifecycle')
 }
 const releaseAppfile = readFileSync(resolve(mobileRoot, 'fastlane/Appfile'), 'utf8')
 const releaseFastfile = readFileSync(resolve(mobileRoot, 'fastlane/Fastfile'), 'utf8')
