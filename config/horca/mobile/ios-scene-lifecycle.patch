@@ -1,0 +1,12 @@
+diff --git c/mobile/app.json i/mobile/app.json
+index af30d7bbb7..6473df05ad 100644
+--- c/mobile/app.json
++++ i/mobile/app.json
+@@ -75,6 +75,7 @@
+     },
+     "plugins": [
+       "expo-router",
++      "./plugins/ios-scene-lifecycle.js",
+       "./plugins/android-respect-rotation-lock.js",
+       [
+         "expo-splash-screen",
