@@ -30,7 +30,7 @@ index 64f1081b73..9682d76351 100644
  ├── scripts/
  │   ├── test-subscribe.ts  # Desktop streaming repro without a phone
 diff --git c/mobile/app.json i/mobile/app.json
-index d5a420cc74..2d250740c9 100644
+index d5a420cc74..af30d7bbb7 100644
 --- c/mobile/app.json
 +++ i/mobile/app.json
 @@ -1,26 +1,20 @@
@@ -95,7 +95,7 @@ index d5a420cc74..2d250740c9 100644
          }
        ]
 diff --git c/mobile/app/h/[hostId]/session/[worktreeId].tsx i/mobile/app/h/[hostId]/session/[worktreeId].tsx
-index a34c8643ab..f69ea63205 100644
+index a34c8643ab..34cce73b29 100644
 --- c/mobile/app/h/[hostId]/session/[worktreeId].tsx
 +++ i/mobile/app/h/[hostId]/session/[worktreeId].tsx
 @@ -20,6 +20,7 @@ import {
@@ -154,7 +154,15 @@ index a34c8643ab..f69ea63205 100644
  import { MobileBrowserPane } from '../../../../src/browser/MobileBrowserPane'
  import { normalizeBrowserUrl } from '../../../../src/browser/browser-url'
  import { StatusDot } from '../../../../src/components/StatusDot'
-@@ -251,11 +242,6 @@ import {
+@@ -230,6 +221,7 @@ import {
+   isDictationSetupRequiredError
+ } from '../../../../src/dictation/mobile-dictation-setup'
+ import { TerminalPaneView } from '../../../../src/session/TerminalPaneView'
++import { TerminalNativeViewportUpdate } from '../../../../src/terminal/terminal-native-viewport-update'
+ import { MobileNativeChatOverlay } from '../../../../src/session/MobileNativeChatOverlay'
+ import { MobileBrowserTabActionSheet } from '../../../../src/session/MobileBrowserTabActionSheet'
+ import { useMobileNativeChatController } from '../../../../src/session/use-mobile-native-chat-controller'
+@@ -251,11 +243,6 @@ import {
    useMobileTerminalInventoryRecoveryBridge,
    type MobileTerminalInventoryRefreshOptions
  } from '../../../../src/session/use-mobile-terminal-inventory-recovery'
@@ -166,7 +174,7 @@ index a34c8643ab..f69ea63205 100644
  import { activateMobileSessionTab } from '../../../../src/session/mobile-session-tab-activation'
  import { MobileTerminalDiagnostics } from '../../../../src/session/mobile-terminal-diagnostics'
  import { runAcceptedMobileSessionTabsEffects } from '../../../../src/session/mobile-session-tabs-accepted-effects'
-@@ -270,7 +256,6 @@ import {
+@@ -270,7 +257,6 @@ import {
    getRepoIdFromMobileWorktreeId,
    getActiveTabIdForHandle,
    isFileExistsErrorMessage,
@@ -174,7 +182,7 @@ index a34c8643ab..f69ea63205 100644
    isTerminalPhoneDisplayMode,
    MOBILE_SESSION_STATUS_LABELS,
    TERMINAL_GESTURE_INPUT_BUCKET_CAPACITY,
-@@ -902,7 +887,6 @@ export default function SessionScreen() {
+@@ -902,7 +888,6 @@ export default function SessionScreen() {
    const [terminalKeyboardMetrics, setTerminalKeyboardMetrics] = useState<
      Map<string, TerminalKeyboardAvoidanceMetrics>
    >(new Map())
@@ -182,7 +190,7 @@ index a34c8643ab..f69ea63205 100644
    const [canPaste, setCanPaste] = useState(false)
    const [showDictationSetup, setShowDictationSetup] = useState(false)
    // 'hold' = press-and-hold mic, 'toggle' = tap-to-start/stop; mirrors Settings ▸ Voice ▸ Dictation Mode.
-@@ -911,13 +895,10 @@ export default function SessionScreen() {
+@@ -911,13 +896,10 @@ export default function SessionScreen() {
    const toastOpacityRef = useRef(new Animated.Value(0))
    const toastHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
    const toastSeqRef = useRef(0)
@@ -196,16 +204,18 @@ index a34c8643ab..f69ea63205 100644
    const deviceTokenRef = useRef<string | null>(null)
    // Why: state (not a ref) so the connection verdict re-renders when the endpoint loads and the Tailscale hint can appear.
    const [hostEndpoint, setHostEndpoint] = useState<string | null>(null)
-@@ -926,7 +907,7 @@ export default function SessionScreen() {
+@@ -926,7 +908,9 @@ export default function SessionScreen() {
    // Why: measured once on mount, then passed with every subscribe so the server can auto-fit the PTY to phone dims.
    const viewportRef = useRef<{ cols: number; rows: number } | null>(null)
    const viewportMeasuredRef = useRef(false)
 -  const terminalRefs = useRef<Map<string, TerminalWebViewHandle>>(new Map())
++  const terminalViewportUpdateRef = useRef(new TerminalNativeViewportUpdate())
++  const terminalResizeSeqRef = useRef<Map<string, number>>(new Map())
 +  const terminalRefs = useRef<Map<string, TerminalViewRef>>(new Map())
    const liveInputRef = useRef<TextInput>(null)
    const commandInputRef = useRef<TextInput>(null)
    const liveInputFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-@@ -946,10 +927,7 @@ export default function SessionScreen() {
+@@ -946,10 +930,7 @@ export default function SessionScreen() {
    const leaseOnlyHandlesRef = useRef<Set<string>>(new Set())
    const initializedHandlesRef = useRef<Set<string>>(new Set())
    const terminalDiagnosticsRef = useRef(new MobileTerminalDiagnostics())
@@ -217,7 +227,7 @@ index a34c8643ab..f69ea63205 100644
    const activeHandleRef = useRef<string | null>(null)
    const activeSessionTabTypeRef = useRef<MobileSessionTabType | null>(null)
    const pendingActiveSessionTabIdRef = useRef<string | null>(null)
-@@ -975,10 +953,7 @@ export default function SessionScreen() {
+@@ -975,10 +956,7 @@ export default function SessionScreen() {
    // Why: highest applyLayout seq seen per handle; drop older scrollback/resized as stale, but a >20 gap resets (fresh subscription/server restart).
    const layoutSeqRef = useRef<Map<string, number>>(new Map())
    const sendingRef = useRef(false)
@@ -228,7 +238,7 @@ index a34c8643ab..f69ea63205 100644
    const activeSessionTab = sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null
    const {
      clearPendingLiveInputCommit,
-@@ -1304,35 +1279,16 @@ export default function SessionScreen() {
+@@ -1304,35 +1282,16 @@ export default function SessionScreen() {
      leaseOnlyHandlesRef.current.clear()
      initializedHandlesRef.current.clear()
      terminalDiagnosticsRef.current.clearTerminalCache()
@@ -266,7 +276,7 @@ index a34c8643ab..f69ea63205 100644
    const subscribeToTerminal = useCallback(
      (handle: string) => {
        const diagnostics = terminalDiagnosticsRef.current
-@@ -1355,14 +1311,14 @@ export default function SessionScreen() {
+@@ -1355,14 +1314,14 @@ export default function SessionScreen() {
          activeHandleRef.current,
          handle
        )
@@ -285,7 +295,7 @@ index a34c8643ab..f69ea63205 100644
            return
          }
        }
-@@ -1404,7 +1360,7 @@ export default function SessionScreen() {
+@@ -1404,7 +1363,7 @@ export default function SessionScreen() {
              markNativeChatInputLeaseReady(handle)
              return
            }
@@ -294,7 +304,7 @@ index a34c8643ab..f69ea63205 100644
            if (
              nativeChatTerminalStream.isTerminalCoveredByNativeChat(
                showNativeChatRef.current,
-@@ -1440,27 +1396,18 @@ export default function SessionScreen() {
+@@ -1440,27 +1399,18 @@ export default function SessionScreen() {
                return
              }
              updateTerminalCwdFromStreamEvent(handle, data, terminalCwdRef.current)
@@ -325,7 +335,7 @@ index a34c8643ab..f69ea63205 100644
              initializedHandlesRef.current.add(handle)
              if (data.displayMode) {
                const displayMode = data.displayMode as MobileDisplayMode
-@@ -1469,30 +1416,6 @@ export default function SessionScreen() {
+@@ -1469,30 +1419,6 @@ export default function SessionScreen() {
                  prev.get(handle) === displayMode ? prev : new Map(prev).set(handle, displayMode)
                )
              }
@@ -356,7 +366,7 @@ index a34c8643ab..f69ea63205 100644
            } else if (data.type === 'metadata') {
              updateTerminalCwdFromStreamEvent(handle, data, terminalCwdRef.current)
            } else if (data.type === 'data') {
-@@ -1513,23 +1436,13 @@ export default function SessionScreen() {
+@@ -1513,23 +1439,13 @@ export default function SessionScreen() {
                  chunkLen: typeof data.chunk === 'string' ? data.chunk.length : 0
                })
              }
@@ -382,7 +392,7 @@ index a34c8643ab..f69ea63205 100644
              }
              if (data.displayMode) {
                const displayMode = data.displayMode as MobileDisplayMode
-@@ -1538,7 +1451,6 @@ export default function SessionScreen() {
+@@ -1538,7 +1454,6 @@ export default function SessionScreen() {
                  prev.get(handle) === displayMode ? prev : new Map(prev).set(handle, displayMode)
                )
              }
@@ -390,7 +400,7 @@ index a34c8643ab..f69ea63205 100644
            }
          },
          () => {
-@@ -1554,14 +1466,7 @@ export default function SessionScreen() {
+@@ -1554,14 +1469,7 @@ export default function SessionScreen() {
        }
        subscribingHandlesRef.current.delete(handle)
      },
@@ -406,7 +416,7 @@ index a34c8643ab..f69ea63205 100644
    )
  
    const nativeChatStream = useMobileNativeChatTerminalStream({
-@@ -1573,7 +1478,7 @@ export default function SessionScreen() {
+@@ -1573,7 +1481,7 @@ export default function SessionScreen() {
      subscriptionsRef: terminalUnsubsRef,
      subscribingRef: subscribingHandlesRef,
      leaseOnlyRef: leaseOnlyHandlesRef,
@@ -415,7 +425,7 @@ index a34c8643ab..f69ea63205 100644
      initializedRef: initializedHandlesRef,
      subscribe: subscribeToTerminal,
      unsubscribe: unsubscribeTerminal
-@@ -1674,16 +1579,12 @@ export default function SessionScreen() {
+@@ -1674,16 +1582,12 @@ export default function SessionScreen() {
                unsubscribeTerminal(handle)
                terminalRefs.current.delete(handle)
                initializedHandlesRef.current.delete(handle)
@@ -432,7 +442,7 @@ index a34c8643ab..f69ea63205 100644
              lastKnownTerminalCountRef.current = result.terminals.length
              // Why: dedupe duplicate handles (rename/split race) to avoid a React duplicate-key throw; keep first for tab-strip order.
              const seen = new Set<string>()
-@@ -2439,7 +2340,7 @@ export default function SessionScreen() {
+@@ -2439,7 +2343,7 @@ export default function SessionScreen() {
        setAgentSessionHistorySupported(capabilities.includes(MOBILE_AI_VAULT_CAPABILITY))
        setQuickCommandsSupported(supportsMobileQuickCommands(capabilities))
        // Why: hosts without this capability strip inputKind from terminal.send,
@@ -441,7 +451,7 @@ index a34c8643ab..f69ea63205 100644
        hostQueryReplyInputSupportedRef.current = capabilities.includes(
          TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY
        )
-@@ -2505,85 +2406,33 @@ export default function SessionScreen() {
+@@ -2505,85 +2409,33 @@ export default function SessionScreen() {
      }
    }, [])
  
@@ -536,7 +546,7 @@ index a34c8643ab..f69ea63205 100644
        setKeyboardHeight(0)
      }
      const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-@@ -2594,7 +2443,7 @@ export default function SessionScreen() {
+@@ -2594,7 +2446,7 @@ export default function SessionScreen() {
        showSub.remove()
        hideSub.remove()
      }
@@ -545,7 +555,7 @@ index a34c8643ab..f69ea63205 100644
  
    const scrollActiveTabIntoView = useCallback((tabId: string | null, animated: boolean) => {
      if (!tabId) {
-@@ -2697,20 +2546,14 @@ export default function SessionScreen() {
+@@ -2697,20 +2549,14 @@ export default function SessionScreen() {
      if (connState !== 'connected') {
        return
      }
@@ -568,7 +578,7 @@ index a34c8643ab..f69ea63205 100644
      void (async () => {
        const reportActivationOutcome = (response: RpcSuccess | null): void => {
          if (!disposed && response && headlessActivationNeedsHostRenderer(response.result)) {
-@@ -2739,10 +2582,10 @@ export default function SessionScreen() {
+@@ -2739,10 +2585,10 @@ export default function SessionScreen() {
        if (disposed) {
          return
        }
@@ -582,7 +592,7 @@ index a34c8643ab..f69ea63205 100644
            if (activeHandleRef.current) {
              return
            }
-@@ -2759,16 +2602,14 @@ export default function SessionScreen() {
+@@ -2759,16 +2605,14 @@ export default function SessionScreen() {
                return
              }
              await fetchTerminals({ allowEmptyLoaded: true })
@@ -601,7 +611,7 @@ index a34c8643ab..f69ea63205 100644
      }
    }, [
      client,
-@@ -2948,8 +2789,7 @@ export default function SessionScreen() {
+@@ -2948,8 +2792,7 @@ export default function SessionScreen() {
    // Ref to latest switchSessionTab so fetchSessionTabs can activate a synced browser tab without a dependency cycle.
    switchSessionTabRef.current = switchSessionTab
  
@@ -611,7 +621,7 @@ index a34c8643ab..f69ea63205 100644
      terminalDiagnosticsRef.current.webViewRef(handle, ref != null)
      if (ref) {
        terminalRefs.current.set(handle, ref)
-@@ -2965,10 +2805,12 @@ export default function SessionScreen() {
+@@ -2965,10 +2808,12 @@ export default function SessionScreen() {
      }
    }, [])
  
@@ -628,7 +638,7 @@ index a34c8643ab..f69ea63205 100644
        nativeChatStream.notifyWebReady(handle, wasAlreadyReady)
        terminalDiagnosticsRef.current.webViewReady(
          handle,
-@@ -2976,7 +2818,7 @@ export default function SessionScreen() {
+@@ -2976,7 +2821,7 @@ export default function SessionScreen() {
          handle === activeHandleRef.current
        )
        if (wasAlreadyReady && initializedHandlesRef.current.has(handle)) {
@@ -637,7 +647,7 @@ index a34c8643ab..f69ea63205 100644
          unsubscribeTerminal(handle)
          initializedHandlesRef.current.delete(handle)
          if (handle === activeHandleRef.current) {
-@@ -2984,20 +2826,35 @@ export default function SessionScreen() {
+@@ -2984,20 +2829,56 @@ export default function SessionScreen() {
          }
          return
        }
@@ -653,9 +663,8 @@ index a34c8643ab..f69ea63205 100644
 -          }
 -        })()
 +        subscribeToTerminal(handle)
-       }
-     },
--    [measureViewportOnce, nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
++      }
++    },
 +    [nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
 +  )
 +
@@ -673,16 +682,38 @@ index a34c8643ab..f69ea63205 100644
 +        !initializedHandlesRef.current.has(handle)
 +      ) {
 +        return
+       }
++      const resizeSeq = (terminalResizeSeqRef.current.get(handle) ?? 0) + 1
++      terminalResizeSeqRef.current.set(handle, resizeSeq)
++      const deviceToken = deviceTokenRef.current
++      if (!client || !deviceToken) {
++        return
 +      }
-+      unsubscribeTerminal(handle)
-+      initializedHandlesRef.current.delete(handle)
-+      subscribeToTerminal(handle)
-+    },
-+    [subscribeToTerminal, unsubscribeTerminal]
++      void terminalViewportUpdateRef.current
++        .request(client, handle, deviceToken, { cols, rows })
++        .then((updated) => {
++          if (
++            terminalResizeSeqRef.current.get(handle) !== resizeSeq ||
++            handle !== activeHandleRef.current ||
++            !terminalRefs.current.has(handle)
++          ) {
++            return
++          }
++          if (updated) {
++            client.updateTerminalSubscriptionViewport(handle, { cols, rows })
++            return
++          }
++          unsubscribeTerminal(handle)
++          initializedHandlesRef.current.delete(handle)
++          subscribeToTerminal(handle)
++        })
+     },
+-    [measureViewportOnce, nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
++    [client, subscribeToTerminal, unsubscribeTerminal]
    )
  
    useEffect(() => {
-@@ -3293,7 +3150,7 @@ export default function SessionScreen() {
+@@ -3293,7 +3174,7 @@ export default function SessionScreen() {
          current.tokens + elapsedSeconds * TERMINAL_GESTURE_INPUT_REFILL_PER_SECOND
        )
  
@@ -691,7 +722,7 @@ index a34c8643ab..f69ea63205 100644
        if (tokens < sequenceCount) {
          terminalGestureInputBucketsRef.current.set(handle, { tokens, lastRefillMs: now })
          return false
-@@ -3410,20 +3267,29 @@ export default function SessionScreen() {
+@@ -3410,20 +3291,29 @@ export default function SessionScreen() {
    )
  
    const handleTerminalInput = useCallback(
@@ -726,7 +757,7 @@ index a34c8643ab..f69ea63205 100644
          return
        }
        if (!allowTerminalGestureInput(handle, sequenceCount)) {
-@@ -3434,23 +3300,11 @@ export default function SessionScreen() {
+@@ -3434,23 +3324,11 @@ export default function SessionScreen() {
      [allowTerminalGestureInput, client, connState, enqueueTerminalGestureInput]
    )
  
@@ -751,7 +782,7 @@ index a34c8643ab..f69ea63205 100644
      try {
        await client.sendRequest('terminal.clearBuffer', {
          terminal: target.handle
-@@ -3498,7 +3352,7 @@ export default function SessionScreen() {
+@@ -3498,7 +3376,7 @@ export default function SessionScreen() {
        if (node !== null) {
          return
        }
@@ -760,7 +791,7 @@ index a34c8643ab..f69ea63205 100644
        toastSeqRef.current += 1
        clearTerminalCache()
        clearToastHideTimer()
-@@ -3518,96 +3372,6 @@ export default function SessionScreen() {
+@@ -3518,96 +3396,6 @@ export default function SessionScreen() {
      ]
    )
  
@@ -857,7 +888,7 @@ index a34c8643ab..f69ea63205 100644
    const getActiveWorktreeConnectionId = useCallback(async (): Promise<string | null> => {
      // Why: the floating workspace always runs on the paired host itself, never an SSH repo target.
      if (!client || isFloatingWorkspaceRoute) {
-@@ -3632,6 +3396,22 @@ export default function SessionScreen() {
+@@ -3632,6 +3420,22 @@ export default function SessionScreen() {
      })
    }, [])
  
@@ -880,7 +911,7 @@ index a34c8643ab..f69ea63205 100644
    const handlePaste = useMobileTerminalPaste({
      client,
      activeHandle,
-@@ -3641,12 +3421,11 @@ export default function SessionScreen() {
+@@ -3641,12 +3445,11 @@ export default function SessionScreen() {
      connState,
      connStateRef,
      clientRef,
@@ -894,7 +925,7 @@ index a34c8643ab..f69ea63205 100644
      refreshCanPaste,
      showToast
    })
-@@ -3698,15 +3477,13 @@ export default function SessionScreen() {
+@@ -3698,15 +3501,13 @@ export default function SessionScreen() {
      const sub = AppState.addEventListener('change', (s: AppStateStatus) => {
        if (s === 'active') {
          refresh()
@@ -911,7 +942,7 @@ index a34c8643ab..f69ea63205 100644
  
    useEffect(() => {
      const shouldLoadAgentOptions = showCreateTabDrawer || pendingDiffNotesDelivery !== null
-@@ -4721,11 +4498,6 @@ export default function SessionScreen() {
+@@ -4721,11 +4522,6 @@ export default function SessionScreen() {
                  style={styles.terminalFrame}
                  onLayout={(e) => {
                    terminalFrameHeightRef.current = e.nativeEvent.layout.height
@@ -923,7 +954,7 @@ index a34c8643ab..f69ea63205 100644
                  }}
                >
                  {terminals.map((terminal) => (
-@@ -4736,22 +4508,11 @@ export default function SessionScreen() {
+@@ -4736,22 +4532,11 @@ export default function SessionScreen() {
                      keyboardLift={terminal.handle === activeHandle ? activeTerminalKeyboardLift : 0}
                      terminalTheme={terminal.terminalTheme}
                      textScale={terminalTextScale}
@@ -966,7 +997,7 @@ index 860f906e77..2bdbdc32ac 100644
    { value: 'smallest', label: 'Smallest (50%)', scale: 0.5 },
    { value: 'smaller', label: 'Smaller (75%)', scale: 0.75 },
 diff --git c/mobile/package.json i/mobile/package.json
-index 9c3c4d4c0d..b49e43df2e 100644
+index 9c3c4d4c0d..372fbac710 100644
 --- c/mobile/package.json
 +++ i/mobile/package.json
 @@ -1,5 +1,5 @@
@@ -4959,10 +4990,10 @@ index 0000000000..14163613eb
 +}
 diff --git c/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift i/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift
 new file mode 100644
-index 0000000000..14d58eb23f
+index 0000000000..0db35f67bc
 --- /dev/null
 +++ i/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,197 @@
 +import ExpoModulesCore
 +import GhosttyTerminal
 +import UIKit
@@ -5087,6 +5118,11 @@ index 0000000000..14d58eb23f
 +    addSubview(terminalView)
 +  }
 +
++  override func layoutSubviews() {
++    super.layoutSubviews()
++    terminalView.frame = bounds
++  }
++
 +  /// Feed PTY output (terminal.output on the wire) into the grid.
 +  func write(_ data: Data) {
 +    session?.receive(data)
@@ -5098,10 +5134,9 @@ index 0000000000..14d58eb23f
 +  }
 +
 +  func reset(with text: String) {
-+    session?.finish(exitCode: 0, runtimeMilliseconds: 0)
-+    let replacement = makeSession()
-+    installSession(replacement)
-+    replacement.receive(text)
++    var data = Data([0x1b, 0x63, 0x1b, 0x5b, 0x33, 0x4a])
++    data.append(contentsOf: text.utf8)
++    session?.receive(data)
 +  }
 +
 +  func paste(_ text: String) {
@@ -33093,7 +33128,7 @@ index 699f8a1614..6b6c12a9cb 100644
 +  overlay: StyleSheet.absoluteFill
  })
 diff --git c/mobile/src/session/TerminalPaneView.tsx i/mobile/src/session/TerminalPaneView.tsx
-index 06174cd037..2ee67d54ab 100644
+index 06174cd037..5a02480460 100644
 --- c/mobile/src/session/TerminalPaneView.tsx
 +++ i/mobile/src/session/TerminalPaneView.tsx
 @@ -1,33 +1,62 @@
@@ -33260,7 +33295,7 @@ index 06174cd037..2ee67d54ab 100644
 -        onOpenUrl={(url) => onOpenUrl(handle, url)}
 -        onTextScaleChange={onTextScaleChange}
 +        style={styles.terminal}
-+        fontSize={14 * textScale}
++        fontSize={8 * textScale}
 +        theme={theme}
 +        keyboardEnabled={false}
 +        onTap={({ nativeEvent }) => handleTap(nativeEvent)}
@@ -35528,6 +35563,131 @@ index 3a09ae3acd..0000000000
 -    }
 -  })
 -})
+diff --git c/mobile/src/terminal/terminal-native-viewport-update.test.ts i/mobile/src/terminal/terminal-native-viewport-update.test.ts
+new file mode 100644
+index 0000000000..12832e29a8
+--- /dev/null
++++ i/mobile/src/terminal/terminal-native-viewport-update.test.ts
+@@ -0,0 +1,72 @@
++import { describe, expect, it, vi } from 'vitest'
++import type { RpcClient } from '../transport/rpc-client'
++import type { RpcResponse } from '../transport/types'
++import { TerminalNativeViewportUpdate } from './terminal-native-viewport-update'
++
++function makeClient(responses: RpcResponse[]): RpcClient {
++  return {
++    sendRequest: vi.fn(async () => responses.shift()!),
++    subscribe: vi.fn(),
++    updateTerminalSubscriptionViewport: vi.fn(),
++    getState: vi.fn(() => 'connected'),
++    getReconnectAttempt: vi.fn(() => 0),
++    getLastConnectedAt: vi.fn(() => null),
++    onStateChange: vi.fn(() => () => {}),
++    notifyForeground: vi.fn(),
++    close: vi.fn()
++  }
++}
++
++const viewport = { cols: 72, rows: 36 }
++
++describe('TerminalNativeViewportUpdate', () => {
++  it('updates the existing mobile subscriber in place', async () => {
++    const client = makeClient([
++      { id: '1', ok: true, result: { updated: true }, _meta: { runtimeId: 'runtime' } }
++    ])
++    const update = new TerminalNativeViewportUpdate()
++
++    await expect(update.request(client, 'term-1', 'phone-1', viewport)).resolves.toBe(true)
++    expect(client.sendRequest).toHaveBeenCalledWith('terminal.updateViewport', {
++      terminal: 'term-1',
++      client: { id: 'phone-1', type: 'mobile' },
++      viewport
++    })
++  })
++
++  it('probes an older host only once before using the resubscribe fallback', async () => {
++    const unsupported = {
++      id: '1',
++      ok: false,
++      error: { code: 'method_not_found', message: 'Unknown method: terminal.updateViewport' },
++      _meta: { runtimeId: 'runtime' }
++    } satisfies RpcResponse
++    const client = makeClient([unsupported])
++    const update = new TerminalNativeViewportUpdate()
++
++    await expect(update.request(client, 'term-1', 'phone-1', viewport)).resolves.toBe(false)
++    await expect(update.request(client, 'term-1', 'phone-1', viewport)).resolves.toBe(false)
++    expect(client.sendRequest).toHaveBeenCalledTimes(1)
++  })
++
++  it('retries after a transient failure', async () => {
++    const transient = {
++      id: '1',
++      ok: false,
++      error: { code: 'temporary_failure', message: 'retryable' },
++      _meta: { runtimeId: 'runtime' }
++    } satisfies RpcResponse
++    const updated = {
++      id: '2',
++      ok: true,
++      result: { updated: true },
++      _meta: { runtimeId: 'runtime' }
++    } satisfies RpcResponse
++    const client = makeClient([transient, updated])
++    const update = new TerminalNativeViewportUpdate()
++
++    await expect(update.request(client, 'term-1', 'phone-1', viewport)).resolves.toBe(false)
++    await expect(update.request(client, 'term-1', 'phone-1', viewport)).resolves.toBe(true)
++    expect(client.sendRequest).toHaveBeenCalledTimes(2)
++  })
++})
+diff --git c/mobile/src/terminal/terminal-native-viewport-update.ts i/mobile/src/terminal/terminal-native-viewport-update.ts
+new file mode 100644
+index 0000000000..f414c66ed2
+--- /dev/null
++++ i/mobile/src/terminal/terminal-native-viewport-update.ts
+@@ -0,0 +1,41 @@
++import type { RpcClient } from '../transport/rpc-client'
++
++type TerminalViewport = { cols: number; rows: number }
++type ViewportCapability = 'unknown' | 'supported' | 'unsupported'
++
++export class TerminalNativeViewportUpdate {
++  private readonly capabilities = new WeakMap<RpcClient, ViewportCapability>()
++
++  async request(
++    client: RpcClient,
++    terminal: string,
++    clientId: string,
++    viewport: TerminalViewport
++  ): Promise<boolean> {
++    if (this.capabilities.get(client) === 'unsupported') {
++      return false
++    }
++
++    try {
++      const response = await client.sendRequest('terminal.updateViewport', {
++        terminal,
++        client: { id: clientId, type: 'mobile' as const },
++        viewport
++      })
++      if (!response.ok) {
++        if (response.error.code === 'method_not_found') {
++          this.capabilities.set(client, 'unsupported')
++        }
++        return false
++      }
++      this.capabilities.set(client, 'supported')
++      return (
++        typeof response.result === 'object' &&
++        response.result != null &&
++        (response.result as { updated?: unknown }).updated === true
++      )
++    } catch {
++      return false
++    }
++  }
++}
 diff --git c/mobile/src/terminal/terminal-path-tap-injected.ts i/mobile/src/terminal/terminal-path-tap-injected.ts
 deleted file mode 100644
 index 766c381ea2..0000000000
