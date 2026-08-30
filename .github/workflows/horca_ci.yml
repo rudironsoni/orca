@@ -100,3 +100,61 @@ jobs:
       - name: Test pinned Herdr runtime
         if: inputs.full == true
         run: node config/horca/scripts/run-herdr-stock-integration.mjs
+
+  android:
+    if: github.repository == 'rudironsoni/horca'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Materialize Horca mobile
+        run: |
+          node config/horca/mobile/materialize.mjs
+          node config/horca/mobile/verify-materialized.mjs
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: none
+
+      - name: Install Horca mobile dependencies
+        run: pnpm --dir out/horca-mobile/mobile install --frozen-lockfile
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Android SDK components
+        run: >-
+          sdkmanager
+          'platforms;android-36'
+          'build-tools;36.0.0'
+          'build-tools;35.0.0'
+          'ndk;27.1.12297006'
+          'ndk;27.0.12077973'
+          'cmake;3.22.1'
+
+      - name: Generate Android project
+        working-directory: out/horca-mobile/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Test Ghostty module and build debug APK
+        working-directory: out/horca-mobile/mobile/android
+        run: >-
+          ./gradlew
+          :orca-libghostty-terminal:testDebugUnitTest
+          :app:assembleDebug
+          -PreactNativeArchitectures=arm64-v8a,x86_64
+
+      - name: Verify Ghostty native libraries and 16 KB alignment
+        env:
+          APK: out/horca-mobile/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+        run: |
+          unzip -Z1 "$APK" | rg -x 'lib/arm64-v8a/libexpolibghostty.so'
+          unzip -Z1 "$APK" | rg -x 'lib/x86_64/libexpolibghostty.so'
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
