@@ -6,7 +6,10 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..')
 const outputRoot = join(repoRoot, 'out', 'horca-mobile')
 const mobileOutput = join(outputRoot, 'mobile')
-const portPatch = join(import.meta.dirname, 'ghostty-port.patch')
+const downstreamPatches = [
+  join(import.meta.dirname, 'ghostty-port.patch'),
+  join(import.meta.dirname, 'horca-branding.patch')
+]
 
 function trackedFiles(prefix) {
   return execFileSync('git', ['ls-files', '-z', prefix], {
@@ -36,10 +39,12 @@ if (dirname(outputRoot) !== join(repoRoot, 'out') || !outputRoot.endsWith(`${sep
 rmSync(outputRoot, { recursive: true, force: true })
 copyTracked('mobile')
 copyTracked('src/shared')
-execFileSync(
-  'git',
-  ['apply', '--binary', '-p1', `--directory=${relative(repoRoot, outputRoot)}`, portPatch],
-  { cwd: repoRoot, stdio: 'inherit', maxBuffer: 64 * 1024 * 1024 }
-)
+for (const patch of downstreamPatches) {
+  execFileSync(
+    'git',
+    ['apply', '--binary', '-p1', `--directory=${relative(repoRoot, outputRoot)}`, patch],
+    { cwd: repoRoot, stdio: 'inherit', maxBuffer: 64 * 1024 * 1024 }
+  )
+}
 
 console.log(`Materialized Horca mobile at ${relative(repoRoot, mobileOutput)}`)
