@@ -128,6 +128,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
       - name: Install Android SDK components
         run: >-
@@ -153,6 +154,6 @@ jobs:
         env:
           APK: out/horca-mobile/mobile/android/app/build/outputs/apk/debug/app-debug.apk
         run: |
-          unzip -Z1 "$APK" | rg -x 'lib/arm64-v8a/libexpolibghostty.so'
-          unzip -Z1 "$APK" | rg -x 'lib/x86_64/libexpolibghostty.so'
+          unzip -Z1 "$APK" | grep -Fx 'lib/arm64-v8a/libexpolibghostty.so'
+          unzip -Z1 "$APK" | grep -Fx 'lib/x86_64/libexpolibghostty.so'
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
