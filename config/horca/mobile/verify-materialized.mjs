@@ -27,6 +27,29 @@ for (const path of forbidden) {
 }
 
 const packageJson = JSON.parse(readFileSync(resolve(mobileRoot, 'package.json'), 'utf8'))
+const appJson = JSON.parse(readFileSync(resolve(mobileRoot, 'app.json'), 'utf8'))
+const expoConfig = appJson.expo
+if (
+  expoConfig?.name !== 'Horca' ||
+  expoConfig?.slug !== 'horca-mobile' ||
+  expoConfig?.scheme !== 'horca' ||
+  expoConfig?.ios?.bundleIdentifier !== 'com.rudironsoni.horca' ||
+  expoConfig?.android?.package !== 'com.rudironsoni.horca'
+) {
+  throw new Error('Materialized Horca mobile app identity is incorrect')
+}
+if (packageJson.name !== 'horca-mobile') {
+  throw new Error('Materialized Horca mobile package name is incorrect')
+}
+const releaseAppfile = readFileSync(resolve(mobileRoot, 'fastlane/Appfile'), 'utf8')
+const releaseFastfile = readFileSync(resolve(mobileRoot, 'fastlane/Fastfile'), 'utf8')
+if (
+  !releaseAppfile.includes('com.rudironsoni.horca') ||
+  !releaseFastfile.includes('Horca.xcworkspace') ||
+  !releaseFastfile.includes('BUNDLE_ID = "com.rudironsoni.horca"')
+) {
+  throw new Error('Materialized Horca mobile release identity is incorrect')
+}
 if (
   packageJson.dependencies?.['@orca/libghostty-terminal'] !== 'file:./packages/libghostty-terminal'
 ) {
