@@ -88,6 +88,9 @@ jobs:
           --exclude '**/*.integration.test.ts'
           --exclude '**/*.probe.test.ts'
 
+      - name: Test Horca release metadata
+        run: node --test config/horca/scripts/prepare-release.test.mjs
+
       - name: Build downstream distribution
         if: inputs.full == true
         env:

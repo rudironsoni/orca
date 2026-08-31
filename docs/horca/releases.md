@@ -8,8 +8,10 @@ People do not create or manage them.
 
 Each successful push to Horca `main` starts `Horca: Stable Release`. The
 workflow validates the exact source SHA, builds signed and notarized macOS DMGs,
-creates `v<orca-core>-horca.<N>` and publishes the GitHub release. The Horca
-Maintenance App then dispatches an immediate update of `Casks/horca.rb`.
+creates `v<orca-core>-horca.<N>` and publishes the GitHub release. The core is
+the latest Orca stable GitHub release, not the development `package.json` on
+Orca `main`. The Horca Maintenance App then dispatches an immediate update of
+`Casks/horca.rb`.
 
 Stable omits Windows until Horca has its own Windows signing certificate.
 
