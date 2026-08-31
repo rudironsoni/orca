@@ -27,6 +27,27 @@ function readMatchingEntries(asarPath, predicate) {
     .join('\n')
 }
 
+export function evaluateHorcaAsarContents({ shared, main, renderer }) {
+  const checks = [
+    ['runtime selects Horca', /DOWNSTREAM_DISTRIBUTION\s*=\s*["']horca["']/.test(shared)],
+    ['product name is Horca', /productName:\s*["']Horca["']/.test(shared)],
+    ['state root is .horca', /stateRootDirName:\s*["']\.horca["']/.test(shared)],
+    ['public CLI is horca', /publicCli:\s*["']horca["']/.test(shared)],
+    [
+      'Horca Electron profile is configured',
+      main.includes('horca-packaged-electron-profile') && /setPath\(["']userData["']/.test(main)
+    ],
+    ['Herdr provider is packaged', main.includes('Could not resolve herdr target for spawn')],
+    ['Herdr settings are registered', main.includes('terminal-backends.json')],
+    ['Herdr settings UI is packaged', renderer.includes('data-horca-settings')],
+    ['Horca product title is packaged', renderer.includes('data-horca-product-name')]
+  ]
+  return {
+    checks: checks.map(([label]) => label),
+    failures: checks.filter(([, passed]) => !passed).map(([label]) => label)
+  }
+}
+
 export function verifyHorcaAsar(asarPath) {
   const shared = readMatchingEntries(
     asarPath,
@@ -40,26 +61,11 @@ export function verifyHorcaAsar(asarPath) {
     asarPath,
     (entry) => entry.startsWith('/out/renderer/') && entry.endsWith('.js')
   )
-  const checks = [
-    ['runtime selects Horca', /DOWNSTREAM_DISTRIBUTION\s*=\s*["']horca["']/.test(shared)],
-    ['product name is Horca', /productName:\s*["']Horca["']/.test(shared)],
-    ['state root is .horca', /stateRootDirName:\s*["']\.horca["']/.test(shared)],
-    ['public CLI is horca', /publicCli:\s*["']horca["']/.test(shared)],
-    [
-      'Horca Electron profile is configured',
-      (main.match(/configureHorcaUserDataPath\(/g)?.length ?? 0) >= 2 &&
-        /setPath\(["']userData["']/.test(main)
-    ],
-    ['Herdr provider is packaged', main.includes('HerdrPtyProvider')],
-    ['Herdr settings are registered', main.includes('terminal-backends.json')],
-    ['Herdr settings UI is packaged', renderer.includes('data-horca-settings')],
-    ['Horca product title is packaged', renderer.includes('data-horca-product-name')]
-  ]
-  const failures = checks.filter(([, passed]) => !passed).map(([label]) => label)
+  const { checks, failures } = evaluateHorcaAsarContents({ shared, main, renderer })
   if (failures.length > 0) {
     throw new Error(`${basename(asarPath)} failed Horca checks: ${failures.join(', ')}`)
   }
-  return checks.map(([label]) => label)
+  return checks
 }
 
 export function verifyHorcaResources(asarPath) {
