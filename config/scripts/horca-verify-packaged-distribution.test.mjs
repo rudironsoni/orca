@@ -23,7 +23,7 @@ describe('packaged Horca asar probes', () => {
     ].join('\n'),
     main: [
       'horca-packaged-electron-profile',
-      'setPath("userData", root)',
+      'setPath(`userData`, root)',
       'Could not resolve herdr target for spawn',
       'terminal-backends.json'
     ].join('\n'),
@@ -32,6 +32,15 @@ describe('packaged Horca asar probes', () => {
 
   it('accepts minify-stable Horca and Herdr markers', () => {
     expect(evaluateHorcaAsarContents(passing).failures).toEqual([])
+  })
+
+  it('accepts quoted setPath userData as well as backticks', () => {
+    expect(
+      evaluateHorcaAsarContents({
+        ...passing,
+        main: passing.main.replace('setPath(`userData`, root)', 'setPath("userData", root)')
+      }).failures
+    ).toEqual([])
   })
 
   it('rejects minified identifier-only profile and provider probes', () => {
