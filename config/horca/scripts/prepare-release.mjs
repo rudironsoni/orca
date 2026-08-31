@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { appendFileSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..')
@@ -29,6 +29,36 @@ function packageVersion(commit) {
   return JSON.parse(git(['show', `${commit}:package.json`])).version
 }
 
+export function parseStableVersion(tag) {
+  return tag.match(/^v?(\d+\.\d+\.\d+)$/)?.[1] ?? null
+}
+
+export function selectReleaseCore(packageVer, orcaStableVersion) {
+  const packageCore = packageVer.match(/^(\d+\.\d+\.\d+)/)?.[1]
+  const orcaCore = parseStableVersion(orcaStableVersion ?? '')
+  return orcaCore ?? packageCore ?? null
+}
+
+function highestLocalStableVersion() {
+  const versions = git(['tag', '--list', 'v*'])
+    .split('\n')
+    .flatMap((tag) => {
+      const version = parseStableVersion(tag)
+      return version ? [version] : []
+    })
+  versions.sort((left, right) => {
+    const a = left.split('.').map(Number)
+    const b = right.split('.').map(Number)
+    return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+  })
+  return versions.at(-1) ?? null
+}
+
+async function latestOrcaStableVersion() {
+  const release = await github('/repos/stablyai/orca/releases/latest')
+  return parseStableVersion(release?.tag_name ?? '') ?? highestLocalStableVersion()
+}
+
 function resolveSource(sourceRef, channel) {
   if (!gitSucceeds(['remote', 'get-url', 'upstream'])) {
     git(['remote', 'add', 'upstream', 'https://github.com/stablyai/orca.git'])
@@ -36,6 +66,7 @@ function resolveSource(sourceRef, channel) {
   git(['fetch', '--no-prune-tags', 'origin', '+refs/heads/*:refs/remotes/origin/*'])
   git(['fetch', '--no-prune-tags', 'origin', 'refs/tags/*:refs/tags/*'])
   git(['fetch', '--no-prune-tags', 'upstream', 'main'])
+  gitSucceeds(['fetch', '--no-prune-tags', 'upstream', 'refs/tags/v*:refs/tags/v*'])
   let sourceSha
   if (/^[a-f0-9]{40}$/.test(sourceRef)) {
     sourceSha = git(['rev-parse', `${sourceRef}^{commit}`])
@@ -103,7 +134,8 @@ async function metadata() {
   }
   const sourceSha = resolveSource(process.env.SOURCE_REF, channel)
   const sourceVersion = packageVersion(sourceSha)
-  const core = sourceVersion.match(/^(\d+\.\d+\.\d+)/)?.[1]
+  const orcaStableVersion = await latestOrcaStableVersion()
+  const core = selectReleaseCore(sourceVersion, orcaStableVersion)
   if (!core) {
     throw new Error(`Cannot derive release core from ${sourceVersion}`)
   }
@@ -122,7 +154,7 @@ async function metadata() {
   output('version', tag.slice(1))
   output('source_sha', sourceSha)
   output('upstream_sha', upstreamSha)
-  output('upstream_version', packageVersion(upstreamSha))
+  output('upstream_version', orcaStableVersion ?? packageVersion(upstreamSha))
   output('published', String(Boolean(release && !release.draft)))
 }
 
@@ -167,11 +199,13 @@ function manifest(directory) {
   )
 }
 
-const [command, ...args] = process.argv.slice(2)
-if (command === 'metadata') {
-  await metadata()
-} else if (command === 'manifest') {
-  manifest(...args)
-} else {
-  throw new Error(`Unknown command: ${command}`)
+if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
+  const [command, ...args] = process.argv.slice(2)
+  if (command === 'metadata') {
+    await metadata()
+  } else if (command === 'manifest') {
+    manifest(...args)
+  } else {
+    throw new Error(`Unknown command: ${command}`)
+  }
 }
