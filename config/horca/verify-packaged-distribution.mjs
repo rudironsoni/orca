@@ -35,7 +35,7 @@ export function evaluateHorcaAsarContents({ shared, main, renderer }) {
     ['public CLI is horca', /publicCli:\s*["']horca["']/.test(shared)],
     [
       'Horca Electron profile is configured',
-      main.includes('horca-packaged-electron-profile') && /setPath\(["']userData["']/.test(main)
+      main.includes('horca-packaged-electron-profile') && /setPath\([`'"]userData[`'"]/.test(main)
     ],
     ['Herdr provider is packaged', main.includes('Could not resolve herdr target for spawn')],
     ['Herdr settings are registered', main.includes('terminal-backends.json')],
