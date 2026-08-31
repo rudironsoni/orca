@@ -2,12 +2,46 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { verifyHorcaResources } from '../horca/verify-packaged-distribution.mjs'
+import {
+  evaluateHorcaAsarContents,
+  verifyHorcaResources
+} from '../horca/verify-packaged-distribution.mjs'
 
 const roots = []
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+describe('packaged Horca asar probes', () => {
+  const passing = {
+    shared: [
+      'DOWNSTREAM_DISTRIBUTION = "horca"',
+      'productName: "Horca"',
+      'stateRootDirName: ".horca"',
+      'publicCli: "horca"'
+    ].join('\n'),
+    main: [
+      'horca-packaged-electron-profile',
+      'setPath("userData", root)',
+      'Could not resolve herdr target for spawn',
+      'terminal-backends.json'
+    ].join('\n'),
+    renderer: 'data-horca-settings data-horca-product-name'
+  }
+
+  it('accepts minify-stable Horca and Herdr markers', () => {
+    expect(evaluateHorcaAsarContents(passing).failures).toEqual([])
+  })
+
+  it('rejects minified identifier-only profile and provider probes', () => {
+    expect(
+      evaluateHorcaAsarContents({
+        ...passing,
+        main: 'configureHorcaUserDataPath(); class HerdrPtyProvider {} terminal-backends.json'
+      }).failures
+    ).toEqual(['Horca Electron profile is configured', 'Herdr provider is packaged'])
+  })
 })
 
 describe('packaged Horca Herdr resources', () => {
