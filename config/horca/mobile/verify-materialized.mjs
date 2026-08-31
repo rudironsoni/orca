@@ -61,9 +61,32 @@ if (
 }
 if (
   packageJson.dependencies?.['react-native'] !== '0.86.3' ||
-  packageJson.dependencies?.expo !== '~57.0.18'
+  packageJson.dependencies?.expo !== '~57.0.18' ||
+  packageJson.dependencies?.['react-native-webview'] !== '13.16.1' ||
+  packageJson.devDependencies?.['@types/react-native'] !== undefined ||
+  packageJson.devDependencies?.['expo-module-scripts'] !== undefined ||
+  packageJson.packageManager !== 'pnpm@12.0.0'
 ) {
   throw new Error('Materialized Horca mobile dependency versions are incorrect')
+}
+
+const lockfile = readFileSync(resolve(mobileRoot, 'pnpm-lock.yaml'), 'utf8')
+const deprecatedPackages = [
+  '@types/react-native@0.73.0',
+  'eslint@9.39.4',
+  '@xmldom/xmldom@0.8.13',
+  '@xmldom/xmldom@0.9.10',
+  'abab@2.0.6',
+  'domexception@4.0.0',
+  'glob@7.2.3',
+  'inflight@1.0.6',
+  'rimraf@3.0.2',
+  'whatwg-encoding@2.0.0'
+]
+for (const packageVersion of deprecatedPackages) {
+  if (lockfile.includes(packageVersion)) {
+    throw new Error(`Deprecated package survived Horca mobile materialization: ${packageVersion}`)
+  }
 }
 
 console.log('Horca mobile materialization verified')
