@@ -4,8 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
+import { parseStableVersion, selectReleaseCore } from './prepare-release.mjs'
 
 const script = new URL('./prepare-release.mjs', import.meta.url).pathname
+
+test('uses the latest Orca stable release as the Horca core', () => {
+  assert.equal(parseStableVersion('v1.4.193'), '1.4.193')
+  assert.equal(parseStableVersion('v1.4.178-rc.2'), null)
+  assert.equal(selectReleaseCore('1.4.178-rc.2', 'v1.4.193'), '1.4.193')
+  assert.equal(selectReleaseCore('1.4.178-rc.2', null), '1.4.178')
+})
 
 test('writes a verifiable beta release manifest', () => {
   const directory = mkdtempSync(join(tmpdir(), 'horca-release-test-'))
