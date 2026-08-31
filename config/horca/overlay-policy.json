@@ -311,13 +311,6 @@
       "dropWhen": "Upstream centralizes external product identity"
     },
     {
-      "path": "src/main/updater-test-harness.ts",
-      "subsystem": "horca-distribution-identity",
-      "reason": "Keep updater test state under the distribution state root",
-      "upstreamPr": null,
-      "dropWhen": "Upstream centralizes its local state root"
-    },
-    {
       "path": "src/main/updater.ts",
       "subsystem": "horca-distribution-identity",
       "reason": "Disable the stock updater for downstream releases",
