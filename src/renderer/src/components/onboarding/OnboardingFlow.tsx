@@ -210,7 +210,9 @@ export default function OnboardingFlow({
         <section
           ref={flow.setLifecycleRootRef}
           role="dialog"
-          aria-label={`${ACTIVE_PRODUCT_NAME} onboarding`}
+          aria-label={productCopy(
+            translate('auto.components.onboarding.OnboardingFlow.277ba45540', 'Orca onboarding')
+          )}
           aria-modal="true"
           data-onboarding-modal
           className={cn(
@@ -274,7 +276,12 @@ export default function OnboardingFlow({
             <div className="mt-8 shrink-0">
               {stepIndex === 0 && (
                 <div className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {`Welcome to ${ACTIVE_PRODUCT_NAME}`}
+                  {productCopy(
+                    translate(
+                      'auto.components.onboarding.OnboardingFlow.1b5e182e9f',
+                      'Welcome to Orca'
+                    )
+                  )}
                 </div>
               )}
               <h1 className="text-[34px] font-semibold leading-[1.15] tracking-tight text-foreground">

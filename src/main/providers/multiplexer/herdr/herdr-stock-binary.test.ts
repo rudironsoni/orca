@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveStockHerdrTestBinary } from './herdr-stock-binary'
-import { isHerdrProcessGone } from './herdr-socket-transport'
+import { isHerdrProcessGone } from './herdr-process-gone'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 
 describe('resolveStockHerdrTestBinary', () => {
@@ -15,7 +15,7 @@ describe('isHerdrProcessGone', () => {
     expect(isHerdrProcessGone(Object.assign(new Error('gone'), { code: 'ECONNREFUSED' }))).toBe(
       true
     )
-    expect(isHerdrProcessGone(new Error('Connection to /tmp/x.sock timed out'))).toBe(true)
+    expect(isHerdrProcessGone(new Error('Connection to /tmp/x.sock timed out'))).toBe(false)
     expect(isHerdrProcessGone(new HerdrRuntimeError('not_git_worktree', 'no'))).toBe(false)
   })
 })

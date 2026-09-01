@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Project } from '../../../../shared/project-types'
-import {
-  HERDR_PROTOCOL_VERSION,
-  type HerdrHostTransport,
-  type HerdrResponse,
-  type HerdrSessionSnapshot
-} from './herdr-runtime-contract'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
+import { stockTransport } from './herdr-runtime-manager-test-fixtures'
 
 function project(): Project {
   return {
@@ -51,83 +46,6 @@ function singleLeafGraph() {
         expandedLeafId: null
       }
     }
-  }
-}
-
-function stockTransport() {
-  const snapshot: HerdrSessionSnapshot = {
-    version: '0.8.2',
-    protocol: HERDR_PROTOCOL_VERSION,
-    workspaces: [],
-    tabs: [],
-    panes: [],
-    layouts: [],
-    agents: []
-  }
-  const requestMock = vi.fn(
-    async (_session: string, method: string, params: unknown): Promise<HerdrResponse<unknown>> => {
-      if (method === 'session.snapshot') {
-        return { id: 'snapshot', result: { snapshot } }
-      }
-      if (method === 'workspace.create') {
-        const workspace = { workspace_id: 'w1', label: 'repo' }
-        const tab = { tab_id: 'w1:t1', workspace_id: 'w1', label: '1' }
-        const rootPane = { pane_id: 'w1:p1', tab_id: 'w1:t1', workspace_id: 'w1' }
-        return { id: 'workspace', result: { workspace, tab, root_pane: rootPane } }
-      }
-      if (method === 'tab.rename') {
-        const input = params as { tab_id: string; label: string }
-        const existing = snapshot.tabs.find((candidate) => candidate.tab_id === input.tab_id)
-        if (existing) {
-          existing.label = input.label
-        }
-        return { id: 'tab-rename', result: { type: 'ok' } }
-      }
-      if (method === 'tab.close') {
-        return { id: 'tab-close', result: { type: 'ok' } }
-      }
-      if (method === 'workspace.report_metadata') {
-        const input = params as { workspace_id: string; tokens: Record<string, string> }
-        const workspace = snapshot.workspaces.find(
-          (candidate) => candidate.workspace_id === input.workspace_id
-        )
-        if (workspace) {
-          workspace.tokens = { ...workspace.tokens, ...input.tokens }
-        }
-        return { id: 'workspace-metadata', result: { type: 'ok' } }
-      }
-      if (method === 'pane.report_metadata') {
-        const input = params as { pane_id: string; tokens: Record<string, string> }
-        const pane = snapshot.panes.find((candidate) => candidate.pane_id === input.pane_id)
-        if (pane) {
-          pane.tokens = { ...pane.tokens, ...input.tokens }
-        }
-        return { id: 'pane-metadata', result: { type: 'ok' } }
-      }
-      if (method === 'layout.apply') {
-        const pane = { pane_id: 'w1:p2', tab_id: 'w1:t2', workspace_id: 'w1' }
-        snapshot.panes.push(pane)
-        return {
-          id: 'layout',
-          result: {
-            layout: { root: { type: 'pane', pane_id: pane.pane_id } },
-            workspace_id: 'w1',
-            tab_id: 'w1:t2'
-          }
-        }
-      }
-      throw new Error(`Unexpected stock method ${method}`)
-    }
-  )
-  const request: HerdrHostTransport['request'] = async <T>(session, method, params) =>
-    (await requestMock(session, method, params)) as HerdrResponse<T>
-  return {
-    snapshot,
-    requestMock,
-    transport: {
-      ensureSession: vi.fn(async () => undefined),
-      request
-    } satisfies HerdrHostTransport
   }
 }
 

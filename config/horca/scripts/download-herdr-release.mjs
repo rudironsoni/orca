@@ -131,18 +131,20 @@ async function main() {
   const platform = option('--platform') ?? process.platform
   const architecture = option('--arch') ?? process.arch
   const stage = option('--stage')
+  const releaseTag = typeof pin.tag === 'string' && pin.tag.length > 0 ? pin.tag : `v${pin.version}`
+  const cacheKey = typeof pin.tag === 'string' && pin.tag.length > 0 ? pin.tag : pin.version
   const asset = assetName(pin.version, platform, architecture)
   const cacheRoot =
     process.env.HORCA_HERDR_BINARY_CACHE ?? join(homedir(), '.cache', 'horca', 'herdr')
-  const destination = join(cacheRoot, pin.version, asset)
+  const destination = join(cacheRoot, cacheKey, asset)
   const expectedSha256 = pin.sha256?.[asset]
   if (typeof expectedSha256 !== 'string') {
     throw new Error(`No SHA-256 pin for ${asset}`)
   }
-  const url = `https://github.com/${HERDR_RELEASE_REPO}/releases/download/v${pin.version}/${asset}`
+  const url = `https://github.com/${HERDR_RELEASE_REPO}/releases/download/${releaseTag}/${asset}`
   const downloaded = await download(url, destination, expectedSha256)
   const executable =
-    platform === 'win32' ? extractWindowsArchive(downloaded, cacheRoot, pin.version) : downloaded
+    platform === 'win32' ? extractWindowsArchive(downloaded, cacheRoot, cacheKey) : downloaded
   process.stdout.write(`${stage ? stageBundle(executable, platform, stage) : executable}\n`)
 }
 

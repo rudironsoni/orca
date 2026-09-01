@@ -1,4 +1,3 @@
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
 import type { HerdrHostTransport, HerdrTerminalController } from './herdr-runtime-contract'
 import type { HerdrPtyBinding } from './herdr-pty-types'
 
@@ -19,11 +18,8 @@ export function openSharedHerdrPaneController(
 }
 
 export async function writeSharedHerdrInput(binding: HerdrPtyBinding, data: string): Promise<void> {
-  unwrapHerdrResponse(
-    await binding.transport.request(binding.sessionName, 'pane.send_text', {
-      pane_id: binding.paneId,
-      text: data
-    })
+  await binding.transport.sdk.run(binding.sessionName, (herdr) =>
+    herdr.panes.sendText(herdr.ids.pane(binding.paneId), data)
   )
 }
 

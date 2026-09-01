@@ -3,6 +3,8 @@ import type { HerdrTerminalFrame } from './herdr-runtime-contract'
 import { retireExitedHerdrPane } from './herdr-pty-provider-runtime'
 import { waitForFirstHerdrFrame } from './herdr-pty-frames'
 import type { HerdrPtyBinding } from './herdr-pty-types'
+import { handlerTransport } from './herdr-sdk-test-host'
+import { testPane } from './herdr-sdk-test-snapshot'
 
 function frame(bytes: string, opts: { full?: boolean; seq?: number } = {}): HerdrTerminalFrame {
   return {
@@ -137,19 +139,12 @@ describe('waitForFirstHerdrFrame', () => {
 describe('retireExitedHerdrPane', () => {
   it('emits exit and closes the Herdr pane', async () => {
     const { binding } = makeBinding()
-    const request = vi.fn(async (_session: string, method: string) => {
-      if (method === 'pane.get') {
-        return {
-          id: 'pane',
-          result: { pane: { pane_id: 'pane-1', workspace_id: 'w1' } }
-        }
-      }
-      if (method === 'pane.list') {
-        return { id: 'list', result: { panes: [{ pane_id: 'pane-1' }] } }
-      }
-      return { id: 'ok', result: { type: 'ok' } }
+    const { transport, requestMock } = handlerTransport({
+      'pane.get': () => testPane({ id: 'pane-1', workspaceId: 'w1' }),
+      'pane.list': () => [testPane({ id: 'pane-1', workspaceId: 'w1' })],
+      'workspace.close': () => undefined
     })
-    binding.transport = { request } as unknown as HerdrPtyBinding['transport']
+    binding.transport = transport
     const bindings = new Map([[binding.id, binding]])
     const emitExit = vi.fn()
 
@@ -159,7 +154,7 @@ describe('retireExitedHerdrPane', () => {
     expect(emitExit).toHaveBeenCalledWith({ id: binding.id, code: 0 })
     expect(bindings.has(binding.id)).toBe(false)
     await vi.waitFor(() => {
-      expect(request).toHaveBeenCalledWith('orca', 'workspace.close', { workspace_id: 'w1' })
+      expect(requestMock).toHaveBeenCalledWith('orca', 'workspace.close', { workspaceId: 'w1' })
     })
   })
 })

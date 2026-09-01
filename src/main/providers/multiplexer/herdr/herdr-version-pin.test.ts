@@ -14,12 +14,14 @@ describe('herdr release version pin', () => {
       readFileSync(join(process.cwd(), 'config', 'horca', 'herdr-version.json'), 'utf8')
     ) as {
       version: string
+      tag: string
       protocol: number
       schemaVersion: number
       sha256: Record<string, string>
     }
 
-    expect(pin.version).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(pin.version).toMatch(/^\d+\.\d+\.\d+(?:-preview\.[0-9a-z.-]+)?$/)
+    expect(pin.tag).toMatch(/^preview-/)
     expect(pin.protocol).toBe(HERDR_PROTOCOL_VERSION)
     expect(pin.schemaVersion).toBe(HERDR_SCHEMA_VERSION)
     expect(pin.sha256).toEqual({

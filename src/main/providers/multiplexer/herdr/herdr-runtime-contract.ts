@@ -1,109 +1,27 @@
-import { REQUIRED_HERDR_METHODS } from './herdr-runtime-methods'
+import type {
+  Agent,
+  EventSubscriptionSpecEncoded,
+  HerdrEvent,
+  HerdrSdk,
+  IHerdrSdk,
+  Pane,
+  PaneLayoutSnapshot,
+  SessionSnapshot,
+  Tab,
+  Workspace
+} from '@herdr/sdk'
+import type { Effect } from 'effect'
 
 export const HERDR_SCHEMA_VERSION = 1
-export const HERDR_PROTOCOL_VERSION = 20
+export const HERDR_PROTOCOL_VERSION = 21
 
-export type HerdrApiSchema = {
-  protocol: number
-  schema_version: number
-  schemas: Record<string, unknown>
-}
-
-export type HerdrWorkspace = {
-  workspace_id: string
-  label: string
-  tokens?: Record<string, string>
-  cwd?: string
-  path?: string
-  worktree?: { checkout_path: string }
-}
-
-export type HerdrTab = {
-  tab_id: string
-  workspace_id: string
-  label: string
-}
-
-export type HerdrPane = {
-  pane_id: string
-  tab_id: string
-  workspace_id: string
-  cwd?: string
-  foreground_cwd?: string
-  label?: string
-  title?: string
-  terminal_title?: string
-  terminal_title_stripped?: string
-  agent?: string | null
-  agent_status?: HerdrAgentStatus
-  tokens?: Record<string, string>
-  revision?: number
-  focused?: boolean
-}
-
-export type HerdrAgentStatus = 'idle' | 'working' | 'blocked' | 'done' | 'unknown'
-
-export type HerdrAgentInfo = {
-  agent: string | null
-  agent_status: HerdrAgentStatus
-  agent_session?: HerdrAgentSessionInfo | null
-  cwd?: string | null
-  display_agent?: string | null
-  focused?: boolean
-  foreground_cwd?: string | null
-  interactive_ready?: boolean
-  launch_pending?: boolean
-  name?: string | null
-  pane_id: string
-  revision?: number
-  state_labels?: Record<string, string>
-  tab_id?: string
-  terminal_id?: string
-  terminal_title?: string | null
-  terminal_title_stripped?: string | null
-}
-
-export type HerdrAgentSessionInfo = {
-  source: string
-  agent: string
-  kind: string
-  value: string
-}
-
-export type HerdrSessionSnapshot = {
-  version: string
-  protocol: number
-  workspaces: HerdrWorkspace[]
-  tabs: HerdrTab[]
-  panes: HerdrPane[]
-  layouts: HerdrPaneLayoutSnapshot[]
-  agents: unknown[]
-}
-
-export type HerdrPaneLayoutRect = { x: number; y: number; width: number; height: number }
-
-export type HerdrPaneLayoutPane = { pane_id: string; rect: HerdrPaneLayoutRect; focused?: boolean }
-
-export type HerdrPaneLayoutSplit = {
-  id: string
-  direction: 'right' | 'down'
-  ratio: number
-  rect: HerdrPaneLayoutRect
-}
-
-export type HerdrPaneLayoutSnapshot = {
-  workspace_id: string
-  tab_id: string
-  panes: HerdrPaneLayoutPane[]
-  area?: HerdrPaneLayoutRect
-  focused_pane_id?: string
-  splits?: HerdrPaneLayoutSplit[]
-  zoomed?: boolean
-}
-
-export type HerdrResponse<T> =
-  | { id: string; result: T }
-  | { id: string; error: { code: string; message: string } }
+export type HerdrWorkspace = Workspace
+export type HerdrTab = Tab
+export type HerdrPane = Pane
+export type HerdrSessionSnapshot = SessionSnapshot
+export type HerdrPaneLayoutSnapshot = PaneLayoutSnapshot
+export type HerdrAgentInfo = Agent
+export type HerdrAgentStatus = Agent['status']
 
 export type HerdrTerminalFrame = {
   type: 'terminal.frame'
@@ -129,28 +47,32 @@ export type HerdrTerminalControlOptions = {
   cols: number
   rows: number
   takeover?: boolean
-  /** Read-only frames. Lets a Herdr TUI keep exclusive control. */
   observe?: boolean
+}
+
+export type HerdrSdkClient = {
+  run<A>(
+    sessionName: string,
+    operation: (herdr: IHerdrSdk) => Effect.Effect<A, unknown, HerdrSdk>
+  ): Promise<A>
+  subscribe(
+    sessionName: string,
+    specs: readonly EventSubscriptionSpecEncoded[],
+    listener: (event: HerdrEvent) => void
+  ): () => void
+  ping(sessionName: string): Promise<void>
+  dispose(): Promise<void>
 }
 
 export type HerdrHostTransport = {
   ensureSession(sessionName: string): Promise<void>
-  request<T>(sessionName: string, method: string, params: unknown): Promise<HerdrResponse<T>>
+  sdk: HerdrSdkClient
   controlTerminal?(
     sessionName: string,
     target: string,
     options: HerdrTerminalControlOptions
   ): HerdrTerminalController
-  // Optional event stream (socket transport); CLI/SSH transports omit it.
-  onEvent?(listener: (event: HerdrTransportEvent) => void): () => void
-  // Tear down persistent connections (socket event connection, timers).
   disconnect?(): Promise<void>
-}
-
-export type HerdrTransportEvent = {
-  event: string
-  data: { type: string; [key: string]: unknown }
-  sessionName?: string
 }
 
 export class HerdrRuntimeError extends Error {
@@ -162,62 +84,6 @@ export class HerdrRuntimeError extends Error {
   }
 }
 
-export function assertHerdrSchemaCompatible(schema: HerdrApiSchema): void {
-  if (schema.schema_version !== HERDR_SCHEMA_VERSION) {
-    throw new HerdrRuntimeError(
-      'herdr_incompatible',
-      `Orca requires Herdr API schema ${HERDR_SCHEMA_VERSION}; received ${schema.schema_version}`
-    )
-  }
-  if (schema.protocol < HERDR_PROTOCOL_VERSION) {
-    throw new HerdrRuntimeError(
-      'herdr_incompatible',
-      `Orca requires Herdr protocol ${HERDR_PROTOCOL_VERSION} or newer; received ${schema.protocol}`
-    )
-  }
-  const missing = REQUIRED_HERDR_METHODS.filter(
-    (method) => !schemaDeclaresRequestMethod(schema.schemas?.request, method)
-  )
-  if (missing.length > 0) {
-    throw new HerdrRuntimeError(
-      'herdr_incompatible',
-      `Herdr is missing required stock API methods: ${missing.join(', ')}`
-    )
-  }
-}
-
-// Walk the request schema looking for a {"const": "<method>"} declaration so the
-// required-method check does not depend on how the schema happens to serialize.
-function schemaDeclaresRequestMethod(node: unknown, method: string): boolean {
-  if (typeof node === 'object' && node !== null) {
-    const candidate = node as Record<string, unknown>
-    if (candidate.const === method) {
-      return true
-    }
-    return Object.values(candidate).some((value) => schemaDeclaresRequestMethod(value, method))
-  }
-  return false
-}
-
-export function assertHerdrServerCompatible(schema: HerdrApiSchema, protocol: number): void {
-  if (protocol !== schema.protocol) {
-    throw new HerdrRuntimeError(
-      'herdr_incompatible',
-      `Herdr client protocol ${schema.protocol} does not match the running server protocol ${protocol}. Restart the Herdr session with the installed binary.`
-    )
-  }
-}
-
-export function unwrapHerdrResponse<T>(response: HerdrResponse<T>): T {
-  if ('error' in response) {
-    throw new HerdrRuntimeError(response.error.code, response.error.message)
-  }
-  return response.result
-}
-
-export { REQUIRED_HERDR_METHODS } from './herdr-runtime-methods'
-
-// Export all types that were previously in the results file for backward compatibility
 export type {
   HerdrPaneZoomResult,
   HerdrPaneSwapResult,
