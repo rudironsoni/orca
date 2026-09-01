@@ -340,6 +340,9 @@ describe('Herdr PTY target resolution', () => {
     })
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID]).toHaveLength(1)
     expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID][0].id).toBe('floating-tab')
+    expect(target?.graph.tabsByWorktreeId[FLOATING_TERMINAL_WORKTREE_ID][0].title).toBe(
+      'Terminal 1'
+    )
   })
 
   it('uses the host home directory for the shared floating workspace', async () => {

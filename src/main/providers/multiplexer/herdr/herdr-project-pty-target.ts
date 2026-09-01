@@ -22,6 +22,7 @@ import type { PtySpawnOptions } from '../../pty-provider-contract'
 import type { HerdrWorktreeDescriptor } from './ensure-herdr-workspace'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { resolveHerdrSpawnLayout } from './herdr-pty-layout-resolve'
+import { nextOrcaTerminalTitle } from './herdr-tab-title'
 import type { HorcaTerminalSettingsSource } from '../../../horca/terminal-backend/horca-terminal-settings'
 import { createHorcaTerminalSettingsSource } from '../../../horca/terminal-backend/horca-terminal-settings'
 
@@ -214,11 +215,13 @@ function projectHerdrActivation(
     // the pane. Distinctness is orca_binding, not the Herdr tab label.
     const existingTabs = session.tabsByWorktree[worktreeId] ?? []
     const sessionTab = existingTabs.find((tab) => tab.id === tabId)
+    const title = nextOrcaTerminalTitle(existingTabs)
     const syntheticTab: TerminalTab = sessionTab ?? {
       id: tabId,
       ptyId: null,
       worktreeId,
-      title: '1',
+      title,
+      defaultTitle: title,
       customTitle: null,
       color: null,
       sortOrder: 0,

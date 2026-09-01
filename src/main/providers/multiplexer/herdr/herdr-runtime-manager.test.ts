@@ -622,6 +622,21 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
     )
   })
 
+  it('renames a placeholder Herdr tab 1 to Terminal 1', async () => {
+    const host = stockTransport()
+    const manager = new HerdrRuntimeManager(host.transport)
+    await manager.reconcileProjectHost({
+      ...singleLeafGraph(),
+      tabsByWorktreeId: {
+        'worktree-1': [{ ...tab(), title: '1', defaultTitle: 'Terminal 1' }]
+      }
+    })
+    expect(host.snapshot.tabs).toHaveLength(1)
+    expect(host.snapshot.tabs[0]?.label).toBe('Terminal 1')
+    const rename = host.requestMock.mock.calls.find(([, method]) => method === 'tab.rename')
+    expect(rename?.[2]).toEqual({ tabId: 'w1:t1', label: 'Terminal 1' })
+  })
+
   it('adopts the workspace.create tab on spawn instead of minting a UUID-labeled tab', async () => {
     const host = stockTransport()
     const manager = new HerdrRuntimeManager(host.transport)
@@ -642,7 +657,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
 
     expect(paneId).toBe('w1:p1')
     expect(host.snapshot.tabs).toHaveLength(1)
-    expect(host.snapshot.tabs[0]?.label).not.toBe(leafId)
+    expect(host.snapshot.tabs[0]?.label).toBe('Terminal 1')
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'tab.create')
     ).toHaveLength(0)
