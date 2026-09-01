@@ -15,6 +15,7 @@ import {
   orcaWorkspaceBinding,
   paneBindingMapKey
 } from './herdr-binding-metadata'
+import { fromOption } from './herdr-sdk-values'
 import { isStockHerdrDefaultTabLabel } from './herdr-tab-layout'
 
 export type HerdrImportedSurface = {
@@ -46,7 +47,7 @@ export function collectUnboundHerdrSurfaces(
     if (!workspace) {
       continue
     }
-    const tabs = snapshot.tabs.filter((tab) => tab.workspace_id === workspace.workspace_id)
+    const tabs = snapshot.tabs.filter((tab) => tab.workspaceId === workspace.id)
     for (const tab of tabs) {
       imported.push(
         ...collectUnboundTabSurfaces(
@@ -71,10 +72,10 @@ function collectUnboundTabSurfaces(
   snapshot: HerdrSessionSnapshot,
   paneIdsBySessionAndBinding: Map<string, string>
 ): HerdrImportedSurface[] {
-  const panes = snapshot.panes.filter((pane) => pane.tab_id === tab.tab_id)
+  const panes = snapshot.panes.filter((pane) => pane.tabId === tab.id)
   const claimedPaneIds = new Set(paneIdsBySessionAndBinding.values())
   const unbound = panes.filter(
-    (pane) => !pane.tokens?.[ORCA_BINDING_TOKEN] && !claimedPaneIds.has(pane.pane_id)
+    (pane) => !pane.tokens?.[ORCA_BINDING_TOKEN] && !claimedPaneIds.has(pane.id)
   )
   const owner = findOrcaOwnerForHerdrTab(
     sessionName,
@@ -85,7 +86,7 @@ function collectUnboundTabSurfaces(
   )
   if (!owner && (graph.tabsByWorktreeId[worktreeId] ?? []).length > 0) {
     const herdrTabsInWorkspace = snapshot.tabs.filter(
-      (candidate) => candidate.workspace_id === tab.workspace_id
+      (candidate) => candidate.workspaceId === tab.workspaceId
     )
     if (herdrTabsInWorkspace.length <= 1 || isStockHerdrDefaultTabLabel(tab.label)) {
       return []
@@ -107,7 +108,7 @@ function collectUnboundTabSurfaces(
         tab.label,
         index === 0 ? undefined : rootLeafId,
         snapshot,
-        tab.tab_id
+        tab.id
       )
     )
   }
@@ -125,7 +126,7 @@ function collectUnboundTabSurfaces(
       tab.label,
       owner.leafId,
       snapshot,
-      tab.tab_id
+      tab.id
     )
   })
 }
@@ -137,7 +138,7 @@ function findOrcaOwnerForHerdrTab(
   panes: HerdrPane[],
   paneIdsBySessionAndBinding: Map<string, string>
 ): { tabId: string; leafId: string } | null {
-  const paneIds = new Set(panes.map((pane) => pane.pane_id))
+  const paneIds = new Set(panes.map((pane) => String(pane.id)))
   for (const tab of graph.tabsByWorktreeId[worktreeId] ?? []) {
     const root = graph.layoutsByTabId[tab.id]?.root
     const leafIds = root ? collectLeafIds(root) : []
@@ -171,16 +172,16 @@ function surfaceFor(
     worktreeId,
     tabId,
     leafId,
-    paneId: pane.pane_id
+    paneId: pane.id
   })
   return {
     worktreeId,
     tabId,
     leafId,
-    paneId: pane.pane_id,
+    paneId: pane.id,
     ptyId,
     title,
-    cwd: pane.cwd ?? pane.foreground_cwd,
+    cwd: fromOption(pane.cwd) ?? fromOption(pane.foregroundCwd),
     ...(splitFromLeafId
       ? {
           splitFromLeafId,
@@ -194,7 +195,7 @@ function splitDirectionFor(
   snapshot: HerdrSessionSnapshot,
   tabId: string
 ): 'vertical' | 'horizontal' {
-  const layout = snapshot.layouts.find((candidate) => candidate.tab_id === tabId)
+  const layout = snapshot.layouts.find((candidate) => candidate.tabId === tabId)
   const split = layout?.splits?.[0]
   if (split && 'direction' in split && split.direction === 'down') {
     return 'horizontal'
@@ -213,12 +214,19 @@ export async function claimAndPresentHerdrSurfaces(
 ): Promise<void> {
   for (const surface of surfaces) {
     const binding = orcaPaneBinding(projectId, surface.leafId)
-    const pane = snapshot.panes.find((candidate) => candidate.pane_id === surface.paneId)
+    const pane = snapshot.panes.find((candidate) => candidate.id === surface.paneId)
     if (!pane) {
       continue
     }
-    await claimOrcaPaneBinding(transport, sessionName, projectId, surface.leafId, pane, snapshot)
-    if (pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
+    const claimed = await claimOrcaPaneBinding(
+      transport,
+      sessionName,
+      projectId,
+      surface.leafId,
+      pane,
+      snapshot
+    )
+    if (!claimed && pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
       continue
     }
     persist(surface)

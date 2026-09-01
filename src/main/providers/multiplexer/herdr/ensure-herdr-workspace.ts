@@ -17,12 +17,11 @@ import {
 } from './herdr-binding-metadata'
 import type {
   HerdrHostTransport,
-  HerdrPane,
   HerdrSessionSnapshot,
-  HerdrTab,
   HerdrWorkspace
 } from './herdr-runtime-contract'
-import { HerdrRuntimeError, unwrapHerdrResponse } from './herdr-runtime-contract'
+import { HerdrRuntimeError } from './herdr-runtime-contract'
+import { herdrCheckoutPath } from './herdr-sdk-values'
 import { orcaTabTitle, syncHerdrTabLabel } from './herdr-tab-layout'
 
 export type HerdrWorktreeDescriptor = Pick<
@@ -54,13 +53,6 @@ export function isLinkedHerdrWorktree(worktree: HerdrWorktreeDescriptor): boolea
   return normalize(worktree.path) !== normalize(worktree.repoPath)
 }
 
-type OpenedStockWorktree = {
-  workspace: HerdrWorkspace
-  tab: HerdrTab
-  root_pane: HerdrPane
-  already_open: boolean
-}
-
 export async function ensureStockHerdrWorkspace(
   transport: HerdrHostTransport,
   sessionName: string,
@@ -83,8 +75,7 @@ export async function ensureStockHerdrWorkspace(
 
   const adoptable = findAdoptableWorkspace(snapshot.workspaces, worktree, liveBindings)
   if (adoptable) {
-    await reportOrcaWorkspaceBinding(transport, sessionName, adoptable.workspace_id, binding)
-    adoptable.tokens = { ...adoptable.tokens, [ORCA_BINDING_TOKEN]: binding }
+    await reportOrcaWorkspaceBinding(transport, sessionName, adoptable.id, binding)
     return adoptable
   }
 
@@ -103,26 +94,14 @@ export async function ensureStockHerdrWorkspace(
     }
   }
 
-  const created = unwrapHerdrResponse<{
-    workspace: HerdrWorkspace
-    tab: HerdrTab
-    root_pane: HerdrPane
-  }>(
-    await transport.request(sessionName, 'workspace.create', {
+  const created = await transport.sdk.run(sessionName, (herdr) =>
+    herdr.workspaces.create({
       cwd: worktree.path || undefined,
       label: worktree.displayName || basename(worktree.path),
       focus: false
     })
   )
-  await reportOrcaWorkspaceBinding(transport, sessionName, created.workspace.workspace_id, binding)
-  created.workspace.tokens = {
-    ...created.workspace.tokens,
-    [ORCA_BINDING_TOKEN]: binding
-  }
-  snapshot.workspaces.push(created.workspace)
-  snapshot.tabs.push(created.tab)
-  snapshot.panes.push(created.root_pane)
-
+  await reportOrcaWorkspaceBinding(transport, sessionName, created.workspace.id, binding)
   const firstLeafId = firstTerminalLeafId(firstRoot)
   if (firstTab && firstLeafId) {
     await claimOrcaPaneBinding(
@@ -130,7 +109,7 @@ export async function ensureStockHerdrWorkspace(
       sessionName,
       projectId,
       firstLeafId,
-      created.root_pane,
+      created.rootPane,
       snapshot
     )
     await syncHerdrTabLabel(transport, sessionName, created.tab, orcaTabTitle(firstTab))
@@ -147,43 +126,47 @@ async function openStockWorktree(
   firstRoot: TerminalPaneLayoutNode | null,
   snapshot: HerdrSessionSnapshot
 ): Promise<HerdrWorkspace | null> {
-  let opened: OpenedStockWorktree
+  if (!worktree.repoPath) {
+    return null
+  }
   try {
-    opened = unwrapHerdrResponse<OpenedStockWorktree>(
-      await transport.request(sessionName, 'worktree.open', {
+    const opened = await transport.sdk.run(sessionName, (herdr) =>
+      herdr.worktrees.open({
         cwd: worktree.repoPath,
         path: worktree.path,
         label: worktree.displayName || basename(worktree.path),
-        focus: false
+        focus: false,
+        trustRepository: true
       })
     )
+    const binding = orcaWorkspaceBinding(projectId, worktree)
+    await reportOrcaWorkspaceBinding(transport, sessionName, opened.workspace.id, binding)
+    if (opened.alreadyOpen) {
+      const existingTab = snapshot.tabs.find((candidate) => candidate.id === opened.tab.id)
+      if (firstTab && existingTab) {
+        await syncHerdrTabLabel(transport, sessionName, existingTab, orcaTabTitle(firstTab))
+      }
+      return opened.workspace
+    }
+    const firstLeafId = firstTerminalLeafId(firstRoot)
+    if (firstTab && firstLeafId) {
+      await claimOrcaPaneBinding(
+        transport,
+        sessionName,
+        projectId,
+        firstLeafId,
+        opened.rootPane,
+        snapshot
+      )
+      await syncHerdrTabLabel(transport, sessionName, opened.tab, orcaTabTitle(firstTab))
+    }
+    return opened.workspace
   } catch (error) {
     if (!(error instanceof HerdrRuntimeError) || error.code !== 'not_git_worktree') {
       throw error
     }
     return null
   }
-  const binding = orcaWorkspaceBinding(projectId, worktree)
-  const { workspace, tab, root_pane: rootPane, already_open: alreadyOpen } = opened
-  await reportOrcaWorkspaceBinding(transport, sessionName, workspace.workspace_id, binding)
-  workspace.tokens = { ...workspace.tokens, [ORCA_BINDING_TOKEN]: binding }
-  if (alreadyOpen) {
-    const existingTab = snapshot.tabs.find((candidate) => candidate.tab_id === tab.tab_id) ?? tab
-    if (firstTab) {
-      await syncHerdrTabLabel(transport, sessionName, existingTab, orcaTabTitle(firstTab))
-    }
-    return workspace
-  }
-  snapshot.workspaces.push(workspace)
-  snapshot.tabs.push(tab)
-  snapshot.panes.push(rootPane)
-
-  const firstLeafId = firstTerminalLeafId(firstRoot)
-  if (firstTab && firstLeafId) {
-    await claimOrcaPaneBinding(transport, sessionName, projectId, firstLeafId, rootPane, snapshot)
-    await syncHerdrTabLabel(transport, sessionName, tab, orcaTabTitle(firstTab))
-  }
-  return workspace
 }
 
 export async function enrichHerdrWorkspaceCheckouts(
@@ -192,18 +175,13 @@ export async function enrichHerdrWorkspaceCheckouts(
   snapshot: HerdrSessionSnapshot
 ): Promise<void> {
   for (const workspace of snapshot.workspaces) {
-    if (workspace.cwd || workspace.path || workspace.worktree?.checkout_path) {
+    if (herdrCheckoutPath(workspace)) {
       continue
     }
     try {
-      const details = unwrapHerdrResponse<{ workspace: HerdrWorkspace }>(
-        await transport.request(sessionName, 'workspace.get', {
-          workspace_id: workspace.workspace_id
-        })
-      ).workspace
-      workspace.cwd = details.cwd ?? workspace.cwd
-      workspace.path = details.path ?? workspace.path
-      workspace.worktree = details.worktree ?? workspace.worktree
+      await transport.sdk.run(sessionName, (herdr) =>
+        herdr.workspaces.get(herdr.ids.workspace(workspace.id))
+      )
     } catch {
       // Skinny snapshot records stay adoptable by unique label.
     }
@@ -226,7 +204,7 @@ export function findHerdrWorkspaceForWorktree(
 }
 
 function findAdoptableWorkspace(
-  workspaces: HerdrWorkspace[],
+  workspaces: readonly HerdrWorkspace[],
   worktree: { path: string; displayName?: string },
   liveBindings: ReadonlySet<string> = new Set()
 ): HerdrWorkspace | null {
@@ -257,7 +235,6 @@ function findAdoptableWorkspace(
 
 function workspaceMatchesCheckout(workspace: HerdrWorkspace, checkoutPath: string): boolean {
   const expected = normalize(checkoutPath)
-  return [workspace.worktree?.checkout_path, workspace.cwd, workspace.path].some(
-    (candidate) => candidate !== undefined && normalize(candidate) === expected
-  )
+  const checkout = herdrCheckoutPath(workspace)
+  return checkout !== undefined && normalize(checkout) === expected
 }

@@ -261,6 +261,33 @@ export class SshConnection {
     return this.cachedPassphrase != null || this.cachedPassword != null
   }
 
+  async forwardOutStreamLocal(
+    socketPath: string,
+    options?: SshExecOptions
+  ): Promise<ClientChannel> {
+    if (options?.signal?.aborted) {
+      throw createSshOperationAbortError()
+    }
+    if (this.useSystemSshTransport) {
+      throw new Error('Unix-socket forwarding is not available when using system SSH transport')
+    }
+    if (!this.client) {
+      throw new Error('Not connected')
+    }
+    const client = this.client
+    return this.openSessionChannelWithRetry(
+      () =>
+        this.waitForSshCallback(
+          'SSH stream-local channel timed out',
+          (callback) => client.openssh_forwardOutStreamLocal(socketPath, callback),
+          (channel) => channel.close(),
+          options?.signal,
+          true
+        ),
+      options?.signal
+    )
+  }
+
   async exec(cmd: string, options?: SshExecOptions): Promise<ClientChannel> {
     if (options?.signal?.aborted) {
       throw createSshOperationAbortError()
