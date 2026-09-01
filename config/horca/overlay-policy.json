@@ -151,6 +151,34 @@
       "dropWhen": "Upstream exposes a supported distribution build input"
     },
     {
+      "path": "package.json",
+      "subsystem": "herdr-sdk-client",
+      "reason": "Depend on the vendored @herdr/sdk tarball for the Herdr overlay",
+      "upstreamPr": null,
+      "dropWhen": "Upstream adopts @herdr/sdk or Horca stops using Herdr"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "subsystem": "herdr-sdk-client",
+      "reason": "Lock the vendored @herdr/sdk tarball and Effect graph",
+      "upstreamPr": null,
+      "dropWhen": "Upstream adopts @herdr/sdk or Horca stops using Herdr"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "subsystem": "herdr-sdk-client",
+      "reason": "Disable msgpackr-extract native builds required by the SDK graph",
+      "upstreamPr": null,
+      "dropWhen": "Upstream adopts @herdr/sdk or Horca stops using Herdr"
+    },
+    {
+      "path": "src/main/ssh/ssh-connection.ts",
+      "subsystem": "herdr-sdk-reachability",
+      "reason": "Expose OpenSSH stream-local forwarding so the SDK can reach remote herdr.sock",
+      "upstreamPr": null,
+      "dropWhen": "Upstream exposes unix-socket forwarding on SshConnection"
+    },
+    {
       "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
       "subsystem": "horca-distribution-identity",
       "reason": "Use Horca bundle identifiers for native permission attribution",
