@@ -157,7 +157,8 @@ export class HerdrRuntimeManager {
               snapshot,
               graph.persistedPaneIdsByLeafId,
               { tab: ensured.seedTab, pane: ensured.seedPane },
-              tabs.length <= 1
+              tabs.length <= 1,
+              tabs
             )
             for (const leafId of collectLeafIds(root)) {
               const paneId = graph.persistedPaneIdsByLeafId[leafId]
