@@ -24,6 +24,10 @@ function fiberCause(error: unknown): unknown {
 }
 
 export function toHerdrRuntimeError(error: unknown): HerdrRuntimeError {
+  const tagged = taggedName(error)
+  if (tagged === 'HerdrInvalidInput' && error instanceof Error) {
+    return new HerdrRuntimeError('herdr_invalid_input', error.message)
+  }
   const cause = fiberCause(error)
   if (cause instanceof HerdrRuntimeError) {
     return cause

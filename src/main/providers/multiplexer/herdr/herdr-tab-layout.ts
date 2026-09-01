@@ -13,6 +13,7 @@ import {
   restoreOrcaPaneBindings
 } from './herdr-binding-metadata'
 import { applyTabLayout, clearPaneBindings, ensureTabSplits } from './herdr-tab-layout-apply'
+import { herdrOptionalCwd } from './herdr-sdk-values'
 export {
   applyTabLayout,
   collectHerdrPaneIds,
@@ -196,7 +197,7 @@ export async function ensureTabLayout(
     const created = await transport.sdk.run(sessionName, (herdr) =>
       herdr.tabs.create({
         workspaceId,
-        cwd: tab.startupCwd,
+        ...herdrOptionalCwd(tab.startupCwd),
         label: tab.customTitle ?? tab.title,
         focus: false
       })
