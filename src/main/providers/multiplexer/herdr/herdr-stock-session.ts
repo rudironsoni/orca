@@ -1,15 +1,13 @@
-import type { HerdrApiSchema } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 
 export type HerdrListedSession = { name: string; running: boolean }
 
 export type StockHerdrSessionOps = {
-  loadSchema: () => Promise<HerdrApiSchema>
   listSessions: () => Promise<HerdrListedSession[]>
   startServer: (sessionName: string) => Promise<void>
   timeoutMs?: number
   pollMs?: number
-  afterReady?: (schema: HerdrApiSchema) => Promise<void>
+  afterReady?: () => Promise<void>
   socketReady?: (sessionName: string) => Promise<boolean>
 }
 
@@ -23,7 +21,6 @@ export async function ensureStockHerdrSession(
     return await existing
   }
   const run = (async () => {
-    const schema = await ops.loadSchema()
     const sessions = await ops.listSessions()
     const listedRunning = sessions.some(
       (session) => session.name === sessionName && session.running
@@ -33,7 +30,7 @@ export async function ensureStockHerdrSession(
       await ops.startServer(sessionName)
       await waitForStockHerdrSession(sessionName, ops)
     }
-    await ops.afterReady?.(schema)
+    await ops.afterReady?.()
   })()
   pending.set(sessionName, run)
   try {

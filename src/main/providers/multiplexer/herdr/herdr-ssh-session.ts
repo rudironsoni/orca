@@ -5,18 +5,16 @@ import { shellEscape } from '../../../ssh/ssh-connection-utils'
 import { powerShellCommand, powerShellLiteral } from '../../../ssh/ssh-remote-powershell'
 import type { RemoteHostPlatform } from '../../../ssh/ssh-remote-platform'
 import type {
-  HerdrApiSchema,
   HerdrHostTransport,
-  HerdrResponse,
   HerdrTerminalController,
   HerdrTerminalControlOptions
 } from './herdr-runtime-contract'
-import {
-  assertHerdrSchemaCompatible,
-  assertHerdrServerCompatible,
-  unwrapHerdrResponse
-} from './herdr-runtime-contract'
-import { herdrStockCliInvocation, parseHerdrSessionList } from './herdr-cli-session'
+import { parseHerdrSessionList } from './herdr-cli-session'
+import { HerdrSdkRuntime } from './herdr-sdk-runtime'
+import { HerdrSshSocketRelay } from './herdr-ssh-socket-relay'
+import { herdrSessionSocketPath } from './herdr-session-socket-path'
+import { getAppEnvironment } from '../../../../shared/app-environment'
+import { execCommand } from '../../../ssh/ssh-relay-exec-command'
 import { ensureStockHerdrSession, type HerdrListedSession } from './herdr-stock-session'
 import {
   createHerdrSessionControlFromOpen,
@@ -33,7 +31,6 @@ export type HerdrSshSessionOptions = {
 export class HerdrSshSessionManager {
   private executablePromise: Promise<string> | null = null
   private readonly sessionPromises = new Map<string, Promise<void>>()
-  private schema: HerdrApiSchema | null = null
 
   constructor(
     private readonly connection: SshConnection,
@@ -44,27 +41,10 @@ export class HerdrSshSessionManager {
 
   async ensureSession(sessionName: string): Promise<void> {
     await ensureStockHerdrSession(this.sessionPromises, sessionName, {
-      loadSchema: () => this.loadSchema(),
       listSessions: () => this.listSessions(),
       startServer: (name) => this.startServer(name),
-      timeoutMs: this.timeoutMs,
-      afterReady: async (schema) => {
-        const invocation = herdrStockCliInvocation(sessionName, 'session.snapshot', {})
-        const response = invocation.parse(await this.run(invocation.args)) as HerdrResponse<{
-          snapshot: { protocol: number }
-        }>
-        assertHerdrServerCompatible(schema, unwrapHerdrResponse(response).snapshot.protocol)
-      }
+      timeoutMs: this.timeoutMs
     })
-  }
-
-  private async loadSchema(): Promise<HerdrApiSchema> {
-    if (!this.schema) {
-      const schema = JSON.parse(await this.run(['api', 'schema', '--json'])) as HerdrApiSchema
-      assertHerdrSchemaCompatible(schema)
-      this.schema = schema
-    }
-    return this.schema
   }
 
   private async listSessions(): Promise<HerdrListedSession[]> {
@@ -189,7 +169,11 @@ export class HerdrSshSessionManager {
 }
 
 export class HerdrSshHostTransport implements HerdrHostTransport {
+  readonly sdk: HerdrSdkRuntime
   private readonly sessionManager: HerdrSshSessionManager
+  private readonly relays = new Map<string, HerdrSshSocketRelay>()
+  private readonly connection: SshConnection
+  private remoteConfigHomePromise: Promise<string> | null = null
 
   constructor(
     connection: SshConnection,
@@ -198,22 +182,50 @@ export class HerdrSshHostTransport implements HerdrHostTransport {
     hostPlatform?: RemoteHostPlatform,
     sessionManager?: HerdrSshSessionManager
   ) {
+    this.connection = connection
     this.sessionManager =
       sessionManager ??
       new HerdrSshSessionManager(connection, timeoutMs, resolveExecutable, hostPlatform)
+    this.sdk = new HerdrSdkRuntime({
+      application: { name: 'horca', version: getAppEnvironment().getVersion() },
+      resolveTarget: (sessionName) => {
+        const relay = this.relays.get(sessionName)
+        if (!relay) {
+          throw new Error(`Herdr SSH relay is not listening for session ${sessionName}`)
+        }
+        return { sessionName, socketPath: relay.localSocketPath }
+      }
+    })
   }
 
   async ensureSession(sessionName: string): Promise<void> {
     await this.sessionManager.ensureSession(sessionName)
+    let relay = this.relays.get(sessionName)
+    if (!relay) {
+      relay = new HerdrSshSocketRelay(
+        this.connection,
+        herdrSessionSocketPath(await this.remoteConfigHome(), sessionName)
+      )
+      this.relays.set(sessionName, relay)
+      try {
+        await relay.listen()
+      } catch (error) {
+        this.relays.delete(sessionName)
+        await relay.dispose()
+        throw error
+      }
+    }
+    await this.sdk.ping(sessionName)
   }
 
-  async request<T>(
-    sessionName: string,
-    method: string,
-    params: unknown
-  ): Promise<HerdrResponse<T>> {
-    const invocation = herdrStockCliInvocation(sessionName, method, params)
-    return invocation.parse(await this.sessionManager.run(invocation.args)) as HerdrResponse<T>
+  private async remoteConfigHome(): Promise<string> {
+    this.remoteConfigHomePromise ??= readRemoteHerdrConfigHome(this.connection).catch(
+      (error: unknown) => {
+        this.remoteConfigHomePromise = null
+        throw error
+      }
+    )
+    return await this.remoteConfigHomePromise
   }
 
   controlTerminal(
@@ -227,4 +239,20 @@ export class HerdrSshHostTransport implements HerdrHostTransport {
       )
     )
   }
+
+  async disconnect(): Promise<void> {
+    await this.sdk.dispose()
+    await Promise.all([...this.relays.values()].map((relay) => relay.dispose()))
+    this.relays.clear()
+  }
+}
+
+async function readRemoteHerdrConfigHome(connection: SshConnection): Promise<string> {
+  const stdout = (
+    await execCommand(connection, 'printf %s "${XDG_CONFIG_HOME:-$HOME/.config}"')
+  ).trim()
+  if (!stdout.startsWith('/') || /[\n\r]/.test(stdout)) {
+    throw new Error(`Remote Herdr config home is not an absolute path: ${stdout}`)
+  }
+  return stdout
 }

@@ -1,3 +1,4 @@
+import type { EventSubscriptionSpecEncoded } from '@herdr/sdk'
 import { runKeyedSerializedOperation } from '../../../cli/keyed-promise-queue'
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
 import { rememberOrcaPaneBindings } from './herdr-binding-metadata'
@@ -16,32 +17,33 @@ import type { HerdrProjectHostGraph } from './ensure-herdr-workspace'
 
 const RECONCILE_EVENT_DEBOUNCE_MS = 150
 
-const RECONCILE_EVENT_KINDS = new Set([
-  'session.snapshot_changed',
-  'workspace.created',
-  'workspace.updated',
-  'workspace.metadata_updated',
-  'workspace.closed',
-  'workspace.renamed',
-  'workspace.moved',
-  'workspace.reordered',
-  'workspace.focused',
-  'worktree.created',
-  'worktree.opened',
-  'worktree.removed',
-  'tab.created',
-  'tab.closed',
-  'tab.renamed',
-  'tab.moved',
-  'tab.focused',
-  'pane.created',
-  'pane.closed',
-  'pane.updated',
-  'pane.focused',
-  'pane.moved',
-  'pane.exited',
-  'layout.updated'
-])
+const RECONCILE_EVENT_SPECS = [
+  { type: 'workspace.created' },
+  { type: 'workspace.updated' },
+  { type: 'workspace.metadata_updated' },
+  { type: 'workspace.closed' },
+  { type: 'workspace.renamed' },
+  { type: 'workspace.moved' },
+  { type: 'workspace.reordered' },
+  { type: 'workspace.focused' },
+  { type: 'worktree.created' },
+  { type: 'worktree.opened' },
+  { type: 'worktree.removed' },
+  { type: 'tab.created' },
+  { type: 'tab.closed' },
+  { type: 'tab.renamed' },
+  { type: 'tab.moved' },
+  { type: 'tab.focused' },
+  { type: 'pane.created' },
+  { type: 'pane.closed' },
+  { type: 'pane.updated' },
+  { type: 'pane.focused' },
+  { type: 'pane.moved' },
+  { type: 'pane.exited' },
+  { type: 'layout.updated' }
+] as const satisfies readonly EventSubscriptionSpecEncoded[]
+
+const RECONCILE_EVENT_KINDS = new Set<string>(RECONCILE_EVENT_SPECS.map((spec) => spec.type))
 
 export type HerdrLivePaneListener = (sessionName: string, paneIds: ReadonlySet<string>) => void
 export type HerdrPaneExitListener = (sessionName: string, paneId: string) => void
@@ -54,10 +56,6 @@ export type HerdrSurfaceSync = {
 
 function herdrEventKind(event: string): string {
   return event.includes('.') ? event : event.replaceAll('_', '.')
-}
-
-function herdrEventPaneId(data: Record<string, unknown>): string | null {
-  return typeof data.pane_id === 'string' ? data.pane_id : null
 }
 
 function graphsForSession(
@@ -89,29 +87,28 @@ export class HerdrEventRefresh {
   constructor(private readonly host: HerdrEventRefreshHost) {}
 
   ensureSubscription(): void {
-    if (this.eventUnsubscribe || !this.host.transport.onEvent) {
+    if (this.eventUnsubscribe) {
       return
     }
-    this.eventUnsubscribe = this.host.transport.onEvent((event) => {
-      const kind = herdrEventKind(event.event)
-      const sessionNames = event.sessionName
-        ? [event.sessionName]
-        : [...this.host.graphsByKey.keys()].map((key) => key.slice(0, key.indexOf('\n')))
-      if (kind === 'pane.exited') {
-        const paneId = herdrEventPaneId(event.data)
-        if (paneId) {
-          for (const sessionName of sessionNames) {
-            this.host.onPaneExited?.(sessionName, paneId)
-          }
+    const sessionNames = () =>
+      [...this.host.graphsByKey.keys()].map((key) => key.slice(0, key.indexOf('\n')))
+    const unsubscribers = sessionNames().map((sessionName) =>
+      this.host.transport.sdk.subscribe(sessionName, RECONCILE_EVENT_SPECS, (event) => {
+        const kind = herdrEventKind(event.type)
+        if (kind === 'pane.exited' && 'paneId' in event) {
+          const paneId = String(event.paneId)
+          this.host.onPaneExited?.(sessionName, paneId)
         }
+        if (RECONCILE_EVENT_KINDS.has(kind)) {
+          this.schedule(sessionName)
+        }
+      })
+    )
+    this.eventUnsubscribe = () => {
+      for (const unsubscribe of unsubscribers) {
+        unsubscribe()
       }
-      if (!RECONCILE_EVENT_KINDS.has(kind) && !RECONCILE_EVENT_KINDS.has(event.event)) {
-        return
-      }
-      for (const sessionName of sessionNames) {
-        this.schedule(sessionName)
-      }
-    })
+    }
   }
 
   dispose(): void {
@@ -157,7 +154,7 @@ export class HerdrEventRefresh {
           snapshot
         )
       }
-      this.host.onLivePaneIds?.(sessionName, new Set(snapshot.panes.map((pane) => pane.pane_id)))
+      this.host.onLivePaneIds?.(sessionName, new Set(snapshot.panes.map((pane) => pane.id)))
       await this.importUnboundSurfaces(sessionName, graphs, snapshot)
       this.applySurfaceActions(sessionName, graphs, snapshot)
       this.host.lastSnapshots.set(sessionName, snapshot)

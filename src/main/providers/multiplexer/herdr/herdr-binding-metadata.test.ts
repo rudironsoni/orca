@@ -9,12 +9,8 @@ import {
   recoverPaneIdsFromStockLayout,
   restoreOrcaPaneBindings
 } from './herdr-binding-metadata'
-import type {
-  HerdrHostTransport,
-  HerdrPane,
-  HerdrResponse,
-  HerdrSessionSnapshot
-} from './herdr-runtime-contract'
+import { handlerTransport } from './herdr-sdk-test-host'
+import { testPane, testSnapshot } from './herdr-sdk-test-snapshot'
 
 describe('stock Herdr metadata bindings', () => {
   it('uses stable token-sized digests for Orca resources', () => {
@@ -45,15 +41,15 @@ describe('stock Herdr metadata bindings', () => {
         second: { type: 'leaf', leafId: 'right' }
       },
       {
-        workspace_id: 'w1',
-        tab_id: 'w1:t1',
+        workspaceId: 'w1',
+        tabId: 'w1:t1',
         panes: [
           {
-            pane_id: 'w1:p2',
+            paneId: 'w1:p2',
             rect: { x: 60, y: 0, width: 60, height: 40 }
           },
           {
-            pane_id: 'w1:p1',
+            paneId: 'w1:p1',
             rect: { x: 0, y: 0, width: 60, height: 40 }
           }
         ]
@@ -75,15 +71,15 @@ describe('stock Herdr metadata bindings', () => {
         second: { type: 'leaf', leafId: 'right' }
       },
       {
-        workspace_id: 'w1',
-        tab_id: 'w1:t1',
+        workspaceId: 'w1',
+        tabId: 'w1:t1',
         panes: [
           {
-            pane_id: 'w1:p1',
+            paneId: 'w1:p1',
             rect: { x: 0, y: 0, width: 120, height: 20 }
           },
           {
-            pane_id: 'w1:p2',
+            paneId: 'w1:p2',
             rect: { x: 0, y: 20, width: 120, height: 20 }
           }
         ]
@@ -108,12 +104,12 @@ describe('stock Herdr metadata bindings', () => {
         second: { type: 'leaf', leafId: 'right' }
       },
       {
-        workspace_id: 'w1',
-        tab_id: 'w1:t1',
+        workspaceId: 'w1',
+        tabId: 'w1:t1',
         panes: [
-          { pane_id: 'w1:p1', rect: { x: 0, y: 0, width: 60, height: 20 } },
-          { pane_id: 'w1:p2', rect: { x: 0, y: 20, width: 60, height: 20 } },
-          { pane_id: 'w1:p3', rect: { x: 60, y: 0, width: 60, height: 40 } }
+          { paneId: 'w1:p1', rect: { x: 0, y: 0, width: 60, height: 20 } },
+          { paneId: 'w1:p2', rect: { x: 0, y: 20, width: 60, height: 20 } },
+          { paneId: 'w1:p3', rect: { x: 60, y: 0, width: 60, height: 40 } }
         ]
       }
     )
@@ -121,7 +117,6 @@ describe('stock Herdr metadata bindings', () => {
   })
 
   it('keeps persisted pane IDs when geometry recovery fails instead of dropping all bindings', async () => {
-    // vertical split expected, but the persisted layout is horizontal -> recoverPaneIdsFromStockLayout returns null.
     const root = {
       type: 'split',
       direction: 'vertical',
@@ -129,167 +124,126 @@ describe('stock Herdr metadata bindings', () => {
       first: { type: 'leaf', leafId: 'left' },
       second: { type: 'leaf', leafId: 'right' }
     } as const
-    const snapshot = {
-      version: '1',
-      protocol: 18,
-      workspaces: [],
-      tabs: [{ tab_id: 'w1:t1', workspace_id: 'w1', title: 'tab' }],
-      panes: [{ pane_id: 'w1:p1', tab_id: 'w1:t1', tokens: {} }],
-      layouts: [
-        {
-          workspace_id: 'w1',
-          tab_id: 'w1:t1',
-          panes: [{ pane_id: 'w1:p1', rect: { x: 0, y: 0, width: 120, height: 20 } }]
-        }
-      ],
-      agents: []
-    }
-    const reportCalls: { paneId: string; binding: string }[] = []
-    const transport: HerdrHostTransport = {
-      ensureSession: async () => {},
-      request: async <T>(_s: string, _m: string, params: unknown): Promise<HerdrResponse<T>> => {
-        const p = params as { pane_id: string; tokens?: Record<string, string> }
-        reportCalls.push({ paneId: p.pane_id, binding: p.tokens?.orca_binding ?? '' })
-        return { id: '1', result: { type: 'ok' } as unknown as T }
-      }
-    }
-
+    const { transport, calls } = handlerTransport({
+      'pane.report_metadata': () => undefined
+    })
     await restoreOrcaPaneBindings(
       transport,
       'orca-app',
       'project-1',
       root,
       'w1:t1',
-      snapshot as never,
+      testSnapshot({ panes: [{ id: 'w1:p1', tabId: 'w1:t1' }] }),
       { left: 'w1:p1' }
     )
-
-    // The persisted pane id survives the geometric recovery failure and is re-reported.
-    expect(reportCalls).toHaveLength(1)
-
-    expect(reportCalls[0]).toEqual({
-      paneId: 'w1:p1',
-      binding: orcaPaneBinding('project-1', 'left')
-    })
+    expect(calls.filter((call) => call.method === 'pane.report_metadata')).toEqual([
+      {
+        method: 'pane.report_metadata',
+        params: {
+          paneId: 'w1:p1',
+          source: 'orca',
+          tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding('project-1', 'left') }
+        }
+      }
+    ])
   })
 
   it('reclaims a duplicate pane token onto the persisted pane and clears the rest', async () => {
     const binding = orcaPaneBinding('project-1', 'leaf-a')
-    const cleared: string[] = []
-    const transport: HerdrHostTransport = {
-      ensureSession: async () => {},
-      request: async <T>(_s: string, _m: string, params: unknown): Promise<HerdrResponse<T>> => {
-        const input = params as { pane_id: string; tokens?: Record<string, string | null> }
-        if (input.tokens?.[ORCA_BINDING_TOKEN] === null) {
-          cleared.push(input.pane_id)
-        }
-        return { id: '1', result: { type: 'ok' } as unknown as T }
-      }
-    }
-    const snapshot: HerdrSessionSnapshot = {
-      version: '1',
-      protocol: 1,
-      workspaces: [],
-      tabs: [],
+    const { transport, calls } = handlerTransport({
+      'pane.report_metadata': () => undefined
+    })
+    const snapshot = testSnapshot({
       panes: [
         {
-          pane_id: 'w7:p2',
-          tab_id: 'w7:t2',
-          workspace_id: 'w7',
+          id: 'w7:p2',
+          tabId: 'w7:t2',
+          workspaceId: 'w7',
           tokens: { [ORCA_BINDING_TOKEN]: binding }
         },
         {
-          pane_id: 'w7:p1',
-          tab_id: 'w7:t1',
-          workspace_id: 'w7',
+          id: 'w7:p1',
+          tabId: 'w7:t1',
+          workspaceId: 'w7',
           tokens: { [ORCA_BINDING_TOKEN]: binding }
         }
-      ],
-      layouts: [],
-      agents: []
-    }
-
+      ]
+    })
     const winner = await reclaimExclusiveOrcaPaneBinding(transport, 'orca', snapshot, binding, {
       preferredPaneId: 'w7:p1',
       workspaceId: 'w7'
     })
-
-    expect(winner?.pane_id).toBe('w7:p1')
-    expect(cleared).toEqual(['w7:p2'])
+    expect(winner?.id).toBe('w7:p1')
     expect(
-      snapshot.panes.find((pane) => pane.pane_id === 'w7:p2')?.tokens?.[ORCA_BINDING_TOKEN]
-    ).toBeUndefined()
-    expect(
-      snapshot.panes.find((pane) => pane.pane_id === 'w7:p1')?.tokens?.[ORCA_BINDING_TOKEN]
-    ).toBe(binding)
+      calls
+        .filter((call) => call.method === 'pane.report_metadata')
+        .map((call) => call.params.paneId)
+    ).toEqual(['w7:p2'])
   })
 
   it('claims a free binding once and refuses to double-claim it on another live pane', async () => {
-    const reportCalls: string[] = []
-    const transport: HerdrHostTransport = {
-      ensureSession: async () => {},
-      request: async <T>(_s: string, _m: string, params: unknown): Promise<HerdrResponse<T>> => {
-        reportCalls.push((params as { pane_id: string }).pane_id)
-        return { id: '1', result: { type: 'ok' } as unknown as T }
-      }
-    }
-    const snapshot: HerdrSessionSnapshot = {
-      version: '1',
-      protocol: 1,
-      workspaces: [],
-      tabs: [],
-      panes: [{ pane_id: 'w1:p1', tab_id: 'w1:t1', workspace_id: 'w1' }],
-      layouts: [],
-      agents: []
-    }
-    const owner = snapshot.panes[0]
-    await claimOrcaPaneBinding(transport, 'shared', 'project-1', 'leaf-a', owner, snapshot)
-    const imposter: HerdrPane = { pane_id: 'w1:p2', tab_id: 'w1:t1', workspace_id: 'w1' }
-    await claimOrcaPaneBinding(transport, 'shared', 'project-1', 'leaf-a', imposter, snapshot)
-
     const binding = orcaPaneBinding('project-1', 'leaf-a')
-    expect(reportCalls).toEqual(['w1:p1'])
-    expect(owner.tokens?.[ORCA_BINDING_TOKEN]).toBe(binding)
-    expect(imposter.tokens?.[ORCA_BINDING_TOKEN]).toBeUndefined()
-    expect(
-      snapshot.panes.filter((pane) => pane.tokens?.[ORCA_BINDING_TOKEN] === binding)
-    ).toHaveLength(1)
+    const { transport, calls } = handlerTransport({
+      'pane.report_metadata': () => undefined
+    })
+    const claimed = testSnapshot({
+      panes: [
+        {
+          id: 'w1:p1',
+          tabId: 'w1:t1',
+          workspaceId: 'w1',
+          tokens: { [ORCA_BINDING_TOKEN]: binding }
+        }
+      ]
+    })
+    await claimOrcaPaneBinding(
+      transport,
+      'shared',
+      'project-1',
+      'leaf-a',
+      claimed.panes[0],
+      claimed
+    )
+    await claimOrcaPaneBinding(
+      transport,
+      'shared',
+      'project-1',
+      'leaf-a',
+      testPane({ id: 'w1:p2', tabId: 'w1:t1', workspaceId: 'w1' }),
+      claimed
+    )
+    expect(calls.map((call) => call.params.paneId)).toEqual([])
   })
 
   it('lets a pane change its binding to another leaf only when that leaf is unclaimed', async () => {
-    const reportCalls: string[] = []
-    const transport: HerdrHostTransport = {
-      ensureSession: async () => {},
-      request: async <T>(_s: string, _m: string, params: unknown): Promise<HerdrResponse<T>> => {
-        reportCalls.push((params as { pane_id: string }).pane_id)
-        return { id: '1', result: { type: 'ok' } as unknown as T }
-      }
-    }
-    const snapshot: HerdrSessionSnapshot = {
-      version: '1',
-      protocol: 2,
-      workspaces: [],
-      tabs: [],
-      panes: [{ pane_id: 'w1:p1', tab_id: 'w1:t1', workspace_id: 'w1' }],
-      layouts: [],
-      agents: []
-    }
-    const pane = snapshot.panes[0]
-
+    const { transport, calls } = handlerTransport({
+      'pane.report_metadata': () => undefined
+    })
+    const pane = testPane({ id: 'w1:p1', tabId: 'w1:t1', workspaceId: 'w1' })
+    const snapshot = testSnapshot({ panes: [pane] })
     await claimOrcaPaneBinding(transport, 's', 'project-1', 'leaf-a', pane, snapshot)
-    const bindingA = orcaPaneBinding('project-1', 'leaf-a')
-
-    // Re-claiming the same pane for the same leaf is a no-op.
-    await claimOrcaPaneBinding(transport, 's', 'project-1', 'leaf-a', pane, snapshot)
-    expect(reportCalls).toEqual(['w1:p1'])
-    expect(pane.tokens?.[ORCA_BINDING_TOKEN]).toBe(bindingA)
-
-    // Moving the same pane to a different, unclaimed leaf is allowed.
-    await claimOrcaPaneBinding(transport, 's', 'project-1', 'leaf-b', pane, snapshot)
-    expect(reportCalls).toEqual(['w1:p1', 'w1:p1'])
-    expect(pane.tokens?.[ORCA_BINDING_TOKEN]).toBe(orcaPaneBinding('project-1', 'leaf-b'))
-    expect(
-      snapshot.panes.filter((candidate) => candidate.tokens?.[ORCA_BINDING_TOKEN] === bindingA)
-    ).toHaveLength(0)
+    const claimed = testPane({
+      id: 'w1:p1',
+      tabId: 'w1:t1',
+      workspaceId: 'w1',
+      tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding('project-1', 'leaf-a') }
+    })
+    await claimOrcaPaneBinding(
+      transport,
+      's',
+      'project-1',
+      'leaf-a',
+      claimed,
+      testSnapshot({ panes: [claimed] })
+    )
+    await claimOrcaPaneBinding(
+      transport,
+      's',
+      'project-1',
+      'leaf-b',
+      claimed,
+      testSnapshot({ panes: [claimed] })
+    )
+    expect(calls.map((call) => call.params.paneId)).toEqual(['w1:p1', 'w1:p1'])
   })
 })

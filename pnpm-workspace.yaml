@@ -46,6 +46,7 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
   msw: false
+  msgpackr-extract: false
   node-pty: true
   sherpa-onnx: true
   ssh2: false

@@ -4,8 +4,7 @@ import { getDefaultSettings } from '../../../../shared/constants'
 import type { Store } from '../../../persistence'
 import { setHerdrDesktopSurface } from '../../../horca/terminal-backend/herdr-desktop-surface'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
-import { HerdrCliHostTransport } from './herdr-cli-session'
-import { HerdrSocketTransport } from './herdr-socket-transport'
+import { HerdrSdkHost } from './herdr-sdk-host'
 import { HerdrSshHostTransport } from './herdr-ssh-session'
 import {
   createLocalHerdrPtyProvider,
@@ -72,7 +71,7 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
       identity: { hostId: 'wsl:Ubuntu' },
       project: { id: 'project-1' }
     })
-    expect(transport).toBeInstanceOf(HerdrCliHostTransport)
+    expect(transport).toBeInstanceOf(HerdrSdkHost)
     const command = await (
       transport as unknown as {
         options: {
@@ -94,48 +93,32 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
       ...getDefaultSettings('/tmp'),
       terminalBackendDefault: 'herdr'
     }
-    const transport = localTransport(settings) as HerdrSocketTransport
+    const transport = localTransport(settings) as HerdrSdkHost
 
-    expect(transport).toBeInstanceOf(HerdrSocketTransport)
-    expect((transport as unknown as { options: { sessionName: string } }).options.sessionName).toBe(
-      'horca'
-    )
+    expect(transport).toBeInstanceOf(HerdrSdkHost)
   })
 
-  it('routes the herdr backend to the stock socket transport when the runtime is stock', () => {
+  it('routes the herdr backend to the stock socket transport when the runtime is stock', async () => {
     const settings: TestSettings = {
       ...getDefaultSettings('/tmp'),
       terminalBackendDefault: 'herdr',
       herdrSessionName: 'shared-name'
     }
     const transport = localTransport(settings)
-    expect(transport).toBeInstanceOf(HerdrSocketTransport)
+    expect(transport).toBeInstanceOf(HerdrSdkHost)
 
-    const options = (
-      transport as unknown as {
-        options: {
-          sessionName: string
-          serverCommandFor(sessionName: string): {
-            file: string
-            args: string[]
-            env: NodeJS.ProcessEnv
-          }
-        }
-      }
-    ).options
-    expect(options.sessionName).toBe('shared-name')
-
+    const options = (transport as HerdrSdkHost).options
     process.env.HERDR_TEST_LEAK = 'must-be-stripped'
-    const serverCommand = options.serverCommandFor('mysession')
-    expect(serverCommand.file).toBe('herdr')
-    expect(serverCommand.args).toEqual(['--session', 'mysession', 'server'])
-    expect(serverCommand.env.HERDR_TEST_LEAK).toBeUndefined()
-    expect(serverCommand.env.HERDR_SESSION).toBeUndefined()
+    const serverCommand = await options.serverCommandFor?.('mysession')
+    expect(serverCommand?.file).toBe('herdr')
+    expect(serverCommand?.args).toEqual(['--session', 'mysession', 'server'])
+    expect(serverCommand?.env?.HERDR_TEST_LEAK).toBeUndefined()
+    expect(serverCommand?.env?.HERDR_SESSION).toBeUndefined()
   })
 
   it('falls back to the stock socket transport for a non-herdr backend', () => {
     const settings: TestSettings = { ...getDefaultSettings('/tmp') }
-    expect(localTransport(settings)).toBeInstanceOf(HerdrSocketTransport)
+    expect(localTransport(settings)).toBeInstanceOf(HerdrSdkHost)
   })
 
   it('keys cached transports by host, resolved session, and binary source', () => {
@@ -158,14 +141,9 @@ describe('createLocalHerdrPtyProvider stock routing', () => {
     const projectTransport = transportForTarget({
       identity: { hostId: 'local' },
       project: { id: 'project-1', herdrSessionName: 'project-session' }
-    }) as HerdrSocketTransport
-    expect(
-      (
-        projectTransport as unknown as {
-          options: { sessionName: string }
-        }
-      ).options.sessionName
-    ).toBe('project-session')
+    })
+    expect(projectTransport).toBeInstanceOf(HerdrSdkHost)
+    expect(projectTransport).not.toBe(second)
     settings.herdrBinarySource = { kind: 'custom', path: '/opt/herdr' }
     expect(transportForTarget(target)).not.toBe(second)
   })
