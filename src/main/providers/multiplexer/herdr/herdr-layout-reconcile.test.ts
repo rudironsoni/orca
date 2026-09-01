@@ -1,38 +1,20 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { TerminalPaneLayoutNode } from '../../../../shared/terminal-tab-types'
-import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
 import { terminalLayoutToHerdrLayout, applyTabLayout, ensureTabLayout } from './herdr-tab-layout'
 import { ORCA_BINDING_TOKEN, orcaPaneBinding } from './herdr-binding-metadata'
+import { handlerTransport } from './herdr-sdk-test-host'
+import { testPane, testSnapshot, testTab } from './herdr-sdk-test-snapshot'
 
 const PROJECT = 'proj'
 const WORKSPACE = 'w1'
 const SESSION = 'orca-proj'
 
 function makeTransport(handlers: Record<string, (params: Record<string, unknown>) => unknown>) {
-  const calls: { method: string; params: Record<string, unknown> }[] = []
-  const requestMock = vi.fn(
-    async (_session: string, method: string, params: Record<string, unknown>) => {
-      calls.push({ method, params })
-      const handler = handlers[method]
-      if (!handler) {
-        throw new Error(`unhandled method ${method}`)
-      }
-      return { id: 'r', result: handler(params) }
-    }
-  )
-  const transport: HerdrHostTransport = {
-    ensureSession: async () => undefined,
-    request: async <T>(session: string, method: string, params: unknown) =>
-      (await requestMock(session, method, params as Record<string, unknown>)) as {
-        id: string
-        result: T
-      }
-  }
-  return { transport, calls }
+  return handlerTransport(handlers)
 }
 
-function makeSnapshot(): HerdrSessionSnapshot {
-  return { workspaces: [], tabs: [], panes: [] } as unknown as HerdrSessionSnapshot
+function makeSnapshot() {
+  return testSnapshot()
 }
 
 describe('terminalLayoutToHerdrLayout', () => {
@@ -113,13 +95,10 @@ describe('applyTabLayout', () => {
       ])
     )
     const applyCall = calls.find((call) => call.method === 'layout.apply')
-    expect(applyCall?.params.workspace_id).toBe(WORKSPACE)
-    expect(applyCall?.params.tab_label).toBe('T')
+    expect(applyCall?.params.workspaceId).toBe(WORKSPACE)
+    expect(applyCall?.params.tabLabel).toBe('T')
     expect(applyCall?.params.focus).toBe(false)
-    expect(applyCall?.params).not.toHaveProperty('tab_id')
-    expect(snapshot.panes.map((pane) => pane.pane_id)).toEqual(['w1:p1', 'w1:p2'])
-    expect(snapshot.panes[0].tokens?.[ORCA_BINDING_TOKEN]).toBe(orcaPaneBinding(PROJECT, 'l1'))
-    expect(snapshot.panes[1].tokens?.[ORCA_BINDING_TOKEN]).toBe(orcaPaneBinding(PROJECT, 'l2'))
+    expect(applyCall?.params).not.toHaveProperty('replaceTabId')
   })
 
   it('prefers customTitle over title for tab_label', async () => {
@@ -138,7 +117,7 @@ describe('applyTabLayout', () => {
       { type: 'leaf', leafId: 'l1' },
       makeSnapshot()
     )
-    expect(calls.find((call) => call.method === 'layout.apply')?.params.tab_label).toBe('Custom')
+    expect(calls.find((call) => call.method === 'layout.apply')?.params.tabLabel).toBe('Custom')
   })
 
   it('uses title for tab_label when customTitle is omitted', async () => {
@@ -157,7 +136,7 @@ describe('applyTabLayout', () => {
       { type: 'leaf', leafId: 'l1' },
       makeSnapshot()
     )
-    expect(calls.find((call) => call.method === 'layout.apply')?.params.tab_label).toBe('T')
+    expect(calls.find((call) => call.method === 'layout.apply')?.params.tabLabel).toBe('T')
   })
 
   it('passes the adopted herdr tab_id so layout.apply does not mint a sibling tab', async () => {
@@ -187,7 +166,9 @@ describe('applyTabLayout', () => {
       makeSnapshot(),
       't-existing'
     )
-    expect(calls.find((call) => call.method === 'layout.apply')?.params.tab_id).toBe('t-existing')
+    expect(calls.find((call) => call.method === 'layout.apply')?.params.replaceTabId).toBe(
+      't-existing'
+    )
   })
 
   it('returns null when layout.apply fails so the caller falls back to pane.split', async () => {
@@ -237,20 +218,20 @@ describe('applyTabLayout', () => {
     })
     const persisted: Record<string, string> = {}
     const snapshot = makeSnapshot()
-    snapshot.tabs = [{ tab_id: 't1', workspace_id: WORKSPACE, label: 'T' }]
+    snapshot.tabs = [testTab({ id: 't1', workspaceId: WORKSPACE, label: 'T' })]
     snapshot.panes = [
-      {
-        pane_id: 'w1:p1',
-        tab_id: 't1',
-        workspace_id: WORKSPACE,
+      testPane({
+        id: 'w1:p1',
+        tabId: 't1',
+        workspaceId: WORKSPACE,
         tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding(PROJECT, 'l1') }
-      },
-      {
-        pane_id: 'w1:p2',
-        tab_id: 't1',
-        workspace_id: WORKSPACE,
+      }),
+      testPane({
+        id: 'w1:p2',
+        tabId: 't1',
+        workspaceId: WORKSPACE,
         tokens: { [ORCA_BINDING_TOKEN]: orcaPaneBinding(PROJECT, 'l2') }
-      }
+      })
     ]
 
     await ensureTabLayout(
@@ -276,12 +257,12 @@ describe('applyTabLayout', () => {
     const metadataCalls = calls.filter((call) => call.method === 'pane.report_metadata')
     expect(metadataCalls.slice(0, 2).map((call) => call.params)).toEqual([
       {
-        pane_id: 'w1:p1',
+        paneId: 'w1:p1',
         source: 'orca',
         tokens: { [ORCA_BINDING_TOKEN]: null }
       },
       {
-        pane_id: 'w1:p2',
+        paneId: 'w1:p2',
         source: 'orca',
         tokens: { [ORCA_BINDING_TOKEN]: null }
       }

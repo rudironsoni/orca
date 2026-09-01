@@ -130,19 +130,6 @@ describe('HerdrSshSessionManager', () => {
 })
 
 describe('HerdrSshHostTransport', () => {
-  it('parses a JSON request response through the invocation', async () => {
-    const { conn } = createConnection()
-    const manager = new HerdrSshSessionManager(conn, 2000, resolveHerdr)
-    const transport = new HerdrSshHostTransport(conn, 2000, resolveHerdr, undefined, manager)
-    const run = vi
-      .spyOn(manager, 'run')
-      .mockResolvedValue(JSON.stringify({ id: '1', result: { count: 2 } }))
-
-    const response = await transport.request('main', 'session.snapshot', {})
-    expect(run).toHaveBeenCalled()
-    expect(response).toEqual({ id: '1', result: { count: 2 } })
-  })
-
   it('opens remote session control instead of copying the stdin parser', async () => {
     const { conn } = createConnection()
     const manager = new HerdrSshSessionManager(conn, 2000, resolveHerdr)

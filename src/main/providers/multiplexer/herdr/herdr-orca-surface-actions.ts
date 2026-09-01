@@ -55,12 +55,12 @@ export function collectHerdrSurfaceActions(
     return []
   }
   const actions: HerdrOrcaSurfaceAction[] = []
-  const previousTabs = new Map(previous.tabs.map((tab) => [tab.tab_id, tab]))
-  const currentTabs = new Map(current.tabs.map((tab) => [tab.tab_id, tab]))
+  const previousTabs = new Map(previous.tabs.map((tab) => [tab.id, tab]))
+  const currentTabs = new Map(current.tabs.map((tab) => [tab.id, tab]))
 
   for (const [, previousTab] of previousTabs) {
-    const currentTab = currentTabs.get(previousTab.tab_id)
-    const owner = ownerForHerdrTab(previousTab.tab_id, previous.panes, identities)
+    const currentTab = currentTabs.get(previousTab.id)
+    const owner = ownerForHerdrTab(previousTab.id, previous.panes, identities)
     if (!owner) {
       continue
     }
@@ -92,11 +92,11 @@ export function collectHerdrSurfaceActions(
   }
 
   for (const layout of current.layouts) {
-    const previousLayout = previous.layouts.find((candidate) => candidate.tab_id === layout.tab_id)
+    const previousLayout = previous.layouts.find((candidate) => candidate.tabId === layout.tabId)
     if (!previousLayout || sameLayout(previousLayout, layout)) {
       continue
     }
-    const owner = ownerForHerdrTab(layout.tab_id, current.panes, identities)
+    const owner = ownerForHerdrTab(layout.tabId, current.panes, identities)
     const next = herdrLayoutToOrcaLayout(layout, identities)
     if (owner && next) {
       actions.push({ kind: 'layout', tabId: owner.tabId, layout: next })
@@ -108,14 +108,14 @@ export function collectHerdrSurfaceActions(
 
 function ownerForHerdrTab(
   herdrTabId: string,
-  panes: { pane_id: string; tab_id: string }[],
+  panes: readonly { id: string; tabId: string }[],
   identities: Map<string, HerdrOrcaLeafIdentity>
 ): HerdrOrcaLeafIdentity | null {
   for (const pane of panes) {
-    if (pane.tab_id !== herdrTabId) {
+    if (pane.tabId !== herdrTabId) {
       continue
     }
-    const owner = identities.get(pane.pane_id)
+    const owner = identities.get(pane.id)
     if (owner) {
       return owner
     }
@@ -126,11 +126,11 @@ function ownerForHerdrTab(
 function focusedPaneId(snapshot: HerdrSessionSnapshot): string | null {
   const focused = snapshot.panes.find((pane) => pane.focused)
   if (focused) {
-    return focused.pane_id
+    return focused.id
   }
   for (const layout of snapshot.layouts) {
-    if (layout.focused_pane_id) {
-      return layout.focused_pane_id
+    if (layout.focusedPaneId) {
+      return layout.focusedPaneId
     }
   }
   return null
@@ -140,7 +140,7 @@ function sameLayout(left: HerdrPaneLayoutSnapshot, right: HerdrPaneLayoutSnapsho
   return (
     JSON.stringify(left.panes) === JSON.stringify(right.panes) &&
     JSON.stringify(left.splits) === JSON.stringify(right.splits) &&
-    left.focused_pane_id === right.focused_pane_id &&
+    left.focusedPaneId === right.focusedPaneId &&
     left.zoomed === right.zoomed
   )
 }
@@ -150,7 +150,7 @@ export function herdrLayoutToOrcaLayout(
   identities: Map<string, HerdrOrcaLeafIdentity>
 ): TerminalLayoutSnapshot | null {
   const panes = layout.panes.flatMap((pane) => {
-    const leafId = identities.get(pane.pane_id)?.leafId
+    const leafId = identities.get(pane.paneId)?.leafId
     return leafId ? [{ leafId, rect: pane.rect }] : []
   })
   if (panes.length === 0 || panes.length !== layout.panes.length) {
@@ -164,18 +164,16 @@ export function herdrLayoutToOrcaLayout(
   if (panes.length === 1) {
     return {
       root,
-      activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId,
+      activeLeafId: identities.get(layout.focusedPaneId)?.leafId ?? firstLeafId,
       expandedLeafId: layout.zoomed
-        ? (identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId)
+        ? (identities.get(layout.focusedPaneId)?.leafId ?? firstLeafId)
         : null
     }
   }
   return {
     root,
-    activeLeafId: identities.get(layout.focused_pane_id ?? '')?.leafId ?? firstLeafId,
-    expandedLeafId: layout.zoomed
-      ? (identities.get(layout.focused_pane_id ?? '')?.leafId ?? null)
-      : null
+    activeLeafId: identities.get(layout.focusedPaneId)?.leafId ?? firstLeafId,
+    expandedLeafId: layout.zoomed ? (identities.get(layout.focusedPaneId)?.leafId ?? null) : null
   }
 }
 

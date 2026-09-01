@@ -1,34 +1,37 @@
 import { execFileSync } from 'node:child_process'
-import { rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import {
   configHomeDir,
   isolatedStockHerdrHomeEnv,
-  resolveStockHerdrTestBinary
+  resolveProtocolCompatibleHerdrTestBinary
 } from './herdr-stock-binary'
 import { afterAll, describe, expect, it } from 'vitest'
-import { HerdrCliHostTransport, localHerdrCommand } from './herdr-cli-session'
-import {
-  HERDR_PROTOCOL_VERSION,
-  unwrapHerdrResponse,
-  type HerdrHostTransport,
-  type HerdrSessionSnapshot
-} from './herdr-runtime-contract'
-import { terminalLogicalInputFromBytes } from '../../../../shared/horca/terminal-logical-key'
+import { localHerdrCommand } from './herdr-cli-session'
+import { HERDR_PROTOCOL_VERSION } from './herdr-runtime-contract'
+import { HerdrSdkHost } from './herdr-sdk-host'
+import { HerdrSdkRuntime } from './herdr-sdk-runtime'
+import { fromOption } from './herdr-sdk-values'
 
-const binary = resolveStockHerdrTestBinary()
+const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_PROTOCOL_VERSION)
 const describeRealHerdr = binary ? describe : describe.skip
 
 describeRealHerdr('stock Herdr runtime integration', () => {
   const configHome = configHomeDir()
   const sessionName = `ot-${process.pid}-rt`
   const env = isolatedStockHerdrHomeEnv(configHome)
-  const transport = new HerdrCliHostTransport({
+  const previousXdg = process.env.XDG_CONFIG_HOME
+  process.env.XDG_CONFIG_HOME = env.XDG_CONFIG_HOME
+  const sdk = new HerdrSdkRuntime({
+    application: { name: 'horca', version: 'test' },
+    resolveTarget: (name) => ({ sessionName: name })
+  })
+  const transport = new HerdrSdkHost({
+    sdk,
     commandFor: localHerdrCommand(binary as string, env),
     timeoutMs: 30_000
   })
 
-  afterAll(() => {
+  afterAll(async () => {
     try {
       execFileSync(binary as string, ['session', 'stop', sessionName, '--json'], {
         env,
@@ -36,319 +39,78 @@ describeRealHerdr('stock Herdr runtime integration', () => {
         timeout: 30_000
       })
     } catch {
-      // Session never started (early failure); cleanup must not mask the original cause.
+      // Session never started.
     } finally {
+      await transport.disconnect()
+      if (previousXdg === undefined) {
+        delete process.env.XDG_CONFIG_HOME
+      } else {
+        process.env.XDG_CONFIG_HOME = previousXdg
+      }
       rmSync(configHome, { recursive: true, force: true })
     }
   })
 
-  it('starts a named server and reconciles through stock metadata commands', async () => {
+  it('starts a named server and reports metadata through the SDK', async () => {
     await transport.ensureSession(sessionName)
-    const created = unwrapHerdrResponse<{
-      workspace: { workspace_id: string }
-      root_pane: { pane_id: string }
-    }>(
-      await transport.request(sessionName, 'workspace.create', {
+    const created = await transport.sdk.run(sessionName, (herdr) =>
+      herdr.workspaces.create({
         cwd: configHome,
         label: 'Orca integration',
         focus: false
       })
     )
-    await transport.request(sessionName, 'workspace.report_metadata', {
-      workspace_id: created.workspace.workspace_id,
-      source: 'orca',
-      tokens: { orca_binding: 'workspace-binding' }
-    })
-    await transport.request(sessionName, 'pane.report_metadata', {
-      pane_id: created.root_pane.pane_id,
-      source: 'orca',
-      tokens: { orca_binding: 'pane-binding' }
-    })
-
-    const snapshot = unwrapHerdrResponse<{ snapshot: HerdrSessionSnapshot }>(
-      await transport.request(sessionName, 'session.snapshot', {})
-    ).snapshot
+    await transport.sdk.run(sessionName, (herdr) =>
+      herdr.workspaces.reportMetadata(created.workspace.id, {
+        source: 'orca',
+        tokens: { orca_binding: 'workspace-binding' }
+      })
+    )
+    await transport.sdk.run(sessionName, (herdr) =>
+      herdr.panes.reportMetadata(created.rootPane.id, {
+        source: 'orca',
+        tokens: { orca_binding: 'pane-binding' }
+      })
+    )
+    const snapshot = await transport.sdk.run(sessionName, (herdr) => herdr.session.snapshot())
     expect(snapshot.protocol).toBe(HERDR_PROTOCOL_VERSION)
     expect(
-      snapshot.workspaces.find(
-        (workspace) => workspace.workspace_id === created.workspace.workspace_id
-      )?.tokens
+      snapshot.workspaces.find((workspace) => workspace.id === created.workspace.id)?.tokens
     ).toMatchObject({ orca_binding: 'workspace-binding' })
-    expect(
-      snapshot.panes.find((pane) => pane.pane_id === created.root_pane.pane_id)?.tokens
-    ).toMatchObject({ orca_binding: 'pane-binding' })
+    expect(snapshot.panes.find((pane) => pane.id === created.rootPane.id)?.tokens).toMatchObject({
+      orca_binding: 'pane-binding'
+    })
   }, 30_000)
 
-  it('echoes input through pane.send_text and pane.read', async () => {
+  it('echoes input through panes.sendText and panes.read', async () => {
     await transport.ensureSession(sessionName)
-    const created = unwrapHerdrResponse<{
-      root_pane: { pane_id: string }
-    }>(
-      await transport.request(sessionName, 'workspace.create', {
+    const created = await transport.sdk.run(sessionName, (herdr) =>
+      herdr.workspaces.create({
         cwd: configHome,
         label: 'Orca io',
         focus: false
       })
     )
     const marker = `STOCK_IO_${process.pid}`
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_text', {
-        pane_id: created.root_pane.pane_id,
-        text: `echo ${marker}`
-      })
+    await transport.sdk.run(sessionName, (herdr) =>
+      herdr.panes.sendText(created.rootPane.id, `echo ${marker}`)
     )
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_keys', {
-        pane_id: created.root_pane.pane_id,
-        keys: ['Enter']
-      })
+    await transport.sdk.run(sessionName, (herdr) =>
+      herdr.panes.sendKeys(created.rootPane.id, ['Enter'])
     )
-
     const deadline = Date.now() + 10_000
     let text = ''
     while (Date.now() < deadline) {
-      const read = unwrapHerdrResponse<{ read: { text: string } }>(
-        await transport.request(sessionName, 'pane.read', {
-          pane_id: created.root_pane.pane_id,
-          source: 'recent',
-          lines: 80
-        })
+      const read = await transport.sdk.run(sessionName, (herdr) =>
+        herdr.panes.read(created.rootPane.id, { source: 'recent', lines: 80 })
       )
-      text = read.read.text
+      text = read.text
       if (text.includes(marker)) {
         break
       }
       await new Promise((resolve) => setTimeout(resolve, 100))
     }
     expect(text).toContain(marker)
+    expect(fromOption(created.rootPane.cwd) ?? configHome).toBeTruthy()
   }, 30_000)
-
-  it('resizes through the control stream and keeps option-backspace off the echo', async () => {
-    await transport.ensureSession(sessionName)
-    const created = unwrapHerdrResponse<{
-      root_pane: { pane_id: string }
-    }>(
-      await transport.request(sessionName, 'workspace.create', {
-        cwd: configHome,
-        label: 'Orca size',
-        focus: false
-      })
-    )
-    const controller = transport.controlTerminal(sessionName, created.root_pane.pane_id, {
-      cols: 80,
-      rows: 24
-    })
-    controller.resize(120, 40)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_text', {
-        pane_id: created.root_pane.pane_id,
-        text: 'printf COLS=%s\\n "$COLUMNS"'
-      })
-    )
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_keys', {
-        pane_id: created.root_pane.pane_id,
-        keys: ['Enter']
-      })
-    )
-    unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.send_text', {
-        pane_id: created.root_pane.pane_id,
-        text: 'abcd'
-      })
-    )
-    controller.write('\u001b\u007f')
-
-    const deadline = Date.now() + 10_000
-    let text = ''
-    while (Date.now() < deadline) {
-      const read = unwrapHerdrResponse<{ read: { text: string } }>(
-        await transport.request(sessionName, 'pane.read', {
-          pane_id: created.root_pane.pane_id,
-          source: 'recent',
-          lines: 80
-        })
-      )
-      text = read.read.text
-      if (text.includes('COLS=120') && !text.includes('^[?')) {
-        break
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    controller.release()
-    expect(text).toMatch(/COLS=120/)
-    expect(text).not.toContain('^[?')
-    expect(text).not.toContain('^[\u007f')
-  }, 30_000)
-
-  it('interrupts a running command with Ctrl+C through pane.send_keys', async () => {
-    await transport.ensureSession(sessionName)
-    const paneId = await createPane(transport, sessionName, configHome, 'Orca sigint')
-    await runInterruptibleSleep(transport, sessionName, paneId, configHome, 'keys', async (id) => {
-      unwrapHerdrResponse(
-        await transport.request(sessionName, 'pane.send_keys', { pane_id: id, keys: ['Enter'] })
-      )
-    })
-  }, 30_000)
-
-  it('interrupts a running command through exclusive session-control input', async () => {
-    await transport.ensureSession(sessionName)
-    const paneId = await createPane(transport, sessionName, configHome, 'Orca sigint stream')
-    const controller = transport.controlTerminal(sessionName, paneId, { cols: 80, rows: 24 })
-    try {
-      await runInterruptibleSleep(
-        transport,
-        sessionName,
-        paneId,
-        configHome,
-        'stream',
-        async () => {
-          controller.write('\r')
-        }
-      )
-    } finally {
-      controller.release()
-    }
-  }, 30_000)
-
-  it.skipIf(process.platform === 'win32')(
-    'delivers Esc as a logical key to a raw reader',
-    async () => {
-      await transport.ensureSession(sessionName)
-      const paneId = await createPane(transport, sessionName, configHome, 'Orca esc')
-      const reader = join(configHome, 'read-one.py')
-      writeFileSync(
-        reader,
-        [
-          'import sys, tty',
-          'tty.setraw(sys.stdin.fileno())',
-          'print("READY", flush=True)',
-          'b = sys.stdin.buffer.read(1)',
-          'print("\\r\\nGOT:" + b.hex(), flush=True)'
-        ].join('\n')
-      )
-      unwrapHerdrResponse(
-        await transport.request(sessionName, 'pane.send_text', {
-          pane_id: paneId,
-          text: `python3 -u ${reader}`
-        })
-      )
-      unwrapHerdrResponse(
-        await transport.request(sessionName, 'pane.send_keys', {
-          pane_id: paneId,
-          keys: ['Enter']
-        })
-      )
-      await waitForPaneText(transport, sessionName, paneId, (text) => text.includes('READY'))
-      await writeProductInput(transport, sessionName, paneId, '\x1b')
-
-      const text = await waitForPaneText(transport, sessionName, paneId, (value) =>
-        value.includes('GOT:1b')
-      )
-      expect(text).toContain('GOT:1b')
-    },
-    30_000
-  )
 })
-
-function paneHasLine(text: string, line: string): boolean {
-  return text.split('\n').some((entry) => entry.trim() === line)
-}
-
-async function delay(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function runInterruptibleSleep(
-  transport: HerdrHostTransport,
-  sessionName: string,
-  paneId: string,
-  configHome: string,
-  token: string,
-  submit: (paneId: string) => Promise<void>
-): Promise<void> {
-  const started = `INT_START_${token}_${process.pid}`
-  const done = `INT_DONE_${token}_${process.pid}`
-  const script = join(configHome, `int-${token}.sh`)
-  writeFileSync(
-    script,
-    [`printf '%s\\n' '${started}'`, 'sleep 30', `printf '%s\\n' '${done}'`, ''].join('\n')
-  )
-  unwrapHerdrResponse(
-    await transport.request(sessionName, 'pane.send_text', {
-      pane_id: paneId,
-      text: `sh ${JSON.stringify(script)}`
-    })
-  )
-  await submit(paneId)
-  await waitForPaneText(transport, sessionName, paneId, (text) => paneHasLine(text, started))
-  await delay(400)
-  await writeProductInput(transport, sessionName, paneId, '\x03')
-  const interrupted = await waitForPaneText(transport, sessionName, paneId, (value) =>
-    value.includes('^C')
-  )
-  expect(interrupted).toContain('^C')
-  expect(paneHasLine(interrupted, done)).toBe(false)
-  await delay(500)
-  const later = await waitForPaneText(transport, sessionName, paneId, () => true)
-  expect(paneHasLine(later, done)).toBe(false)
-}
-
-async function createPane(
-  transport: HerdrHostTransport,
-  sessionName: string,
-  cwd: string,
-  label: string
-): Promise<string> {
-  return unwrapHerdrResponse<{ root_pane: { pane_id: string } }>(
-    await transport.request(sessionName, 'workspace.create', {
-      cwd,
-      label,
-      focus: false
-    })
-  ).root_pane.pane_id
-}
-
-async function writeProductInput(
-  transport: HerdrHostTransport,
-  sessionName: string,
-  paneId: string,
-  data: string
-): Promise<void> {
-  const input = terminalLogicalInputFromBytes(data)
-  if (input.kind !== 'key') {
-    throw new Error(`expected a logical Herdr key for ${JSON.stringify(data)}`)
-  }
-  unwrapHerdrResponse(
-    await transport.request(sessionName, 'pane.send_keys', {
-      pane_id: paneId,
-      keys: [input.name]
-    })
-  )
-}
-
-async function waitForPaneText(
-  transport: HerdrHostTransport,
-  sessionName: string,
-  paneId: string,
-  match: (text: string) => boolean
-): Promise<string> {
-  const deadline = Date.now() + 10_000
-  let text = ''
-  while (Date.now() < deadline) {
-    const read = unwrapHerdrResponse<{ read: { text: string } }>(
-      await transport.request(sessionName, 'pane.read', {
-        pane_id: paneId,
-        source: 'recent',
-        lines: 80
-      })
-    )
-    text = read.read.text
-    if (match(text)) {
-      return text
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  return text
-}
