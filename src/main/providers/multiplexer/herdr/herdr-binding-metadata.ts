@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import type { TerminalPaneLayoutNode } from '../../../../shared/terminal-tab-types'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
-import { HerdrRuntimeError, unwrapHerdrResponse } from './herdr-runtime-contract'
+import { HerdrRuntimeError } from './herdr-runtime-contract'
+import { reportPaneTokens, reportWorkspaceTokens } from './herdr-sdk-ops'
 
 export const ORCA_BINDING_TOKEN = 'orca_binding'
 
@@ -32,8 +33,8 @@ export type ReclaimOrcaPaneBindingOptions = {
 }
 
 type ReclaimableHerdrPane = {
-  pane_id: string
-  workspace_id?: string
+  id: string
+  workspaceId?: string
   tokens?: Record<string, string>
 }
 
@@ -42,7 +43,7 @@ type ReclaimableHerdrPane = {
 export async function reclaimExclusiveOrcaPaneBinding<T extends ReclaimableHerdrPane>(
   transport: HerdrHostTransport,
   sessionName: string,
-  snapshot: { panes: T[] },
+  snapshot: { panes: readonly T[] },
   binding: string,
   options: ReclaimOrcaPaneBindingOptions = {}
 ): Promise<T | null> {
@@ -52,19 +53,10 @@ export async function reclaimExclusiveOrcaPaneBinding<T extends ReclaimableHerdr
   }
   const winner = pickExclusiveOrcaPane(matches, options)
   for (const extra of matches) {
-    if (extra.pane_id === winner.pane_id) {
+    if (extra.id === winner.id) {
       continue
     }
-    await unwrapHerdrResponse(
-      await transport.request(sessionName, 'pane.report_metadata', {
-        pane_id: extra.pane_id,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: null }
-      })
-    )
-    if (extra.tokens) {
-      delete extra.tokens[ORCA_BINDING_TOKEN]
-    }
+    await reportPaneTokens(transport, sessionName, extra.id, { [ORCA_BINDING_TOKEN]: null })
   }
   return winner
 }
@@ -74,16 +66,16 @@ function pickExclusiveOrcaPane<T extends ReclaimableHerdrPane>(
   options: ReclaimOrcaPaneBindingOptions
 ): T {
   if (options.preferredPaneId) {
-    const preferred = matches.find((pane) => pane.pane_id === options.preferredPaneId)
+    const preferred = matches.find((pane) => pane.id === options.preferredPaneId)
     if (preferred) {
       return preferred
     }
   }
   const scoped = options.workspaceId
-    ? matches.filter((pane) => pane.workspace_id === options.workspaceId)
+    ? matches.filter((pane) => pane.workspaceId === options.workspaceId)
     : matches
   const pool = scoped.length > 0 ? scoped : matches
-  return [...pool].sort((left, right) => left.pane_id.localeCompare(right.pane_id))[0]
+  return [...pool].sort((left, right) => left.id.localeCompare(right.id))[0]
 }
 
 export function orcaPaneBinding(projectId: string, leafId: string): string {
@@ -101,10 +93,8 @@ export function paneBindingMapKey(sessionName: string, binding: string): string 
   return `${sessionName}:${binding}`
 }
 
-export function terminalLeafIds(snapshot: {
-  panes: { leafId?: string; pane_id: string }[]
-}): string[] {
-  return snapshot.panes.map((p) => p.leafId ?? p.pane_id)
+export function terminalLeafIds(snapshot: { panes: { leafId?: string; id: string }[] }): string[] {
+  return snapshot.panes.map((p) => p.leafId ?? p.id)
 }
 
 export function collectLeafIds(node: TerminalPaneLayoutNode): string[] {
@@ -124,13 +114,13 @@ export function collectLeafIds(node: TerminalPaneLayoutNode): string[] {
 export function recoverPaneIdsFromStockLayout(
   root: TerminalPaneLayoutNode,
   snapshot: {
-    workspace_id: string
-    tab_id: string
-    panes: { pane_id: string; rect: { x: number; y: number; width: number; height: number } }[]
+    workspaceId: string
+    tabId: string
+    panes: { paneId: string; rect: { x: number; y: number; width: number; height: number } }[]
   }
 ): Map<string, string> | null {
   if (root.type === 'leaf') {
-    return snapshot.panes.length === 1 ? new Map([[root.leafId, snapshot.panes[0].pane_id]]) : null
+    return snapshot.panes.length === 1 ? new Map([[root.leafId, snapshot.panes[0].paneId]]) : null
   }
   if (root.first.type !== 'leaf' || root.second.type !== 'leaf' || snapshot.panes.length !== 2) {
     return null
@@ -150,8 +140,8 @@ export function recoverPaneIdsFromStockLayout(
   }
 
   const recovered = new Map<string, string>()
-  recovered.set(root.first.leafId, sortedPanes[0].pane_id)
-  recovered.set(root.second.leafId, sortedPanes[1].pane_id)
+  recovered.set(root.first.leafId, sortedPanes[0].paneId)
+  recovered.set(root.second.leafId, sortedPanes[1].paneId)
 
   return recovered
 }
@@ -162,7 +152,7 @@ export async function restoreOrcaPaneBindings(
   projectId: string,
   root: TerminalPaneLayoutNode,
   _tabId: string,
-  snapshot: { panes: { pane_id: string; tokens?: Record<string, string> }[] },
+  snapshot: { panes: readonly { id: string; tokens?: Record<string, string> }[] },
   recovered: Record<string, string> | Map<string, string> | null
 ): Promise<void> {
   const leafIds: string[] = []
@@ -190,17 +180,11 @@ export async function restoreOrcaPaneBindings(
       continue
     }
 
-    const pane = snapshot.panes.find((p) => p.pane_id === paneId)
+    const pane = snapshot.panes.find((p) => p.id === paneId)
     if (pane && pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
       await claimOrcaPaneBinding(transport, sessionName, projectId, leafId, pane, snapshot)
     } else if (!pane) {
-      await unwrapHerdrResponse(
-        await transport.request(sessionName, 'pane.report_metadata', {
-          pane_id: paneId,
-          source: ORCA_METADATA_SOURCE,
-          tokens: { [ORCA_BINDING_TOKEN]: binding }
-        })
-      )
+      await reportPaneTokens(transport, sessionName, paneId, { [ORCA_BINDING_TOKEN]: binding })
     }
     await reclaimExclusiveOrcaPaneBinding(transport, sessionName, snapshot, binding, {
       preferredPaneId: paneId
@@ -213,28 +197,18 @@ export async function claimOrcaPaneBinding(
   sessionName: string,
   projectId: string,
   leafId: string,
-  pane: { pane_id: string; tokens?: Record<string, string> },
-  snapshot: { panes: { pane_id: string; tokens?: Record<string, string> }[] }
-): Promise<void> {
+  pane: { id: string; tokens?: Record<string, string> },
+  snapshot: { panes: readonly { id: string; tokens?: Record<string, string> }[] }
+): Promise<boolean> {
   const binding = orcaPaneBinding(projectId, leafId)
   if (pane.tokens?.[ORCA_BINDING_TOKEN] === binding) {
-    return
+    return true
   }
-  if (
-    snapshot.panes.some(
-      (c) => c.pane_id !== pane.pane_id && c.tokens?.[ORCA_BINDING_TOKEN] === binding
-    )
-  ) {
-    return
+  if (snapshot.panes.some((c) => c.id !== pane.id && c.tokens?.[ORCA_BINDING_TOKEN] === binding)) {
+    return false
   }
-  await unwrapHerdrResponse(
-    await transport.request(sessionName, 'pane.report_metadata', {
-      pane_id: pane.pane_id,
-      source: ORCA_METADATA_SOURCE,
-      tokens: { [ORCA_BINDING_TOKEN]: binding }
-    })
-  )
-  pane.tokens = { ...pane.tokens, [ORCA_BINDING_TOKEN]: binding }
+  await reportPaneTokens(transport, sessionName, pane.id, { [ORCA_BINDING_TOKEN]: binding })
+  return true
 }
 
 export async function reportOrcaWorkspaceBinding(
@@ -243,25 +217,21 @@ export async function reportOrcaWorkspaceBinding(
   workspaceId: string,
   binding: string
 ): Promise<void> {
-  await unwrapHerdrResponse(
-    await transport.request(sessionName, 'workspace.report_metadata', {
-      workspace_id: workspaceId,
-      source: ORCA_METADATA_SOURCE,
-      tokens: { [ORCA_BINDING_TOKEN]: binding }
-    })
-  )
+  await reportWorkspaceTokens(transport, sessionName, workspaceId, {
+    [ORCA_BINDING_TOKEN]: binding
+  })
 }
 
 export function rememberOrcaPaneBindings(
   paneIdsBySessionAndBinding: Map<string, string>,
   sessionName: string,
   _projectId: string,
-  snapshot: { panes: { pane_id: string; tokens?: Record<string, string> }[] }
+  snapshot: { panes: readonly { id: string; tokens?: Record<string, string> }[] }
 ): void {
   for (const pane of snapshot.panes) {
     const token = pane.tokens?.[ORCA_BINDING_TOKEN]
     if (token) {
-      paneIdsBySessionAndBinding.set(paneBindingMapKey(sessionName, token), pane.pane_id)
+      paneIdsBySessionAndBinding.set(paneBindingMapKey(sessionName, token), pane.id)
     }
   }
 }

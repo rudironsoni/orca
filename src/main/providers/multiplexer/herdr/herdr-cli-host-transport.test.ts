@@ -1,18 +1,18 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { localHerdrCommand } from './herdr-cli-session'
+import { HerdrSdkHost } from './herdr-sdk-host'
+import type { HerdrSdkRuntime } from './herdr-sdk-runtime'
 
-const { runProcessMock, spawnProcessMock } = vi.hoisted(() => ({
-  runProcessMock: vi.fn(),
+const { spawnProcessMock } = vi.hoisted(() => ({
   spawnProcessMock: vi.fn()
 }))
 vi.mock('../../../../shared/child-process/run-process', () => ({
-  runProcess: runProcessMock,
+  runProcess: vi.fn(),
   spawnProcess: spawnProcessMock
 }))
 
 beforeEach(() => {
-  runProcessMock.mockReset()
   spawnProcessMock.mockReset()
 })
 
@@ -43,71 +43,22 @@ function createChild(): MockChild {
   return child as unknown as MockChild
 }
 
-async function loadTransport() {
-  const { HerdrCliHostTransport } = await import('./herdr-cli-session')
-  const transport = new HerdrCliHostTransport({
+function loadTransport() {
+  const sdk = {
+    run: vi.fn(),
+    subscribe: vi.fn(() => () => undefined),
+    ping: vi.fn(async () => undefined),
+    dispose: vi.fn(async () => undefined)
+  } as unknown as HerdrSdkRuntime
+  return new HerdrSdkHost({
+    sdk,
     commandFor: localHerdrCommand('/mock/herdr')
   })
-  return transport
 }
 
-describe('HerdrCliHostTransport', () => {
-  it('polls CLI snapshots and emits only real snapshot changes', async () => {
-    vi.useFakeTimers()
-    const transport = await loadTransport()
-    const request = vi.spyOn(transport, 'request')
-    request
-      .mockResolvedValueOnce({ id: 'first', result: { panes: [{ pane_id: 'p1' }] } })
-      .mockResolvedValueOnce({ id: 'second', result: { panes: [{ pane_id: 'p1' }] } })
-      .mockResolvedValueOnce({ id: 'third', result: { panes: [{ pane_id: 'p2' }] } })
-    const events: string[] = []
-    transport.onEvent((event) => events.push(event.event))
-
-    ;(
-      transport as unknown as { eventPoller: { start(sessionName: string): void } }
-    ).eventPoller.start('main')
-    await vi.advanceTimersByTimeAsync(0)
-    await vi.advanceTimersByTimeAsync(500)
-    expect(events).toEqual([])
-    await vi.advanceTimersByTimeAsync(500)
-    expect(events).toEqual(['session.snapshot_changed'])
-
-    await transport.disconnect()
-    await vi.advanceTimersByTimeAsync(2_000)
-    expect(request).toHaveBeenCalledTimes(3)
-  })
-
-  it('parses a JSON response from herdr stdout', async () => {
-    const transport = await loadTransport()
-    runProcessMock.mockResolvedValue({
-      code: 0,
-      signal: null,
-      stdout: JSON.stringify({ id: '1', result: { sessions: [] } }),
-      stderr: '',
-      timedOut: false
-    })
-    await expect(transport.request('main', 'session.snapshot', {})).resolves.toEqual({
-      id: '1',
-      result: { sessions: [] }
-    })
-  })
-
-  it('rejects an invalid response from herdr', async () => {
-    const transport = await loadTransport()
-    runProcessMock.mockResolvedValue({
-      code: 0,
-      signal: null,
-      stdout: 'not json',
-      stderr: '',
-      timedOut: false
-    })
-    await expect(transport.request('main', 'session.snapshot', {})).rejects.toMatchObject({
-      code: 'herdr_invalid_response'
-    })
-  })
-
+describe('HerdrSdkHost terminal control', () => {
   it('streams terminal frames and buffers them until subscribed', async () => {
-    const transport = await loadTransport()
+    const transport = loadTransport()
     const child = createChild()
     spawnProcessMock.mockReturnValue(child)
 
@@ -120,7 +71,7 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('emits closed on a terminal.closed frame', async () => {
-    const transport = await loadTransport()
+    const transport = loadTransport()
     const child = createChild()
     spawnProcessMock.mockReturnValue(child)
 
@@ -132,7 +83,7 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('sends input, resize, and release over stdin', async () => {
-    const transport = await loadTransport()
+    const transport = loadTransport()
     const child = createChild()
     spawnProcessMock.mockReturnValue(child)
 
@@ -151,7 +102,7 @@ describe('HerdrCliHostTransport', () => {
   })
 
   it('emits closed when the child exits without releasing', async () => {
-    const transport = await loadTransport()
+    const transport = loadTransport()
     const child = createChild()
     spawnProcessMock.mockReturnValue(child)
 

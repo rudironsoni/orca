@@ -1,12 +1,8 @@
 import type { TerminalPaneLayoutNode, TerminalTab } from '../../../../shared/terminal-tab-types'
 import { firstTerminalLeafId } from '../../../../shared/horca/herdr-session-identity'
-import type {
-  HerdrHostTransport,
-  HerdrPane,
-  HerdrSessionSnapshot,
-  HerdrTab
-} from './herdr-runtime-contract'
-import { HerdrRuntimeError, unwrapHerdrResponse } from './herdr-runtime-contract'
+import type { HerdrHostTransport, HerdrSessionSnapshot, HerdrTab } from './herdr-runtime-contract'
+import { HerdrRuntimeError } from './herdr-runtime-contract'
+import { closeHerdrTab, renameHerdrTab } from './herdr-sdk-ops'
 import {
   claimOrcaPaneBinding,
   collectLeafIds,
@@ -35,7 +31,7 @@ function tabBoundToOtherLeaf(
 ): boolean {
   return snapshot.panes.some(
     (pane) =>
-      pane.tab_id === tabId &&
+      pane.tabId === tabId &&
       pane.tokens?.[ORCA_BINDING_TOKEN] !== undefined &&
       pane.tokens[ORCA_BINDING_TOKEN] !== rootBinding
   )
@@ -57,13 +53,7 @@ export async function syncHerdrTabLabel(
   if (!title || herdrTab.label === title) {
     return
   }
-  unwrapHerdrResponse(
-    await transport.request(sessionName, 'tab.rename', {
-      tab_id: herdrTab.tab_id,
-      label: title
-    })
-  )
-  herdrTab.label = title
+  await renameHerdrTab(transport, sessionName, herdrTab.id, title)
 }
 
 export async function closeUnboundStockHerdrTabs(
@@ -74,19 +64,17 @@ export async function closeUnboundStockHerdrTabs(
 ): Promise<void> {
   const boundTabIds = new Set(
     snapshot.panes
-      .filter((pane) => pane.workspace_id === workspaceId && pane.tokens?.[ORCA_BINDING_TOKEN])
-      .map((pane) => pane.tab_id)
+      .filter((pane) => pane.workspaceId === workspaceId && pane.tokens?.[ORCA_BINDING_TOKEN])
+      .map((pane) => pane.tabId)
   )
   if (boundTabIds.size === 0) {
     return
   }
-  for (const tab of snapshot.tabs.filter((candidate) => candidate.workspace_id === workspaceId)) {
-    if (boundTabIds.has(tab.tab_id) || !isStockHerdrDefaultTabLabel(tab.label)) {
+  for (const tab of snapshot.tabs.filter((candidate) => candidate.workspaceId === workspaceId)) {
+    if (boundTabIds.has(tab.id) || !isStockHerdrDefaultTabLabel(tab.label)) {
       continue
     }
-    unwrapHerdrResponse(await transport.request(sessionName, 'tab.close', { tab_id: tab.tab_id }))
-    snapshot.tabs = snapshot.tabs.filter((candidate) => candidate.tab_id !== tab.tab_id)
-    snapshot.panes = snapshot.panes.filter((pane) => pane.tab_id !== tab.tab_id)
+    await closeHerdrTab(transport, sessionName, tab.id)
   }
 }
 
@@ -100,7 +88,7 @@ function hintedSplitIsLive(
     const paneId = persistedPaneIds[leafId]
     return Boolean(
       paneId &&
-      snapshot.panes.some((pane) => pane.pane_id === paneId && pane.workspace_id === workspaceId)
+      snapshot.panes.some((pane) => pane.id === paneId && pane.workspaceId === workspaceId)
     )
   })
 }
@@ -135,26 +123,26 @@ export async function ensureTabLayout(
   const hintedPane = collectLeafIds(root)
     .map((leafId) => persistedPaneIds[leafId])
     .filter((paneId): paneId is string => Boolean(paneId))
-    .map((paneId) => snapshot.panes.find((pane) => pane.pane_id === paneId))
-    .find((pane) => pane?.workspace_id === workspaceId)
+    .map((paneId) => snapshot.panes.find((pane) => pane.id === paneId))
+    .find((pane) => pane?.workspaceId === workspaceId)
   let herdrTab = rootPane
-    ? snapshot.tabs.find((candidate) => candidate.tab_id === rootPane?.tab_id)
-    : snapshot.tabs.find((candidate) => candidate.tab_id === hintedPane?.tab_id)
+    ? snapshot.tabs.find((candidate) => candidate.id === rootPane?.tabId)
+    : snapshot.tabs.find((candidate) => candidate.id === hintedPane?.tabId)
 
   if (!herdrTab) {
     const expectedLabel = tab.customTitle ?? tab.title
     herdrTab =
       findUniqueHerdrMatch(
         snapshot.tabs,
-        (candidate) => candidate.workspace_id === workspaceId && candidate.label === expectedLabel,
+        (candidate) => candidate.workspaceId === workspaceId && candidate.label === expectedLabel,
         `tab label ${expectedLabel}`
       ) ?? undefined
-    if (herdrTab && tabBoundToOtherLeaf(snapshot, herdrTab.tab_id, rootBinding)) {
+    if (herdrTab && tabBoundToOtherLeaf(snapshot, herdrTab.id, rootBinding)) {
       herdrTab = undefined
     }
     if (herdrTab) {
       const untaggedPanes = snapshot.panes.filter(
-        (pane) => pane.tab_id === herdrTab?.tab_id && !pane.tokens?.[ORCA_BINDING_TOKEN]
+        (pane) => pane.tabId === herdrTab?.id && !pane.tokens?.[ORCA_BINDING_TOKEN]
       )
       rootPane = untaggedPanes.length === 1 ? untaggedPanes[0] : null
     }
@@ -164,12 +152,10 @@ export async function ensureTabLayout(
   // persists title "1", so label match fails and tab.create would duplicate.
   // A tab already bound to another leaf is not leftover — mint a new tab.
   if (!herdrTab) {
-    const workspaceTabs = snapshot.tabs.filter(
-      (candidate) => candidate.workspace_id === workspaceId
-    )
+    const workspaceTabs = snapshot.tabs.filter((candidate) => candidate.workspaceId === workspaceId)
     if (workspaceTabs.length === 1) {
       const only = workspaceTabs[0]
-      if (!tabBoundToOtherLeaf(snapshot, only.tab_id, rootBinding)) {
+      if (!tabBoundToOtherLeaf(snapshot, only.id, rootBinding)) {
         herdrTab = only
       }
     }
@@ -181,7 +167,7 @@ export async function ensureTabLayout(
       sessionName,
       projectId,
       root,
-      herdrTab.tab_id,
+      herdrTab.id,
       snapshot,
       persistedPaneIds
     )
@@ -194,12 +180,12 @@ export async function ensureTabLayout(
     // no untagged pane to adopt. Reclaim the tab's first pane and move the
     // binding to it; the daemon enforces single-owner tokens so the stale
     // holder drops the key.
-    const tabPane = snapshot.panes.find((pane) => pane.tab_id === herdrTab?.tab_id)
+    const tabPane = snapshot.panes.find((pane) => pane.tabId === herdrTab?.id)
     if (tabPane) {
       await clearPaneBindings(
         transport,
         sessionName,
-        snapshot.panes.filter((pane) => pane.tab_id === herdrTab?.tab_id)
+        snapshot.panes.filter((pane) => pane.tabId === herdrTab?.id)
       )
       await claimOrcaPaneBinding(transport, sessionName, projectId, rootLeafId, tabPane, snapshot)
       rootPane = tabPane
@@ -207,24 +193,22 @@ export async function ensureTabLayout(
   }
 
   if (!herdrTab) {
-    const created = unwrapHerdrResponse<{ tab: HerdrTab; root_pane: HerdrPane }>(
-      await transport.request(sessionName, 'tab.create', {
-        workspace_id: workspaceId,
+    const created = await transport.sdk.run(sessionName, (herdr) =>
+      herdr.tabs.create({
+        workspaceId,
         cwd: tab.startupCwd,
         label: tab.customTitle ?? tab.title,
         focus: false
       })
     )
     herdrTab = created.tab
-    rootPane = created.root_pane
-    snapshot.tabs.push(created.tab)
-    snapshot.panes.push(created.root_pane)
+    rootPane = created.rootPane
   }
 
   if (!rootPane) {
     throw new HerdrRuntimeError(
       'herdr_binding_ambiguous',
-      `Cannot identify a root pane for stock Herdr tab ${herdrTab.tab_id}`
+      `Cannot identify a root pane for stock Herdr tab ${herdrTab.id}`
     )
   }
   if (rootPane.tokens?.[ORCA_BINDING_TOKEN] !== rootBinding) {
@@ -242,7 +226,7 @@ export async function ensureTabLayout(
       sessionName,
       projectId,
       root,
-      herdrTab.tab_id,
+      herdrTab.id,
       snapshot,
       persistedPaneIds
     )
@@ -258,11 +242,11 @@ export async function ensureTabLayout(
     tab,
     root,
     snapshot,
-    herdrTab.tab_id
+    herdrTab.id
   )
   if (applied) {
     Object.assign(persistedPaneIds, Object.fromEntries(applied))
   } else {
-    await ensureTabSplits(transport, sessionName, projectId, root, rootPane.pane_id, snapshot)
+    await ensureTabSplits(transport, sessionName, projectId, root, rootPane.id, snapshot)
   }
 }
