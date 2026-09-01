@@ -91,7 +91,7 @@ export async function bindSpawnLeafPane(args: {
     layoutRoot && collectLeafIds(layoutRoot).includes(args.identity.leafId)
       ? layoutRoot
       : { type: 'leaf' as const, leafId: args.identity.leafId }
-  const workspace = await ensureStockHerdrWorkspace(
+  const ensured = await ensureStockHerdrWorkspace(
     args.transport,
     args.sessionName,
     args.graph.project.id,
@@ -101,6 +101,7 @@ export async function bindSpawnLeafPane(args: {
     snapshot,
     args.liveWorkspaceBindings
   )
+  const workspace = ensured.workspace
   args.graph.persistedPaneIdsByLeafId ??= {}
   let liveSnapshot = await args.snapshot()
   await ensureTabLayout(
@@ -111,7 +112,9 @@ export async function bindSpawnLeafPane(args: {
     tab,
     root,
     liveSnapshot,
-    args.graph.persistedPaneIdsByLeafId
+    args.graph.persistedPaneIdsByLeafId,
+    { tab: ensured.seedTab, pane: ensured.seedPane },
+    (args.graph.tabsByWorktreeId[worktree.id] ?? []).length <= 1
   )
   liveSnapshot = await args.snapshot()
   const livePaneBindings = desiredLeafBindings(args.graph.project.id, args.graph)
@@ -127,7 +130,7 @@ export async function bindSpawnLeafPane(args: {
     args.paneIdsBySessionAndBinding,
     args.sessionName,
     args.graph.project.id,
-    snapshot
+    liveSnapshot
   )
   const binding = orcaPaneBinding(args.identity.projectId, args.identity.leafId)
   return args.paneIdsBySessionAndBinding.get(paneBindingMapKey(args.sessionName, binding)) ?? null
