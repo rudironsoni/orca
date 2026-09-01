@@ -4,7 +4,6 @@ import {
   claimOrcaPaneBinding,
   collectLeafIds,
   ORCA_BINDING_TOKEN,
-  ORCA_METADATA_SOURCE,
   orcaPaneBinding,
   paneBindingMapKey,
   rememberOrcaPaneBindings
@@ -15,7 +14,7 @@ import {
   type HerdrProjectHostGraph
 } from './ensure-herdr-workspace'
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
+import { reportPaneTokens } from './herdr-sdk-ops'
 import { ensureTabLayout } from './herdr-tab-layout'
 
 export async function materializeHerdrLeafPane(args: {
@@ -35,7 +34,7 @@ export async function materializeHerdrLeafPane(args: {
   const workspace = findHerdrWorkspaceForWorktree(snapshot, args.project.id, worktree)
   const claimedPaneIds = new Set(args.paneIdsBySessionAndBinding.values())
   const workspacePanes = snapshot.panes.filter(
-    (pane) => workspace && pane.workspace_id === workspace.workspace_id
+    (pane) => workspace && pane.workspaceId === workspace.id
   )
   // Why: the Orca session is the only authority on which panes exist. A bare
   // pane is reusable, and a pane whose orca_binding names a leaf the session
@@ -49,13 +48,13 @@ export async function materializeHerdrLeafPane(args: {
   if (alreadyMine) {
     args.paneIdsBySessionAndBinding.set(
       paneBindingMapKey(args.sessionName, selfBinding),
-      alreadyMine.pane_id
+      alreadyMine.id
     )
-    return alreadyMine.pane_id
+    return alreadyMine.id
   }
   const reusable =
     workspacePanes.find(
-      (pane) => !claimedPaneIds.has(pane.pane_id) && !pane.tokens?.[ORCA_BINDING_TOKEN]
+      (pane) => !claimedPaneIds.has(pane.id) && !pane.tokens?.[ORCA_BINDING_TOKEN]
     ) ??
     workspacePanes.find((pane) => {
       const token = pane.tokens?.[ORCA_BINDING_TOKEN]
@@ -107,7 +106,7 @@ export async function bindSpawnLeafPane(args: {
     args.transport,
     args.sessionName,
     args.graph.project.id,
-    workspace.workspace_id,
+    workspace.id,
     tab,
     root,
     snapshot,
@@ -172,16 +171,11 @@ async function claimMaterializedPane(
   const binding = orcaPaneBinding(args.project.id, args.leafId)
   const staleToken = pane.tokens?.[ORCA_BINDING_TOKEN]
   if (staleToken !== undefined && staleToken !== binding) {
-    await unwrapHerdrResponse(
-      await args.transport.request(args.sessionName, 'pane.report_metadata', {
-        pane_id: pane.pane_id,
-        source: ORCA_METADATA_SOURCE,
-        tokens: { [ORCA_BINDING_TOKEN]: null }
-      })
-    )
-    delete pane.tokens?.[ORCA_BINDING_TOKEN]
+    await reportPaneTokens(args.transport, args.sessionName, pane.id, {
+      [ORCA_BINDING_TOKEN]: null
+    })
   }
-  await claimOrcaPaneBinding(
+  const claimed = await claimOrcaPaneBinding(
     args.transport,
     args.sessionName,
     args.project.id,
@@ -189,9 +183,9 @@ async function claimMaterializedPane(
     pane,
     snapshot
   )
-  if (pane.tokens?.[ORCA_BINDING_TOKEN] !== binding) {
+  if (!claimed) {
     return null
   }
-  args.paneIdsBySessionAndBinding.set(paneBindingMapKey(args.sessionName, binding), pane.pane_id)
-  return pane.pane_id
+  args.paneIdsBySessionAndBinding.set(paneBindingMapKey(args.sessionName, binding), pane.id)
+  return pane.id
 }

@@ -40,7 +40,7 @@ export async function startHerdrAgentIfRequested(args: {
   sessionName: string
   leafId: string
   paneId: string
-  request: (sessionName: string, method: string, params: unknown) => Promise<unknown>
+  startAgent: (input: { name: string; kind: string; paneId: string }) => Promise<unknown>
   writeCommand: (text: string) => void
 }): Promise<void> {
   if (args.sessionId) {
@@ -48,10 +48,10 @@ export async function startHerdrAgentIfRequested(args: {
   }
   const kind = herdrAgentKind(args.launchAgent)
   if (kind) {
-    await args.request(args.sessionName, 'agent.start', {
+    await args.startAgent({
       name: herdrAgentName(args.leafId),
       kind,
-      pane_id: args.paneId
+      paneId: args.paneId
     })
     return
   }

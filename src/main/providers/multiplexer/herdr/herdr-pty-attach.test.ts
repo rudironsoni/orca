@@ -6,6 +6,7 @@ import {
   openSharedHerdrPaneController,
   writeSharedHerdrInput
 } from './herdr-pty-attach'
+import { handlerTransport } from './herdr-sdk-test-host'
 
 describe('openSharedHerdrPaneController', () => {
   it('observes so a Herdr TUI can keep exclusive control', () => {
@@ -99,15 +100,17 @@ describe('applyHerdrPaneSize', () => {
 
 describe('writeSharedHerdrInput', () => {
   it('types through pane.send_text so observe does not steal exclusive control', async () => {
-    const request = vi.fn(async () => ({ id: '1', result: { type: 'ok' } }))
+    const { transport, requestMock } = handlerTransport({
+      'pane.send_text': () => undefined
+    })
     const binding = {
       sessionName: 'orca',
       paneId: 'w1:p1',
-      transport: { request }
+      transport
     } as unknown as HerdrPtyBinding
     await writeSharedHerdrInput(binding, 'hello')
-    expect(request).toHaveBeenCalledWith('orca', 'pane.send_text', {
-      pane_id: 'w1:p1',
+    expect(requestMock).toHaveBeenCalledWith('orca', 'pane.send_text', {
+      paneId: 'w1:p1',
       text: 'hello'
     })
   })

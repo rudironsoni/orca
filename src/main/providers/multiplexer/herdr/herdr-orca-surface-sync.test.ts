@@ -5,7 +5,12 @@ import {
   herdrLayoutToOrcaLayout,
   resolveHerdrPaneIdentities
 } from './herdr-orca-surface-actions'
-import { HERDR_PROTOCOL_VERSION, type HerdrSessionSnapshot } from './herdr-runtime-contract'
+import {
+  asSessionSnapshot,
+  testLayout,
+  testSnapshot,
+  type LooseRecord
+} from './herdr-sdk-test-snapshot'
 import type { Project } from '../../../../shared/project-types'
 
 const project: Project = {
@@ -17,17 +22,8 @@ const project: Project = {
   updatedAt: 1
 }
 
-function snapshot(overrides: Partial<HerdrSessionSnapshot> = {}): HerdrSessionSnapshot {
-  return {
-    version: '0.8.2',
-    protocol: HERDR_PROTOCOL_VERSION,
-    workspaces: [],
-    tabs: [],
-    panes: [],
-    layouts: [],
-    agents: [],
-    ...overrides
-  }
+function snapshot(overrides: LooseRecord = {}) {
+  return asSessionSnapshot(testSnapshot(overrides))
 }
 
 const identities = new Map([['w1:p1', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }]])
@@ -115,7 +111,7 @@ describe('herdrLayoutToOrcaLayout', () => {
       ['w1:p2', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-2' }]
     ])
     const layout = herdrLayoutToOrcaLayout(
-      {
+      testLayout({
         workspace_id: 'w1',
         tab_id: 'w1:t1',
         focused_pane_id: 'w1:p1',
@@ -126,7 +122,7 @@ describe('herdrLayoutToOrcaLayout', () => {
         splits: [
           { id: 's1', direction: 'right', ratio: 0.4, rect: { x: 0, y: 0, width: 80, height: 20 } }
         ]
-      },
+      }),
       two
     )
     expect(layout).toEqual({
