@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { runProcessSync } from '../../../../shared/child-process/run-process'
 
 /** Resolve a stock herdr binary for live tests: explicit env, then PATH. */
-export function resolveProtocolCompatibleHerdrTestBinary(protocol: number): string | null {
+export function resolveProtocolCompatibleHerdrTestBinary(
+  protocol: number | readonly number[]
+): string | null {
   const binary = resolveStockHerdrTestBinary()
   if (!binary) {
     return null
   }
+  const accepted = typeof protocol === 'number' ? [protocol] : protocol
   try {
     const result = runProcessSync({
       program: binary,
@@ -17,7 +20,11 @@ export function resolveProtocolCompatibleHerdrTestBinary(protocol: number): stri
       maxOutputBytes: 2 * 1024 * 1024
     })
     const schema = JSON.parse(result.stdout) as { protocol?: unknown }
-    return result.code === 0 && schema.protocol === protocol ? binary : null
+    return result.code === 0 &&
+      typeof schema.protocol === 'number' &&
+      accepted.includes(schema.protocol)
+      ? binary
+      : null
   } catch {
     return null
   }
