@@ -61,21 +61,20 @@ export async function closeUnboundStockHerdrTabs(
   transport: HerdrHostTransport,
   sessionName: string,
   workspaceId: string,
-  snapshot: HerdrSessionSnapshot
+  snapshot: HerdrSessionSnapshot,
+  livePaneBindings: ReadonlySet<string>
 ): Promise<void> {
-  const boundTabIds = new Set(
-    snapshot.panes
-      .filter((pane) => pane.workspaceId === workspaceId && pane.tokens?.[ORCA_BINDING_TOKEN])
-      .map((pane) => pane.tabId)
-  )
-  if (boundTabIds.size === 0) {
-    return
-  }
   for (const tab of snapshot.tabs.filter((candidate) => candidate.workspaceId === workspaceId)) {
-    if (boundTabIds.has(tab.id) || !isStockHerdrDefaultTabLabel(tab.label)) {
-      continue
+    const live = snapshot.panes.some((pane) => {
+      if (pane.tabId !== tab.id) {
+        return false
+      }
+      const token = pane.tokens?.[ORCA_BINDING_TOKEN]
+      return token !== undefined && livePaneBindings.has(token)
+    })
+    if (!live) {
+      await closeHerdrTab(transport, sessionName, tab.id)
     }
-    await closeHerdrTab(transport, sessionName, tab.id)
   }
 }
 
