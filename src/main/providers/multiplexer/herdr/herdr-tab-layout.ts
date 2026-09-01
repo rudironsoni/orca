@@ -19,16 +19,14 @@ import {
 } from './herdr-binding-metadata'
 import { applyTabLayout, clearPaneBindings, ensureTabSplits } from './herdr-tab-layout-apply'
 import { herdrOptionalCwd } from './herdr-sdk-values'
+import { orcaTabTitle } from './herdr-tab-title'
 export {
   applyTabLayout,
   collectHerdrPaneIds,
   ensureTabSplits,
   terminalLayoutToHerdrLayout
 } from './herdr-tab-layout-apply'
-
-export function orcaTabTitle(tab: { title: string; customTitle?: string | null }): string {
-  return tab.customTitle ?? tab.title
-}
+export { isStockHerdrDefaultTabLabel, nextOrcaTerminalTitle, orcaTabTitle } from './herdr-tab-title'
 
 function tabBoundToOtherLeaf(
   snapshot: HerdrSessionSnapshot,
@@ -41,13 +39,6 @@ function tabBoundToOtherLeaf(
       pane.tokens?.[ORCA_BINDING_TOKEN] !== undefined &&
       pane.tokens[ORCA_BINDING_TOKEN] !== rootBinding
   )
-}
-
-export function isStockHerdrDefaultTabLabel(label: string | undefined): boolean {
-  if (!label) {
-    return false
-  }
-  return label === '1' || label === 'Terminal' || /^leaf-[0-9a-f-]{8,}$/i.test(label)
 }
 
 export async function syncHerdrTabLabel(
@@ -110,7 +101,8 @@ export async function ensureTabLayout(
   snapshot: HerdrSessionSnapshot,
   persistedPaneIds: Record<string, string>,
   seed?: { tab?: HerdrTab; pane?: HerdrPane },
-  adoptExisting = false
+  adoptExisting = false,
+  siblings: readonly TerminalTab[] = []
 ): Promise<void> {
   if (seed?.tab && !snapshot.tabs.some((candidate) => candidate.id === seed.tab?.id)) {
     snapshot = { ...snapshot, tabs: [...snapshot.tabs, seed.tab] }
@@ -118,6 +110,7 @@ export async function ensureTabLayout(
   if (seed?.pane && !snapshot.panes.some((candidate) => candidate.id === seed.pane?.id)) {
     snapshot = { ...snapshot, panes: [...snapshot.panes, seed.pane] }
   }
+  const desiredLabel = orcaTabTitle(tab, siblings)
   const rootLeafId = firstTerminalLeafId(root)
   if (!rootLeafId) {
     return
@@ -143,12 +136,11 @@ export async function ensureTabLayout(
     : snapshot.tabs.find((candidate) => candidate.id === hintedPane?.tabId)
 
   if (!herdrTab) {
-    const expectedLabel = tab.customTitle ?? tab.title
     herdrTab =
       findUniqueHerdrMatch(
         snapshot.tabs,
-        (candidate) => candidate.workspaceId === workspaceId && candidate.label === expectedLabel,
-        `tab label ${expectedLabel}`
+        (candidate) => candidate.workspaceId === workspaceId && candidate.label === desiredLabel,
+        `tab label ${desiredLabel}`
       ) ?? undefined
     if (herdrTab && tabBoundToOtherLeaf(snapshot, herdrTab.id, rootBinding)) {
       herdrTab = undefined
@@ -211,7 +203,7 @@ export async function ensureTabLayout(
       herdr.tabs.create({
         workspaceId,
         ...herdrOptionalCwd(tab.startupCwd),
-        label: tab.customTitle ?? tab.title,
+        label: desiredLabel,
         focus: false
       })
     )
@@ -228,7 +220,7 @@ export async function ensureTabLayout(
   if (rootPane.tokens?.[ORCA_BINDING_TOKEN] !== rootBinding) {
     await claimOrcaPaneBinding(transport, sessionName, projectId, rootLeafId, rootPane, snapshot)
   }
-  await syncHerdrTabLabel(transport, sessionName, herdrTab, orcaTabTitle(tab))
+  await syncHerdrTabLabel(transport, sessionName, herdrTab, desiredLabel)
   if (root.type === 'leaf') {
     return
   }

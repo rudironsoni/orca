@@ -15,7 +15,6 @@ import {
   orcaWorkspaceBinding,
   reportOrcaWorkspaceBinding
 } from './herdr-binding-metadata'
-import { herdrOptionalCwd } from './herdr-sdk-values'
 import type {
   HerdrHostTransport,
   HerdrPane,
@@ -24,7 +23,7 @@ import type {
   HerdrWorkspace
 } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
-import { herdrCheckoutPath } from './herdr-sdk-values'
+import { herdrCheckoutPath, herdrOptionalCwd } from './herdr-sdk-values'
 import { orcaTabTitle, syncHerdrTabLabel } from './herdr-tab-layout'
 
 export type HerdrWorktreeDescriptor = Pick<
