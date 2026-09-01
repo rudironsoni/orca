@@ -7,12 +7,12 @@ import {
 } from './herdr-stock-binary'
 import { afterAll, describe, expect, it } from 'vitest'
 import { localHerdrCommand } from './herdr-cli-session'
-import { HERDR_PROTOCOL_VERSION } from './herdr-runtime-contract'
+import { HERDR_SUPPORTED_PROTOCOLS } from './herdr-runtime-contract'
 import { HerdrSdkHost } from './herdr-sdk-host'
 import { HerdrSdkRuntime } from './herdr-sdk-runtime'
 import { fromOption } from './herdr-sdk-values'
 
-const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_PROTOCOL_VERSION)
+const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_SUPPORTED_PROTOCOLS)
 const describeRealHerdr = binary ? describe : describe.skip
 
 describeRealHerdr('stock Herdr runtime integration', () => {
@@ -73,7 +73,7 @@ describeRealHerdr('stock Herdr runtime integration', () => {
       })
     )
     const snapshot = await transport.sdk.run(sessionName, (herdr) => herdr.session.snapshot())
-    expect(snapshot.protocol).toBe(HERDR_PROTOCOL_VERSION)
+    expect(HERDR_SUPPORTED_PROTOCOLS).toContain(snapshot.protocol)
     expect(
       snapshot.workspaces.find((workspace) => workspace.id === created.workspace.id)?.tokens
     ).toMatchObject({ orca_binding: 'workspace-binding' })
