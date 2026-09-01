@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { HERDR_PROTOCOL_VERSION } from '../../providers/multiplexer/herdr/herdr-runtime-contract'
+import { HERDR_SUPPORTED_PROTOCOLS } from '../../providers/multiplexer/herdr/herdr-runtime-contract'
 import { readLocalHerdrHealth } from './horca-herdr-health'
 import type { HorcaTerminalSettingsSource } from './horca-terminal-settings'
 
@@ -24,7 +24,7 @@ describe('local Herdr health', () => {
       .mockResolvedValueOnce({
         code: 0,
         timedOut: false,
-        stdout: JSON.stringify({ protocol: HERDR_PROTOCOL_VERSION, schema_version: 1 }),
+        stdout: JSON.stringify({ protocol: 20, schema_version: 1 }),
         stderr: ''
       })
 
@@ -41,13 +41,13 @@ describe('local Herdr health', () => {
       .mockResolvedValueOnce({
         code: 0,
         timedOut: false,
-        stdout: JSON.stringify({ protocol: HERDR_PROTOCOL_VERSION - 1, schema_version: 1 }),
+        stdout: JSON.stringify({ protocol: 18, schema_version: 1 }),
         stderr: ''
       })
 
     await expect(readLocalHerdrHealth(settings)).resolves.toMatchObject({
       status: 'unavailable',
-      error: expect.stringContaining(`incompatible with ${HERDR_PROTOCOL_VERSION}`)
+      error: expect.stringContaining(`incompatible with ${HERDR_SUPPORTED_PROTOCOLS.join(', ')}`)
     })
   })
 })
