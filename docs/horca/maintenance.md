@@ -26,6 +26,22 @@ The App is the only permanent actor that can bypass the non-fast-forward rule on
 
 If rebase fails, `main` stays unchanged. The workflow keeps the partial candidate branch, uploads the conflict paths and range-diff, and creates or updates one `sync-conflict` issue.
 
+## Feature branch rebase
+
+Hourly sync **replaces** `main`. Overlay commit subjects stay. SHAs change. A feature branch cut from yesterday's `main` still lists those overlay commits as unique.
+
+Do **not** run `git rebase origin/main` on that branch. Git will cherry-pick the old overlay stack onto the new overlay stack. That is a conflict storm, not missing feature work.
+
+Replay only the unique feature commits:
+
+```bash
+git fetch origin
+git log --oneline origin/main..HEAD
+git rebase --onto origin/main <old-main-tip>
+```
+
+`<old-main-tip>` is the last overlay commit on the feature branch before your topic (same subject as current `origin/main`, different SHA). If `origin/main..HEAD` is only your topic commits, plain `git rebase origin/main` is fine.
+
 ## Conflict recovery
 
 Start from the failed candidate information. Replay the same patch stack on the recorded upstream SHA. Resolve only the failed topic, then run:
