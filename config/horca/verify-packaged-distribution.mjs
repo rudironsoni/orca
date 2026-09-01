@@ -38,7 +38,7 @@ export function evaluateHorcaAsarContents({ shared, main, renderer }) {
       main.includes('horca-packaged-electron-profile') && /setPath\([`'"]userData[`'"]/.test(main)
     ],
     ['Herdr provider is packaged', main.includes('Could not resolve herdr target for spawn')],
-    ['Herdr SDK is packaged', main.includes('is incompatible with SDK protocol')],
+    ['Herdr SDK is packaged', main.includes('is incompatible with SDK protocols')],
     ['Herdr settings are registered', main.includes('terminal-backends.json')],
     ['Herdr settings UI is packaged', renderer.includes('data-horca-settings')],
     ['Horca product title is packaged', renderer.includes('data-horca-product-name')]
