@@ -10,14 +10,14 @@ import {
   resolveProtocolCompatibleHerdrTestBinary
 } from './herdr-stock-binary'
 import { ORCA_BINDING_TOKEN } from './herdr-binding-metadata'
-import { HERDR_PROTOCOL_VERSION } from './herdr-runtime-contract'
+import { HERDR_SUPPORTED_PROTOCOLS } from './herdr-runtime-contract'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
 import { HerdrSdkHost } from './herdr-sdk-host'
 import { HerdrSdkRuntime } from './herdr-sdk-runtime'
 import type { Project } from '../../../../shared/project-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
-const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_PROTOCOL_VERSION)
+const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_SUPPORTED_PROTOCOLS)
 const describeRealHerdr = binary ? describe : describe.skip
 
 async function waitForSocketRemoval(socketPath: string): Promise<void> {
