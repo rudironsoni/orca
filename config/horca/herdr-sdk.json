@@ -2,9 +2,9 @@
   "package": "@herdr/sdk",
   "version": "0.8.2",
   "git": "https://github.com/rudironsoni/herdr-ts-sdk",
-  "sha": "cdcb6b29797333c94ab1ef245c46f3a76531b2f1",
+  "sha": "c51296a75a0c876fbf58d4d4ab4ec78cb3392a2c",
   "protocol": [19, 20, 21],
   "upstreamCommit": "4a3b04f59ba3b7d8a15cea187b23e1e80c343b0c",
   "tarball": "config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz",
-  "sha256": "72666696ebfd44950077951573c64ecd5ed06f659595ee22792404504bc79f60"
+  "sha256": "4082d2b1c155054ad594ae411a307f754fb2ec10ab222c71ce8416fb4a983fb2"
 }
