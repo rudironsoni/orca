@@ -13,7 +13,16 @@ import type {
 import type { Effect } from 'effect'
 
 export const HERDR_SCHEMA_VERSION = 1
+/** Latest protocol the vendored SDK was generated against (bundled pin). */
 export const HERDR_PROTOCOL_VERSION = 21
+/** Handshake accepts stable 0.8.0/0.8.2 and unpublished 21. */
+export const HERDR_SUPPORTED_PROTOCOLS = [19, 20, 21] as const
+
+export function isSupportedHerdrProtocol(
+  protocol: number
+): protocol is (typeof HERDR_SUPPORTED_PROTOCOLS)[number] {
+  return (HERDR_SUPPORTED_PROTOCOLS as readonly number[]).includes(protocol)
+}
 
 export type HerdrWorkspace = Workspace
 export type HerdrTab = Tab
