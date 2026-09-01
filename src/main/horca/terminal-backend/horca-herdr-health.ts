@@ -3,7 +3,7 @@ import type { HorcaHerdrHealth } from '../../../shared/horca/terminal-settings-a
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { resolveHerdrExecutable } from '../../providers/multiplexer/herdr/herdr-provider-factory'
 import {
-  HERDR_SUPPORTED_PROTOCOLS,
+  SUPPORTED_HERDR_PROTOCOLS,
   isSupportedHerdrProtocol
 } from '../../providers/multiplexer/herdr/herdr-runtime-contract'
 import type { HorcaTerminalSettingsSource } from './horca-terminal-settings'
@@ -36,7 +36,7 @@ export async function readLocalHerdrHealth(
     const schema = JSON.parse(schemaResult.stdout) as { protocol?: unknown }
     if (typeof schema.protocol !== 'number' || !isSupportedHerdrProtocol(schema.protocol)) {
       throw new Error(
-        `Herdr protocol ${String(schema.protocol)} is incompatible with ${HERDR_SUPPORTED_PROTOCOLS.join(', ')}`
+        `Herdr protocol ${String(schema.protocol)} is incompatible with ${SUPPORTED_HERDR_PROTOCOLS.join(', ')}`
       )
     }
     return { status: 'ready', source, executable, version }
