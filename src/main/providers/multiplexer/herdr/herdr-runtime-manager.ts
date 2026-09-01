@@ -158,7 +158,24 @@ export class HerdrRuntimeManager {
             }
           }
         }
-        await closeUnboundStockHerdrTabs(this.transport, sessionName, workspace.id, snapshot)
+        snapshot = await this.snapshot(sessionName)
+        const livePaneBindings = new Set<string>()
+        for (const tab of tabs) {
+          const root = graph.layoutsByTabId[tab.id]?.root
+          if (!root) {
+            continue
+          }
+          for (const leafId of collectLeafIds(root)) {
+            livePaneBindings.add(orcaPaneBinding(graph.project.id, leafId))
+          }
+        }
+        await closeUnboundStockHerdrTabs(
+          this.transport,
+          sessionName,
+          workspace.id,
+          snapshot,
+          livePaneBindings
+        )
       }
 
       rememberOrcaPaneBindings(
