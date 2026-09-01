@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
 import { HerdrPtyProvider } from './herdr-pty-provider'
 import type { HerdrPtyBinding } from './herdr-pty-types'
+import { handlerTransport } from './herdr-sdk-test-host'
 
 describe('HerdrPtyProvider input ordering', () => {
   it('serializes signals after pending text writes', async () => {
@@ -9,13 +10,12 @@ describe('HerdrPtyProvider input ordering', () => {
     const textPending = new Promise<void>((resolve) => {
       releaseText = resolve
     })
-    const request = vi.fn(async (_session: string, method: string) => {
-      if (method === 'pane.send_text') {
+    const { transport, requestMock } = handlerTransport({
+      'pane.send_text': async () => {
         await textPending
-      }
-      return { id: method, result: { type: 'ok' } }
+      },
+      'pane.send_keys': () => undefined
     })
-    const transport = { request } as unknown as HerdrHostTransport
     const provider = new HerdrPtyProvider(
       () => transport,
       async () => null,
@@ -35,11 +35,14 @@ describe('HerdrPtyProvider input ordering', () => {
     const signalPending = provider.sendSignal(id, 'SIGINT')
 
     await vi.waitFor(() => {
-      expect(request.mock.calls.map((call) => call[1])).toEqual(['pane.send_text'])
+      expect(requestMock.mock.calls.map((call) => call[1])).toEqual(['pane.send_text'])
     })
     releaseText()
     await signalPending
-    expect(request.mock.calls.map((call) => call[1])).toEqual(['pane.send_text', 'pane.send_keys'])
+    expect(requestMock.mock.calls.map((call) => call[1])).toEqual([
+      'pane.send_text',
+      'pane.send_keys'
+    ])
   })
 
   it('forwards signals for Orca fallback PTYs', async () => {

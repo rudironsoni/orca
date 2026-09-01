@@ -1,0 +1,10 @@
+{
+  "package": "@herdr/sdk",
+  "version": "0.8.2",
+  "git": "https://github.com/dmmulroy/herdr-ts-sdk",
+  "sha": "b0353ec276620b6ebb3f7b6c4d254c81344ea997",
+  "protocol": 21,
+  "upstreamCommit": "4a3b04f59ba3b7d8a15cea187b23e1e80c343b0c",
+  "tarball": "config/horca/vendor/herdr-sdk-0.8.2.tgz",
+  "sha256": "8c608847a99211e65678750f7c68171ee0d03fe3c5e7b223a8c78e331a957344"
+}

@@ -1,11 +1,8 @@
 import { herdrSessionNameForProject } from '../../../../shared/horca/herdr-session-identity'
 import type { Store } from '../../../persistence'
 import type { IPtyProvider } from '../../types'
-import {
-  HerdrCliHostTransport,
-  herdrServerEnvironment,
-  localHerdrCommand
-} from './herdr-cli-session'
+import { herdrServerEnvironment, localHerdrCommand } from './herdr-cli-session'
+import { HerdrSdkHost } from './herdr-sdk-host'
 import { HerdrPtyProvider } from './herdr-pty-provider'
 import type { HerdrPtyTarget } from './herdr-pty-types'
 import {
@@ -28,7 +25,6 @@ import {
   type HorcaTerminalSettingsSource
 } from '../../../horca/terminal-backend/horca-terminal-settings'
 import { HerdrSshHostTransport } from './herdr-ssh-session'
-import { HerdrSocketTransport } from './herdr-socket-transport'
 import type { HerdrHostTransport } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 import { createHerdrSurfaceSync } from './herdr-surface-presentation'
@@ -66,13 +62,13 @@ export function createLocalHerdrPtyProvider(
       const wslDistro = parseWslHostId(hostId)
       if (wslDistro) {
         const executableFor = () => resolveWslHerdrExecutable(wslDistro, source)
-        transport = new HerdrCliHostTransport({
+        transport = new HerdrSdkHost({
           wslDistro,
           commandFor: async (args) => ({
             file: await executableFor(),
             args
           }),
-          serverCommandFor: async (sessionName) => {
+          serverCommandFor: async (name) => {
             const executable = await executableFor()
             const envKeysToRemove = Object.keys(process.env).filter((k) => k.startsWith('HERDR_'))
             return {
@@ -81,7 +77,7 @@ export function createLocalHerdrPtyProvider(
                 ...envKeysToRemove.flatMap((k) => ['-u', k]),
                 executable,
                 '--session',
-                sessionName,
+                name,
                 'server'
               ]
             }
@@ -89,14 +85,11 @@ export function createLocalHerdrPtyProvider(
         })
       } else {
         const executable = resolveHerdrExecutable(source)
-        transport = new HerdrSocketTransport({
-          sessionName,
+        transport = new HerdrSdkHost({
           commandFor: localHerdrCommand(executable),
-          serverCommandFor: (sessionName) => ({
+          serverCommandFor: (name) => ({
             file: executable,
-            args: ['--session', sessionName, 'server'],
-            // Why: strip HERDR_* so a server spawned from inside a stock herdr
-            // session binds the named session, not the parent session's socket.
+            args: ['--session', name, 'server'],
             env: herdrServerEnvironment(undefined)
           })
         })

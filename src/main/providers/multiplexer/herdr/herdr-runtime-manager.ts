@@ -6,7 +6,7 @@ import type {
   HerdrTerminalController,
   HerdrTerminalControlOptions
 } from './herdr-runtime-contract'
-import { HerdrRuntimeError, unwrapHerdrResponse } from './herdr-runtime-contract'
+import { HerdrRuntimeError } from './herdr-runtime-contract'
 import {
   enrichHerdrWorkspaceCheckouts,
   ensureStockHerdrWorkspace,
@@ -131,6 +131,7 @@ export class HerdrRuntimeManager {
           snapshot,
           this.liveWorkspaceBindings(sessionName, worktree.id)
         )
+        snapshot = await this.snapshot(sessionName)
         for (const tab of tabs) {
           const root = graph.layoutsByTabId[tab.id]?.root
           if (root) {
@@ -143,7 +144,7 @@ export class HerdrRuntimeManager {
               this.transport,
               sessionName,
               graph.project.id,
-              workspace.workspace_id,
+              workspace.id,
               tab,
               root,
               snapshot,
@@ -157,12 +158,7 @@ export class HerdrRuntimeManager {
             }
           }
         }
-        await closeUnboundStockHerdrTabs(
-          this.transport,
-          sessionName,
-          workspace.workspace_id,
-          snapshot
-        )
+        await closeUnboundStockHerdrTabs(this.transport, sessionName, workspace.id, snapshot)
       }
 
       rememberOrcaPaneBindings(
@@ -178,7 +174,7 @@ export class HerdrRuntimeManager {
         graph.project.id,
         snapshot
       )
-      this.onLivePaneIds?.(sessionName, new Set(snapshot.panes.map((pane) => pane.pane_id)))
+      this.onLivePaneIds?.(sessionName, new Set(snapshot.panes.map((pane) => pane.id)))
       this.lastSnapshots.set(sessionName, snapshot)
       return snapshot
     })
@@ -193,10 +189,8 @@ export class HerdrRuntimeManager {
   }
 
   async listAgents(sessionName: string): Promise<HerdrAgentRollup> {
-    const response = unwrapHerdrResponse<{ agents: HerdrBindingAgentState[] }>(
-      await this.transport.request(sessionName, 'agent.list', {})
-    )
-    return { agents: response.agents }
+    const agents = await this.transport.sdk.run(sessionName, (herdr) => herdr.agents.list())
+    return { agents: agents as unknown as HerdrBindingAgentState[] }
   }
 
   listSessionNames(): string[] {
@@ -263,8 +257,6 @@ export class HerdrRuntimeManager {
   }
 
   private async snapshot(sessionName: string): Promise<HerdrSessionSnapshot> {
-    return unwrapHerdrResponse<{ snapshot: HerdrSessionSnapshot }>(
-      await this.transport.request(sessionName, 'session.snapshot', {})
-    ).snapshot
+    return this.transport.sdk.run(sessionName, (herdr) => herdr.session.snapshot())
   }
 }

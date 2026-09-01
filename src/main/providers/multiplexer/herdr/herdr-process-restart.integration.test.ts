@@ -1,22 +1,23 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { herdrSessionNameForProject } from '../../../../shared/horca/herdr-session-identity'
 import { herdrServerEnvironment, localHerdrCommand } from './herdr-cli-session'
-import { defaultHerdrSocketPath } from './herdr-socket-connection'
 import {
   configHomeDir,
   isolatedStockHerdrHomeEnv,
-  resolveStockHerdrTestBinary
+  resolveProtocolCompatibleHerdrTestBinary
 } from './herdr-stock-binary'
 import { ORCA_BINDING_TOKEN } from './herdr-binding-metadata'
+import { HERDR_PROTOCOL_VERSION } from './herdr-runtime-contract'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
-import { HerdrSocketTransport } from './herdr-socket-transport'
+import { HerdrSdkHost } from './herdr-sdk-host'
+import { HerdrSdkRuntime } from './herdr-sdk-runtime'
 import type { Project } from '../../../../shared/project-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
-const binary = resolveStockHerdrTestBinary()
+const binary = resolveProtocolCompatibleHerdrTestBinary(HERDR_PROTOCOL_VERSION)
 const describeRealHerdr = binary ? describe : describe.skip
 
 async function waitForSocketRemoval(socketPath: string): Promise<void> {
@@ -31,10 +32,21 @@ describeRealHerdr('stock Herdr process restart', () => {
   const configHome = configHomeDir()
   const sessionName = `ot-${process.pid}-rs`
   const env = isolatedStockHerdrHomeEnv(configHome)
-  const socketPath = defaultHerdrSocketPath(sessionName, process.platform, env)
-  const transport = new HerdrSocketTransport({
+  const previousXdg = process.env.XDG_CONFIG_HOME
+  process.env.XDG_CONFIG_HOME = env.XDG_CONFIG_HOME
+  const socketPath = join(
+    env.XDG_CONFIG_HOME as string,
+    'herdr',
+    'sessions',
     sessionName,
-    socketPath,
+    'herdr.sock'
+  )
+  const sdk = new HerdrSdkRuntime({
+    application: { name: 'horca', version: 'test' },
+    resolveTarget: (name) => ({ sessionName: name })
+  })
+  const transport = new HerdrSdkHost({
+    sdk,
     commandFor: localHerdrCommand(binary as string, env),
     serverCommandFor: (name) => ({
       file: binary as string,
@@ -56,6 +68,11 @@ describeRealHerdr('stock Herdr process restart', () => {
       // Session never started.
     }
     await transport.disconnect()
+    if (previousXdg === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = previousXdg
+    }
     rmSync(configHome, { recursive: true, force: true })
   })
 
@@ -100,7 +117,7 @@ describeRealHerdr('stock Herdr process restart', () => {
     const first = await manager.reconcileProjectHost(graph)
     expect(first.workspaces).toHaveLength(1)
     expect(first.panes.filter((pane) => pane.tokens?.[ORCA_BINDING_TOKEN])).toHaveLength(2)
-    const firstWorkspaceId = first.workspaces[0].workspace_id
+    const firstWorkspaceId = first.workspaces[0].id
     const session = herdrSessionNameForProject(project, sessionName)
     const firstLeaf1 = manager.getPaneId(session, project.id, 'leaf-1')
     const firstLeaf2 = manager.getPaneId(session, project.id, 'leaf-2')
@@ -116,13 +133,11 @@ describeRealHerdr('stock Herdr process restart', () => {
     await new Promise((resolve) => setTimeout(resolve, 500))
 
     await transport.ensureSession(sessionName)
-    const restored = unwrapHerdrResponse<{ snapshot: typeof first }>(
-      await transport.request(sessionName, 'session.snapshot', {})
-    ).snapshot
+    const restored = await transport.sdk.run(sessionName, (herdr) => herdr.session.snapshot())
 
     const second = await manager.reconcileProjectHost(graph)
     expect(second.workspaces).toHaveLength(1)
-    expect(second.workspaces[0].workspace_id).toBe(firstWorkspaceId)
+    expect(second.workspaces[0].id).toBe(firstWorkspaceId)
     expect(manager.getPaneId(session, project.id, 'leaf-1')).toBe(firstLeaf1)
     expect(manager.getPaneId(session, project.id, 'leaf-2')).toBe(firstLeaf2)
     expect(

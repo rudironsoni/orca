@@ -166,7 +166,7 @@ describe('HerdrPtyProvider', () => {
     expect(host.requestMock).toHaveBeenCalledWith(
       herdrSessionNameForProject({ id: 'project-1' }, 'test-session'),
       'workspace.close',
-      { workspace_id: 'w1' }
+      { workspaceId: 'w1' }
     )
     expect(host.value.controlTerminal).toHaveBeenCalledWith(
       herdrSessionNameForProject({ id: 'project-1' }, 'test-session'),
@@ -256,7 +256,7 @@ describe('HerdrPtyProvider', () => {
       ['ctrl+c'],
       ['ctrl+c']
     ])
-    expect(sendKeys.every((call) => (call[2] as { pane_id: string }).pane_id === 'p1')).toBe(true)
+    expect(sendKeys.every((call) => (call[2] as { paneId: string }).paneId === 'p1')).toBe(true)
   })
 
   it('serializes text writes so terminal input cannot reorder', async () => {
@@ -325,12 +325,12 @@ describe('HerdrPtyProvider', () => {
     expect(host.requestMock).toHaveBeenCalledWith(
       herdrSessionNameForProject({ id: 'project-1' }, 'test-session'),
       'pane.get',
-      { pane_id: 'p1' }
+      { paneId: 'p1' }
     )
     expect(
       host.requestMock.mock.calls.some((call) => {
-        const params = call[2] as { pane_id?: string } | undefined
-        return params?.pane_id === spawned.id
+        const params = call[2] as { paneId?: string } | undefined
+        return params?.paneId === spawned.id
       })
     ).toBe(false)
   })
@@ -419,13 +419,13 @@ describe('HerdrPtyProvider', () => {
     expect(host.requestMock).toHaveBeenCalledWith(
       herdrSessionNameForProject({ id: 'project-1' }, 'test-session'),
       'pane.send_keys',
-      { pane_id: 'p1', keys: ['ctrl+c'] }
+      { paneId: 'p1', keys: ['ctrl+c'] }
     )
     expect(write).not.toHaveBeenCalled()
     expect(
       host.requestMock.mock.calls.some((call) => {
-        const params = call[2] as { pane_id?: string } | undefined
-        return params?.pane_id === spawned.id
+        const params = call[2] as { paneId?: string } | undefined
+        return params?.paneId === spawned.id
       })
     ).toBe(false)
   })
@@ -450,7 +450,7 @@ describe('HerdrPtyProvider', () => {
       expect(host.requestMock).toHaveBeenCalledWith(
         herdrSessionNameForProject({ id: 'project-1' }, 'test-session'),
         'pane.send_text',
-        { pane_id: 'p1', text: 'ls\r' }
+        { paneId: 'p1', text: 'ls\r' }
       )
     })
   })
@@ -506,7 +506,7 @@ describe('HerdrPtyProvider', () => {
       'agent.start',
       expect.objectContaining({
         kind: 'claude',
-        pane_id: 'p1'
+        paneId: 'p1'
       })
     )
   })
@@ -607,11 +607,11 @@ describe('HerdrPtyProvider', () => {
       if (method === 'pane.get') {
         return {
           id: method,
-          result: { pane: { pane_id: 'p1', workspace_id: 'w1' } }
+          result: { pane: { paneId: 'p1', workspaceId: 'w1' } }
         }
       }
       if (method === 'pane.list') {
-        return { id: method, result: { panes: [{ pane_id: 'p1' }] } }
+        return { id: method, result: { panes: [{ paneId: 'p1' }] } }
       }
       return { id: method, result: { type: 'ok' } }
     })
