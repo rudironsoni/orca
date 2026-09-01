@@ -135,8 +135,8 @@ importers:
         specifier: 1.7.6
         version: 1.7.6
       '@herdr/sdk':
-        specifier: file:config/horca/vendor/herdr-sdk-0.8.2.tgz
-        version: file:config/horca/vendor/herdr-sdk-0.8.2.tgz
+        specifier: file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz
+        version: file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz
       '@linear/sdk':
         specifier: ^82.1.0
         version: 82.1.0(graphql@16.14.2)
@@ -1003,8 +1003,8 @@ packages:
     peerDependencies:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
 
-  '@herdr/sdk@file:config/horca/vendor/herdr-sdk-0.8.2.tgz':
-    resolution: {integrity: sha512-aY0hdhPuV4KS6DqHRn5duQxc9mnQl+3gXYVkTy0ewDxrQ2AgcjeczA4NLoofXs0ogGY8ZX/zLfeWCQeLXCgbHQ==, tarball: file:config/horca/vendor/herdr-sdk-0.8.2.tgz}
+  '@herdr/sdk@file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz':
+    resolution: {integrity: sha512-nz2YZqQO/0oBFa7ycUl2j29apnPuztcDqXqpBSihAX4Gz4p3rh54Qg7cTwxDdOm0ThIlHNeqRAzeOTFvS2OYtw==, tarball: file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz}
     version: 0.8.2
     engines: {node: '>=20'}
 
@@ -7632,7 +7632,7 @@ snapshots:
     dependencies:
       graphql: 16.14.2
 
-  '@herdr/sdk@file:config/horca/vendor/herdr-sdk-0.8.2.tgz':
+  '@herdr/sdk@file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz':
     dependencies:
       '@effect/platform-node-shared': 4.0.0-beta.105(effect@4.0.0-beta.105)
       ajv: 8.20.0
