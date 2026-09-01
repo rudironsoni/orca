@@ -121,7 +121,7 @@ export class HerdrRuntimeManager {
         if (!firstTab) {
           continue
         }
-        const workspace = await ensureStockHerdrWorkspace(
+        const ensured = await ensureStockHerdrWorkspace(
           this.transport,
           sessionName,
           graph.project.id,
@@ -131,6 +131,7 @@ export class HerdrRuntimeManager {
           snapshot,
           this.liveWorkspaceBindings(sessionName, worktree.id)
         )
+        const workspace = ensured.workspace
         snapshot = await this.snapshot(sessionName)
         for (const tab of tabs) {
           const root = graph.layoutsByTabId[tab.id]?.root
@@ -148,7 +149,9 @@ export class HerdrRuntimeManager {
               tab,
               root,
               snapshot,
-              graph.persistedPaneIdsByLeafId
+              graph.persistedPaneIdsByLeafId,
+              { tab: ensured.seedTab, pane: ensured.seedPane },
+              tabs.length <= 1
             )
             for (const leafId of collectLeafIds(root)) {
               const paneId = graph.persistedPaneIdsByLeafId[leafId]
