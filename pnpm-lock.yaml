@@ -1004,7 +1004,7 @@ packages:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
 
   '@herdr/sdk@file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz':
-    resolution: {integrity: sha512-nz2YZqQO/0oBFa7ycUl2j29apnPuztcDqXqpBSihAX4Gz4p3rh54Qg7cTwxDdOm0ThIlHNeqRAzeOTFvS2OYtw==, tarball: file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz}
+    resolution: {integrity: sha512-F66dQUuFBY66Si3GphCKg2jW05zztmXf08LgoZp1ai+5PEZ39XLkeo9QLbaUDSL1ggxF0qALxKjm+thmPkM3ug==, tarball: file:config/horca/vendor/herdr-sdk-0.8.2-protocols-19-20.tgz}
     version: 0.8.2
     engines: {node: '>=20'}
 
