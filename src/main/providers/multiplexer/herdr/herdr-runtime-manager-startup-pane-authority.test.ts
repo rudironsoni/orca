@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { HerdrRuntimeManager } from './herdr-runtime-manager'
-import { ORCA_BINDING_TOKEN, orcaPaneBinding, orcaWorkspaceBinding } from './herdr-binding-metadata'
+import { ORCA_BINDING_TOKEN, orcaWorkspaceBinding } from './herdr-binding-metadata'
 import {
   eventfulTransport,
   project,
@@ -36,7 +36,7 @@ describe('HerdrRuntimeManager startup pane authority', () => {
     expect(persist).not.toHaveBeenCalled()
     expect(present).not.toHaveBeenCalled()
   })
-  it('reclaims a pane whose stale orca binding instead of minting a second herdr tab', async () => {
+  it('closes an extra Herdr tab whose orca binding is stale instead of reclaiming it', async () => {
     const worktree = {
       id: 'worktree-1',
       instanceId: 'instance-1',
@@ -70,15 +70,12 @@ describe('HerdrRuntimeManager startup pane authority', () => {
     const manager = new HerdrRuntimeManager(host.transport)
     await manager.reconcileProjectHost(singleLeafGraph())
 
+    expect(host.snapshot.tabs.map((tab) => tab.id)).toEqual(['w1:t1'])
     const paneId = await manager.materializeLeafPane(project(), 'new-leaf', '/repo', worktree)
-
-    expect(paneId).toBe('w1:p1')
+    expect(paneId).toBeNull()
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'layout.apply')
     ).toHaveLength(0)
-    expect(host.snapshot.panes.find((pane) => pane.id === 'w1:p1')?.tokens).toEqual({
-      [ORCA_BINDING_TOKEN]: orcaPaneBinding('project-1', 'new-leaf')
-    })
   })
   it('imports unbound surfaces created in the live Herdr session through event reconcile', async () => {
     const host = eventfulTransport()
