@@ -64,6 +64,12 @@ Prefer these fork-owned paths:
 
 `config/horca/overlay-policy.json` records every modified upstream file, its reason, and its removal condition. CI rejects deleted upstream files, workflow overlays, locale overlays, E2E overlays, stale ledger entries, unowned changes, and Herdr imports outside fork-owned paths. The report shows files, lines, and hunks so maintainers can reduce the conflict surface without using an arbitrary file-count gate.
 
+`src/main/index.ts` and `src/main/updater.ts` stay byte-identical to upstream. They are thin composers after Orca's startup and updater splits. CI denies overlays of those two paths. Horca startup hooks live here:
+
+- `src/main/startup/main-process-preflight.ts`: `configureHorcaUserDataPath` before the userData decision, `assertHorcaPackagedDistribution` after the lock
+- `src/main/startup/main-process-ready-foundation.ts`: `initializeHorca(store)` after Store construction
+- `src/main/updater/updater-setup.ts`: in-app updater gate for downstream releases
+
 ## Workflow ownership
 
 Upstream workflow files stay byte-identical. The hourly maintenance job enables only the files in `config/horca/enabled-workflows.txt` and disables every other workflow through GitHub repository state. This also disables new upstream workflows without adding a downstream Git change.
