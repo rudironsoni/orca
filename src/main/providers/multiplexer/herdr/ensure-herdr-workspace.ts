@@ -18,7 +18,9 @@ import {
 import { herdrOptionalCwd } from './herdr-sdk-values'
 import type {
   HerdrHostTransport,
+  HerdrPane,
   HerdrSessionSnapshot,
+  HerdrTab,
   HerdrWorkspace
 } from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
@@ -54,6 +56,12 @@ export function isLinkedHerdrWorktree(worktree: HerdrWorktreeDescriptor): boolea
   return normalize(worktree.path) !== normalize(worktree.repoPath)
 }
 
+export type EnsuredHerdrWorkspace = {
+  workspace: HerdrWorkspace
+  seedTab?: HerdrTab
+  seedPane?: HerdrPane
+}
+
 export async function ensureStockHerdrWorkspace(
   transport: HerdrHostTransport,
   sessionName: string,
@@ -63,7 +71,7 @@ export async function ensureStockHerdrWorkspace(
   firstRoot: TerminalPaneLayoutNode | null,
   snapshot: HerdrSessionSnapshot,
   liveBindings: ReadonlySet<string> = new Set()
-): Promise<HerdrWorkspace> {
+): Promise<EnsuredHerdrWorkspace> {
   const binding = orcaWorkspaceBinding(projectId, worktree)
   const bound = findUniqueHerdrMatch(
     snapshot.workspaces,
@@ -71,13 +79,13 @@ export async function ensureStockHerdrWorkspace(
     'workspace binding'
   )
   if (bound) {
-    return bound
+    return { workspace: bound }
   }
 
   const adoptable = findAdoptableWorkspace(snapshot.workspaces, worktree, liveBindings)
   if (adoptable) {
     await reportOrcaWorkspaceBinding(transport, sessionName, adoptable.id, binding)
-    return adoptable
+    return { workspace: adoptable }
   }
 
   if (isLinkedHerdrWorktree(worktree)) {
@@ -115,7 +123,11 @@ export async function ensureStockHerdrWorkspace(
     )
     await syncHerdrTabLabel(transport, sessionName, created.tab, orcaTabTitle(firstTab))
   }
-  return created.workspace
+  return {
+    workspace: created.workspace,
+    seedTab: created.tab,
+    seedPane: created.rootPane
+  }
 }
 
 async function openStockWorktree(
@@ -126,7 +138,7 @@ async function openStockWorktree(
   firstTab: TerminalTab | undefined,
   firstRoot: TerminalPaneLayoutNode | null,
   snapshot: HerdrSessionSnapshot
-): Promise<HerdrWorkspace | null> {
+): Promise<EnsuredHerdrWorkspace | null> {
   if (!worktree.repoPath) {
     return null
   }
@@ -147,7 +159,7 @@ async function openStockWorktree(
       if (firstTab && existingTab) {
         await syncHerdrTabLabel(transport, sessionName, existingTab, orcaTabTitle(firstTab))
       }
-      return opened.workspace
+      return { workspace: opened.workspace, seedTab: opened.tab, seedPane: opened.rootPane }
     }
     const firstLeafId = firstTerminalLeafId(firstRoot)
     if (firstTab && firstLeafId) {
@@ -161,7 +173,7 @@ async function openStockWorktree(
       )
       await syncHerdrTabLabel(transport, sessionName, opened.tab, orcaTabTitle(firstTab))
     }
-    return opened.workspace
+    return { workspace: opened.workspace, seedTab: opened.tab, seedPane: opened.rootPane }
   } catch (error) {
     if (!(error instanceof HerdrRuntimeError) || error.code !== 'not_git_worktree') {
       throw error
