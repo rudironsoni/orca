@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { HERDR_SUPPORTED_PROTOCOLS } from '../../providers/multiplexer/herdr/herdr-runtime-contract'
+import { SUPPORTED_HERDR_PROTOCOLS } from '../../providers/multiplexer/herdr/herdr-runtime-contract'
 import { readLocalHerdrHealth } from './horca-herdr-health'
 import type { HorcaTerminalSettingsSource } from './horca-terminal-settings'
 
@@ -47,7 +47,7 @@ describe('local Herdr health', () => {
 
     await expect(readLocalHerdrHealth(settings)).resolves.toMatchObject({
       status: 'unavailable',
-      error: expect.stringContaining(`incompatible with ${HERDR_SUPPORTED_PROTOCOLS.join(', ')}`)
+      error: expect.stringContaining(`incompatible with ${SUPPORTED_HERDR_PROTOCOLS.join(', ')}`)
     })
   })
 })
