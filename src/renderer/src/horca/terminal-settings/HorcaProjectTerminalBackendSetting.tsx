@@ -38,15 +38,11 @@ export function HorcaProjectTerminalBackendSetting(props: {
       />
       <div className="divide-y divide-border/40">
         <SettingsRow
-          label={horcaTerminalSettingsCopy.projectPreference}
-          description={`${horcaTerminalSettingsCopy.projectPreferenceDescription} ${
-            snapshot.defaults.defaultBackend === 'herdr'
-              ? horcaTerminalSettingsCopy.herdr
-              : horcaTerminalSettingsCopy.orca
-          }`}
+          label="Project preference"
+          description={`Default backend: ${snapshot.defaults.defaultBackend === 'herdr' ? 'Herdr' : 'Orca'}`}
           control={
             <SettingsSegmentedControl
-              ariaLabel={horcaTerminalSettingsCopy.projectBackendAria}
+              ariaLabel="Project terminal backend"
               value={project.preference}
               onChange={(value) =>
                 void updateProject(props.projectId, {
@@ -54,20 +50,20 @@ export function HorcaProjectTerminalBackendSetting(props: {
                 })
               }
               options={[
-                { value: 'inherit', label: horcaTerminalSettingsCopy.inherit },
-                { value: 'herdr', label: horcaTerminalSettingsCopy.herdr },
-                { value: 'orca', label: horcaTerminalSettingsCopy.orca }
+                { value: 'inherit', label: 'Inherit' },
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
         />
         {effectiveBackend === 'herdr' ? (
           <SettingsRow
-            label={horcaTerminalSettingsCopy.projectSession}
-            description={horcaTerminalSettingsCopy.projectSessionDescription}
+            label="Herdr session"
+            description="Clear this value to use the shared Herdr session."
             control={
               <Input
-                aria-label={horcaTerminalSettingsCopy.projectSessionAria}
+                aria-label="Project Herdr session name"
                 className="w-72"
                 maxLength={64}
                 value={project.sessionName ?? ''}
