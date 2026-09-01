@@ -38,7 +38,7 @@ export async function spawnHerdrPtyPane(args: {
   await assertHerdrMigrationReady(target, args.fallback)
   const snapshot = await runtime.manager.reconcileProjectHost(target.graph)
   const sessionName = herdrSessionNameForProject(target.project, args.sharedName)
-  const livePaneIds = new Set(snapshot.panes.map((pane) => pane.id))
+  const livePaneIds = new Set<string>(snapshot.panes.map((pane) => pane.id))
   let paneId = runtime.manager.getPaneId(
     sessionName,
     target.identity.projectId,
