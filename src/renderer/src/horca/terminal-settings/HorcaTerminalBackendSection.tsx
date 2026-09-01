@@ -43,24 +43,24 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
           description={horcaTerminalSettingsCopy.defaultBackendDescription}
           control={
             <SettingsSegmentedControl
-              ariaLabel={horcaTerminalSettingsCopy.defaultBackendAria}
+              ariaLabel="Default terminal backend"
               value={defaults.defaultBackend}
               onChange={(value) =>
                 void updateDefaults({ defaultBackend: value === 'herdr' ? 'herdr' : 'orca' })
               }
               options={[
-                { value: 'herdr', label: horcaTerminalSettingsCopy.herdr },
-                { value: 'orca', label: horcaTerminalSettingsCopy.orca }
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
         />
         <SettingsRow
-          label={horcaTerminalSettingsCopy.floatingTerminal}
-          description={horcaTerminalSettingsCopy.floatingTerminalDescription}
+          label="Floating terminal"
+          description="Choose a backend for floating terminals, or inherit the default."
           control={
             <SettingsSegmentedControl
-              ariaLabel={horcaTerminalSettingsCopy.floatingTerminalAria}
+              ariaLabel="Floating terminal backend"
               value={defaults.floatingPreference}
               onChange={(value) =>
                 void updateDefaults({
@@ -68,9 +68,9 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                 })
               }
               options={[
-                { value: 'inherit', label: horcaTerminalSettingsCopy.inherit },
-                { value: 'herdr', label: horcaTerminalSettingsCopy.herdr },
-                { value: 'orca', label: horcaTerminalSettingsCopy.orca }
+                { value: 'inherit', label: 'Inherit' },
+                { value: 'herdr', label: 'Herdr' },
+                { value: 'orca', label: 'Orca' }
               ]}
             />
           }
@@ -78,8 +78,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
         {defaults.defaultBackend === 'herdr' ? (
           <>
             <SettingsRow
-              label={horcaTerminalSettingsCopy.herdrStatus}
-              description={horcaTerminalSettingsCopy.herdrStatusDescription}
+              label="Herdr status"
+              description="The Herdr executable used for local terminals."
               control={
                 <span
                   className={
@@ -89,8 +89,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                   }
                 >
                   {health?.status === 'ready'
-                    ? horcaTerminalSettingsCopy.ready(health.version)
-                    : (health?.error ?? horcaTerminalSettingsCopy.checking)}
+                    ? `Ready, ${health.version}`
+                    : (health?.error ?? 'Checking…')}
                 </span>
               }
             />
@@ -99,7 +99,7 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
               description={horcaTerminalSettingsCopy.binarySourceDescription}
               control={
                 <SettingsSegmentedControl
-                  ariaLabel={horcaTerminalSettingsCopy.herdrSourceAria}
+                  ariaLabel="Herdr executable source"
                   value={defaults.binarySource.kind}
                   onChange={(value) =>
                     void updateDefaults({
@@ -112,9 +112,9 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                     })
                   }
                   options={[
-                    { value: 'system', label: horcaTerminalSettingsCopy.fromPath },
-                    { value: 'managed', label: horcaTerminalSettingsCopy.bundled },
-                    { value: 'custom', label: horcaTerminalSettingsCopy.custom }
+                    { value: 'system', label: 'From PATH' },
+                    { value: 'managed', label: 'Bundled' },
+                    { value: 'custom', label: 'Custom' }
                   ]}
                 />
               }
@@ -125,7 +125,7 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
                 description={horcaTerminalSettingsCopy.binarySourceDescription}
                 control={
                   <Input
-                    aria-label={horcaTerminalSettingsCopy.customPathAria}
+                    aria-label="Custom Herdr executable path"
                     className="w-72"
                     value={defaults.binarySource.path}
                     onChange={(event) =>
@@ -142,10 +142,10 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
               description={horcaTerminalSettingsCopy.sessionNameDescription}
               control={
                 <Input
-                  aria-label={horcaTerminalSettingsCopy.sessionNameAria}
+                  aria-label="Shared Herdr session name"
                   className="w-72"
                   maxLength={64}
-                  placeholder={horcaTerminalSettingsCopy.sessionNamePlaceholder}
+                  placeholder="horca"
                   value={defaults.defaultSessionName ?? ''}
                   onChange={(event) =>
                     void updateDefaults({ defaultSessionName: event.target.value || null })

@@ -3387,8 +3387,7 @@
             "ab19f603eb": "Rename tab {{value0}}",
             "6df69d9388": "Close tab {{value0}}",
             "fdb2691425": "Collapse pane",
-            "95db5f2f7d": "Close tab",
-            "herdrBadge": "Herdr"
+            "95db5f2f7d": "Close tab"
           },
           "SortableTabContextMenu": {
             "35e8892fd0": "Tab Color",
@@ -16874,45 +16873,6 @@
           "deleteColumn": "Delete column",
           "deleteTable": "Delete table"
         }
-      }
-    },
-    "horca": {
-      "terminalSettings": {
-        "title": "Terminal backend",
-        "description": "Choose which runtime owns new terminal sessions.",
-        "defaultBackend": "Default backend",
-        "defaultBackendDescription": "New projects use this backend until you choose another one.",
-        "defaultBackendAria": "Default terminal backend",
-        "herdr": "Herdr",
-        "orca": "Orca",
-        "inherit": "Inherit",
-        "floatingTerminal": "Floating terminal",
-        "floatingTerminalDescription": "Choose a backend for floating terminals, or inherit the default.",
-        "floatingTerminalAria": "Floating terminal backend",
-        "herdrStatus": "Herdr status",
-        "herdrStatusDescription": "The Herdr executable used for local terminals.",
-        "ready": "Ready, {{value0}}",
-        "checking": "Checking…",
-        "binarySource": "Herdr executable",
-        "binarySourceDescription": "Use Herdr from PATH, the bundled Herdr, or an absolute path.",
-        "herdrSourceAria": "Herdr executable source",
-        "fromPath": "From PATH",
-        "bundled": "Bundled",
-        "custom": "Custom",
-        "customPath": "Custom Herdr path",
-        "customPathAria": "Custom Herdr executable path",
-        "sessionName": "Shared Herdr session",
-        "sessionNameDescription": "Clear this value to use the Horca session.",
-        "sessionNameAria": "Shared Herdr session name",
-        "sessionNamePlaceholder": "horca",
-        "projectTitle": "Terminal backend",
-        "projectDescription": "Choose the terminal backend for this project.",
-        "projectPreference": "Project preference",
-        "projectPreferenceDescription": "Default backend:",
-        "projectBackendAria": "Project terminal backend",
-        "projectSession": "Herdr session",
-        "projectSessionDescription": "Clear this value to use the shared Herdr session.",
-        "projectSessionAria": "Project Herdr session name"
       }
     }
   },
