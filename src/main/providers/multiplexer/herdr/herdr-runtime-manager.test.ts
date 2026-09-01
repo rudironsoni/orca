@@ -150,7 +150,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
     expect(host.requestMock.mock.calls.map(([session]) => session)).not.toContain('orca')
   })
 
-  it('refuses to guess between duplicate stock workspace candidates', async () => {
+  it('adopts the newest duplicate stock workspace instead of minting another', async () => {
     const host = stockTransport({
       workspaces: [
         {
@@ -166,9 +166,11 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       ]
     })
     const manager = new HerdrRuntimeManager(host.transport)
-    await expect(manager.reconcileProjectHost(graph())).rejects.toMatchObject({
-      code: 'herdr_binding_ambiguous'
-    })
+    await manager.reconcileProjectHost(graph())
+    expect(
+      host.requestMock.mock.calls.filter(([, method]) => method === 'workspace.create')
+    ).toHaveLength(0)
+    expect(host.snapshot.workspaces.some((workspace) => workspace.id === 'w2')).toBe(true)
   })
 
   it('opens a git-backed checkout via stock worktree.open and binds the root pane', async () => {

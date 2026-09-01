@@ -187,14 +187,16 @@ export async function enrichHerdrWorkspaceCheckouts(
   sessionName: string,
   snapshot: HerdrSessionSnapshot
 ): Promise<void> {
-  for (const workspace of snapshot.workspaces) {
-    if (herdrCheckoutPath(workspace)) {
+  for (let index = 0; index < snapshot.workspaces.length; index++) {
+    const workspace = snapshot.workspaces[index]
+    if (!workspace) {
       continue
     }
     try {
-      await transport.sdk.run(sessionName, (herdr) =>
+      const fresh = await transport.sdk.run(sessionName, (herdr) =>
         herdr.workspaces.get(herdr.ids.workspace(workspace.id))
       )
+      snapshot.workspaces[index] = fresh
     } catch {
       // Skinny snapshot records stay adoptable by unique label.
     }
@@ -216,6 +218,13 @@ export function findHerdrWorkspaceForWorktree(
   return findAdoptableWorkspace(snapshot.workspaces, worktree) ?? undefined
 }
 
+function newestWorkspace(workspaces: readonly HerdrWorkspace[]): HerdrWorkspace | null {
+  if (workspaces.length === 0) {
+    return null
+  }
+  return [...workspaces].sort((left, right) => right.id.localeCompare(left.id))[0] ?? null
+}
+
 function findAdoptableWorkspace(
   workspaces: readonly HerdrWorkspace[],
   worktree: { path: string; displayName?: string },
@@ -226,24 +235,16 @@ function findAdoptableWorkspace(
     return !token || !liveBindings.has(token)
   })
   if (worktree.path) {
-    const byCheckout = findUniqueHerdrMatch(
-      unbound,
-      (workspace) => workspaceMatchesCheckout(workspace, worktree.path),
-      `workspace checkout ${worktree.path}`
+    const byCheckout = unbound.filter((workspace) =>
+      workspaceMatchesCheckout(workspace, worktree.path)
     )
-    if (byCheckout) {
-      return byCheckout
+    const picked = newestWorkspace(byCheckout)
+    if (picked) {
+      return picked
     }
   }
   const expectedLabel = worktree.displayName || basename(worktree.path)
-  if (unbound.length === 1 && unbound[0].label === expectedLabel) {
-    return unbound[0]
-  }
-  return findUniqueHerdrMatch(
-    unbound,
-    (workspace) => workspace.label === expectedLabel,
-    `workspace label ${expectedLabel}`
-  )
+  return newestWorkspace(unbound.filter((workspace) => workspace.label === expectedLabel))
 }
 
 function workspaceMatchesCheckout(workspace: HerdrWorkspace, checkoutPath: string): boolean {
