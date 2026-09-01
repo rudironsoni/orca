@@ -15,7 +15,7 @@ import {
 } from './ensure-herdr-workspace'
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
 import { reportPaneTokens } from './herdr-sdk-ops'
-import { ensureTabLayout } from './herdr-tab-layout'
+import { closeUnboundStockHerdrTabs, ensureTabLayout } from './herdr-tab-layout'
 
 export async function materializeHerdrLeafPane(args: {
   transport: HerdrHostTransport
@@ -102,6 +102,7 @@ export async function bindSpawnLeafPane(args: {
     args.liveWorkspaceBindings
   )
   args.graph.persistedPaneIdsByLeafId ??= {}
+  let liveSnapshot = await args.snapshot()
   await ensureTabLayout(
     args.transport,
     args.sessionName,
@@ -109,8 +110,18 @@ export async function bindSpawnLeafPane(args: {
     workspace.id,
     tab,
     root,
-    snapshot,
+    liveSnapshot,
     args.graph.persistedPaneIdsByLeafId
+  )
+  liveSnapshot = await args.snapshot()
+  const livePaneBindings = desiredLeafBindings(args.graph.project.id, args.graph)
+  livePaneBindings.add(orcaPaneBinding(args.identity.projectId, args.identity.leafId))
+  await closeUnboundStockHerdrTabs(
+    args.transport,
+    args.sessionName,
+    workspace.id,
+    liveSnapshot,
+    livePaneBindings
   )
   rememberOrcaPaneBindings(
     args.paneIdsBySessionAndBinding,
@@ -127,7 +138,7 @@ function syntheticSpawnTab(tabId: string, worktreeId: string): TerminalTab {
     id: tabId,
     ptyId: null,
     worktreeId,
-    title: tabId,
+    title: '1',
     customTitle: null,
     color: null,
     sortOrder: 0,

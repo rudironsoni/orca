@@ -211,14 +211,14 @@ function projectHerdrActivation(
 
     // Why: floating and attach-only spawns can arrive before the workspace
     // session lists the tab. Synthesize that tab so ensureTabLayout can mint
-    // the pane. The title is the tab id so each adopted pane stays distinct.
+    // the pane. Distinctness is orca_binding, not the Herdr tab label.
     const existingTabs = session.tabsByWorktree[worktreeId] ?? []
     const sessionTab = existingTabs.find((tab) => tab.id === tabId)
     const syntheticTab: TerminalTab = sessionTab ?? {
       id: tabId,
       ptyId: null,
       worktreeId,
-      title: tabId,
+      title: '1',
       customTitle: null,
       color: null,
       sortOrder: 0,
