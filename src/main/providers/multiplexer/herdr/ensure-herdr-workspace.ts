@@ -186,21 +186,19 @@ export async function enrichHerdrWorkspaceCheckouts(
   transport: HerdrHostTransport,
   sessionName: string,
   snapshot: HerdrSessionSnapshot
-): Promise<void> {
-  for (let index = 0; index < snapshot.workspaces.length; index++) {
-    const workspace = snapshot.workspaces[index]
-    if (!workspace) {
-      continue
-    }
-    try {
-      const fresh = await transport.sdk.run(sessionName, (herdr) =>
-        herdr.workspaces.get(herdr.ids.workspace(workspace.id))
-      )
-      snapshot.workspaces[index] = fresh
-    } catch {
-      // Skinny snapshot records stay adoptable by unique label.
-    }
-  }
+): Promise<HerdrSessionSnapshot> {
+  const workspaces = await Promise.all(
+    snapshot.workspaces.map(async (workspace) => {
+      try {
+        return await transport.sdk.run(sessionName, (herdr) =>
+          herdr.workspaces.get(herdr.ids.workspace(workspace.id))
+        )
+      } catch {
+        return workspace
+      }
+    })
+  )
+  return { ...snapshot, workspaces }
 }
 
 export function findHerdrWorkspaceForWorktree(

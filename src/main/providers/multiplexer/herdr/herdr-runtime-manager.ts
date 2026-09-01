@@ -113,9 +113,9 @@ export class HerdrRuntimeManager {
       this.graphsByKey.set(graphKey(sessionName, graph.project.id), graph)
       this.eventRefresh.ensureSubscription()
       let snapshot = await this.snapshot(sessionName)
-      await enrichHerdrWorkspaceCheckouts(this.transport, sessionName, snapshot)
+      snapshot = await enrichHerdrWorkspaceCheckouts(this.transport, sessionName, snapshot)
       if (graph.persistedPaneIdsByLeafId) {
-        const live = new Set(snapshot.panes.map((pane) => pane.id))
+        const live = new Set<string>(snapshot.panes.map((pane) => pane.id))
         graph.persistedPaneIdsByLeafId = Object.fromEntries(
           Object.entries(graph.persistedPaneIdsByLeafId).filter(([, paneId]) => live.has(paneId))
         )
