@@ -15,6 +15,7 @@ import {
   orcaWorkspaceBinding,
   reportOrcaWorkspaceBinding
 } from './herdr-binding-metadata'
+import { herdrOptionalCwd } from './herdr-sdk-values'
 import type {
   HerdrHostTransport,
   HerdrSessionSnapshot,
@@ -96,7 +97,7 @@ export async function ensureStockHerdrWorkspace(
 
   const created = await transport.sdk.run(sessionName, (herdr) =>
     herdr.workspaces.create({
-      cwd: worktree.path || undefined,
+      ...herdrOptionalCwd(worktree.path),
       label: worktree.displayName || basename(worktree.path),
       focus: false
     })
