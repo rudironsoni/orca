@@ -241,7 +241,7 @@ export default function SortableTab({
       />
       {isHerdrTerminal && !isEditing ? (
         <Badge variant="outline" className="mr-1 px-1 py-0 font-normal">
-          Herdr
+          {translate('auto.components.tab.bar.SortableTab.herdrBadge', 'Herdr')}
         </Badge>
       ) : null}
       {isPinned && !isEditing && (

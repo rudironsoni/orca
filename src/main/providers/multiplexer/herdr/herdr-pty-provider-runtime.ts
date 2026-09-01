@@ -7,7 +7,8 @@ import {
   type HerdrPaneExitListener,
   type HerdrSurfaceSync
 } from './herdr-runtime-manager'
-import { unwrapHerdrResponse, type HerdrHostTransport } from './herdr-runtime-contract'
+import type { HerdrHostTransport } from './herdr-runtime-contract'
+import { closeHerdrPane, closeHerdrWorkspace } from './herdr-sdk-ops'
 export { awaitFirstFrame } from './herdr-pty-frames'
 import { bytesFromTerminalLogicalKey } from '../../../../shared/horca/terminal-logical-key'
 import { cancelHerdrPaneSizePulse, writeSharedHerdrInput } from './herdr-pty-attach'
@@ -142,11 +143,8 @@ export function retireMissingHerdrPanes(
 
 export async function sendHerdrNamedKey(binding: HerdrPtyBinding, name: string): Promise<void> {
   try {
-    unwrapHerdrResponse(
-      await binding.transport.request(binding.sessionName, 'pane.send_keys', {
-        pane_id: binding.paneId,
-        keys: [name]
-      })
+    await binding.transport.sdk.run(binding.sessionName, (herdr) =>
+      herdr.panes.sendKeys(herdr.ids.pane(binding.paneId), [name])
     )
   } catch (error: unknown) {
     const bytes = bytesFromTerminalLogicalKey(name)
@@ -162,25 +160,23 @@ export async function sendHerdrNamedKey(binding: HerdrPtyBinding, name: string):
 export async function closeHerdrBindingSurface(binding: HerdrPtyBinding): Promise<void> {
   const { transport, sessionName, paneId } = binding
   try {
-    const pane = unwrapHerdrResponse<{ pane: { workspace_id?: string } }>(
-      await transport.request(sessionName, 'pane.get', { pane_id: paneId })
-    ).pane
-    const workspaceId = pane.workspace_id
+    const pane = await transport.sdk.run(sessionName, (herdr) =>
+      herdr.panes.get(herdr.ids.pane(paneId))
+    )
+    const workspaceId = pane.workspaceId
     if (workspaceId) {
-      const listed = unwrapHerdrResponse<{ panes: { pane_id: string }[] }>(
-        await transport.request(sessionName, 'pane.list', { workspace_id: workspaceId })
-      ).panes
+      const listed = await transport.sdk.run(sessionName, (herdr) =>
+        herdr.panes.list({ workspaceId })
+      )
       if (listed.length <= 1) {
-        unwrapHerdrResponse(
-          await transport.request(sessionName, 'workspace.close', { workspace_id: workspaceId })
-        )
+        await closeHerdrWorkspace(transport, sessionName, workspaceId)
         return
       }
     }
   } catch {
     // Last-pane lookup failed; close the pane directly.
   }
-  unwrapHerdrResponse(await transport.request(sessionName, 'pane.close', { pane_id: paneId }))
+  await closeHerdrPane(transport, sessionName, paneId)
 }
 
 export function retireExitedHerdrPane(

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { herdrSessionNameForProject } from '../../../../shared/horca/herdr-session-identity'
 import { SessionNotFoundError } from '../../../daemon/daemon-errors'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../../types'
-import { unwrapHerdrResponse } from './herdr-runtime-contract'
+
 import type { HerdrHostTransport } from './herdr-runtime-contract'
 import {
   assertHerdrMigrationReady,
@@ -101,8 +101,8 @@ export async function spawnHerdrPtyPane(args: {
     sessionName,
     leafId: target.identity.leafId,
     paneId: resolvedPaneId,
-    request: async (name, method, params) =>
-      unwrapHerdrResponse(await runtime.transport.request(name, method, params)),
+    startAgent: (input) =>
+      runtime.transport.sdk.run(sessionName, (herdr) => herdr.agents.start(input)),
     writeCommand: (text) => {
       void writeSharedHerdrInput(binding, text).catch((error: unknown) => {
         console.warn(`[herdr] Failed to write startup command to pane ${resolvedPaneId}:`, error)

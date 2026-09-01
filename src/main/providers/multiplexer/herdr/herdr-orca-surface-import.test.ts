@@ -4,7 +4,12 @@ import { ORCA_BINDING_TOKEN, orcaPaneBinding, orcaWorkspaceBinding } from './her
 import { herdrLayoutToOrcaLayout } from './herdr-orca-surface-actions'
 import { collectUnboundHerdrSurfaces } from './herdr-orca-surface-import'
 import { decodeHerdrPtyId } from './herdr-pty-types'
-import { HERDR_PROTOCOL_VERSION, type HerdrSessionSnapshot } from './herdr-runtime-contract'
+import {
+  asSessionSnapshot,
+  testLayout,
+  testSnapshot,
+  type LooseRecord
+} from './herdr-sdk-test-snapshot'
 
 const project: Project = {
   id: 'project-1',
@@ -17,17 +22,8 @@ const project: Project = {
 
 const worktree = { id: 'wt-1', path: '/repo', displayName: 'repo' }
 
-function snapshot(overrides: Partial<HerdrSessionSnapshot> = {}): HerdrSessionSnapshot {
-  return {
-    version: '0.8.2',
-    protocol: HERDR_PROTOCOL_VERSION,
-    workspaces: [],
-    tabs: [],
-    panes: [],
-    layouts: [],
-    agents: [],
-    ...overrides
-  }
+function snapshot(overrides: LooseRecord = {}) {
+  return asSessionSnapshot(testSnapshot(overrides))
 }
 
 describe('collectUnboundHerdrSurfaces', () => {
@@ -328,7 +324,7 @@ describe('herdrLayoutToOrcaLayout', () => {
   it('rebuilds a recursive layout with more than two panes', () => {
     expect(
       herdrLayoutToOrcaLayout(
-        {
+        testLayout({
           workspace_id: 'workspace-1',
           tab_id: 'tab-1',
           focused_pane_id: 'pane-1',
@@ -352,7 +348,7 @@ describe('herdrLayoutToOrcaLayout', () => {
             }
           ],
           zoomed: false
-        },
+        }),
         new Map([
           ['pane-1', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }],
           ['pane-2', { worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-2' }],
