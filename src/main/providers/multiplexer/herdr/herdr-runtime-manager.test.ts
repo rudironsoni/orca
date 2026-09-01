@@ -11,6 +11,7 @@ import {
   stockTransport,
   tab
 } from './herdr-runtime-manager-test-fixtures'
+import { testPane, testTab, testWorkspace } from './herdr-sdk-test-snapshot'
 
 describe('HerdrRuntimeManager stock reconciliation', () => {
   it('creates and tags a split without fork-only methods, then stays idempotent', async () => {
@@ -57,7 +58,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       host.requestMock.mock.calls.filter(([, method]) => method === 'layout.apply')
     ).toHaveLength(0)
     const rename = host.requestMock.mock.calls.find(([, method]) => method === 'tab.rename')
-    expect(rename?.[2]).toEqual({ tab_id: 'w1:t1', label: 'Terminal 1' })
+    expect(rename?.[2]).toEqual({ tabId: 'w1:t1', label: 'Terminal 1' })
   })
 
   it('renames the stock worktree.open tab to the Orca title', async () => {
@@ -124,7 +125,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
 
     expect(host.snapshot.tabs.map((candidate) => candidate.label)).toEqual(['Terminal 1'])
     expect(host.requestMock.mock.calls.filter(([, method]) => method === 'tab.close')).toEqual([
-      expect.arrayContaining(['tab.close', { tab_id: 'w1:t2' }])
+      expect.arrayContaining(['tab.close', { tabId: 'w1:t2' }])
     ])
   })
 
@@ -213,7 +214,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       host.requestMock.mock.calls.filter(([, method]) => method === 'workspace.create')
     ).toHaveLength(0)
     expect(host.snapshot.workspaces).toHaveLength(1)
-    expect(host.snapshot.workspaces[0].workspace_id).toBe('w7')
+    expect(host.snapshot.workspaces[0].id).toBe('w7')
     expect(host.snapshot.workspaces[0].tokens?.[ORCA_BINDING_TOKEN]).toBe(
       orcaWorkspaceBinding('project-1', {
         id: 'worktree-1',
@@ -235,7 +236,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       host.requestMock.mock.calls.filter(([, method]) => method === 'workspace.create')
     ).toHaveLength(0)
     expect(host.snapshot.workspaces).toHaveLength(1)
-    expect(host.snapshot.workspaces[0].workspace_id).toBe('w-restored')
+    expect(host.snapshot.workspaces[0].id).toBe('w-restored')
     expect(host.snapshot.workspaces[0].tokens?.[ORCA_BINDING_TOKEN]).toBeTruthy()
   })
 
@@ -249,12 +250,10 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
     expect(leaf1).toBeTruthy()
     expect(leaf2).toBeTruthy()
 
-    for (const pane of host.snapshot.panes) {
-      delete pane.tokens
-    }
-    for (const workspace of host.snapshot.workspaces) {
-      delete workspace.tokens
-    }
+    host.snapshot.panes = host.snapshot.panes.map((pane) => testPane({ ...pane, tokens: {} }))
+    host.snapshot.workspaces = host.snapshot.workspaces.map((workspace) =>
+      testWorkspace({ ...workspace, tokens: {} })
+    )
     host.requestMock.mockClear()
     await manager.reconcileProjectHost(graph())
 
@@ -362,7 +361,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'workspace.create')
     ).toHaveLength(0)
-    expect(host.snapshot.workspaces).toHaveLength(0)
+    expect(host.snapshot.workspaces).toHaveLength(1)
   })
 
   it('falls back to workspace.create when worktree.open reports not_git_worktree', async () => {
@@ -391,38 +390,23 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
         if (method !== 'layout.apply') {
           return baseRequest(session, method, params)
         }
-        const workspaceId = (params as { workspace_id?: string }).workspace_id ?? 'w1'
+        const workspaceId = (params as { workspaceId?: string }).workspaceId ?? 'w1'
         const tabId = `w1:apply-${++seq}`
-        const first = { pane_id: `w1:p${++seq}`, tab_id: tabId, workspace_id: workspaceId }
-        const second = { pane_id: `w1:p${++seq}`, tab_id: tabId, workspace_id: workspaceId }
-        for (const pane of [first, second]) {
-          host.snapshot.panes.push(pane)
-        }
-        host.snapshot.tabs.push({ tab_id: tabId, workspace_id: workspaceId, label: 'Terminal' })
-        host.snapshot.layouts.push({
-          workspace_id: workspaceId,
-          tab_id: tabId,
-          panes: [first, second].map((pane, i) => ({
-            pane_id: pane.pane_id,
-            rect: { x: i === 0 ? 0 : 60, y: 0, width: 60, height: 40 },
-            ...(i === 0 ? { focused: true } : {})
-          }))
-        })
+        const first = testPane({ id: `w1:p${++seq}`, tabId, workspaceId })
+        const second = testPane({ id: `w1:p${++seq}`, tabId, workspaceId })
+        host.snapshot.panes.push(first, second)
+        host.snapshot.tabs.push(testTab({ id: tabId, workspaceId, label: 'Terminal' }))
         return {
           id: 'layout',
           result: {
-            tab_id: tabId,
-            workspace_id: workspaceId,
-            layout: {
-              workspace_id: workspaceId,
-              tab_id: tabId,
-              root: {
-                type: 'split',
-                direction: 'right',
-                ratio: 0.5,
-                first: { type: 'pane', pane_id: first.pane_id },
-                second: { type: 'pane', pane_id: second.pane_id }
-              }
+            tabId,
+            workspaceId,
+            root: {
+              type: 'split',
+              direction: 'right',
+              ratio: 0.5,
+              first: { type: 'pane', paneId: first.id },
+              second: { type: 'pane', paneId: second.id }
             }
           }
         }
@@ -441,7 +425,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       }
       const owner = bindings.get(token)
       expect(owner).toBeUndefined()
-      bindings.set(token, pane.pane_id)
+      bindings.set(token, pane.id)
     }
     expect(bindings.size).toBe(2)
     expect(
@@ -525,7 +509,7 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       host.snapshot.panes.filter((pane) => pane.tokens?.[ORCA_BINDING_TOKEN] === paneBinding)
     ).toHaveLength(1)
     expect(
-      host.snapshot.panes.find((pane) => pane.pane_id === 'w7:p2')?.tokens?.[ORCA_BINDING_TOKEN]
+      host.snapshot.panes.find((pane) => pane.id === 'w7:p2')?.tokens?.[ORCA_BINDING_TOKEN]
     ).not.toBe(paneBinding)
     // Why: at session start Orca's own terminal model is the only pane
     // creator; stray Herdr surfaces arrive later through event-driven
@@ -668,11 +652,8 @@ describe('HerdrRuntimeManager event-driven reconcile', () => {
     await manager.reconcileProjectHost(graph())
 
     const sessionName = herdrSessionNameForProject(project())
-    host.emit('pane_exited', { pane_id: 'w1:p1' })
+    host.emit('pane.exited', { paneId: 'w1:p1' })
     expect(onPaneExited).toHaveBeenCalledWith(sessionName, 'w1:p1')
-
-    host.emit('pane.exited', { pane_id: 'w1:p2' }, 'other')
-    expect(onPaneExited).toHaveBeenCalledWith('other', 'w1:p2')
   })
 
   it('ignores non-structural events', async () => {

@@ -7,6 +7,7 @@ import {
   singleLeafGraph,
   stockTransport
 } from './herdr-runtime-manager-test-fixtures'
+import { testPane } from './herdr-sdk-test-snapshot'
 
 describe('HerdrRuntimeManager startup pane authority', () => {
   it('does not import an unbound sibling pane at session start', async () => {
@@ -23,11 +24,13 @@ describe('HerdrRuntimeManager startup pane authority', () => {
     const tab = host.snapshot.tabs[0]
     expect(workspace).toBeTruthy()
     expect(tab).toBeTruthy()
-    host.snapshot.panes.push({
-      pane_id: 'w1:p-imported',
-      tab_id: tab.tab_id,
-      workspace_id: workspace.workspace_id
-    })
+    host.snapshot.panes.push(
+      testPane({
+        id: 'w1:p-imported',
+        tabId: tab.id,
+        workspaceId: workspace.id
+      })
+    )
 
     await manager.reconcileProjectHost(singleLeafGraph())
     expect(persist).not.toHaveBeenCalled()
@@ -73,7 +76,7 @@ describe('HerdrRuntimeManager startup pane authority', () => {
     expect(
       host.requestMock.mock.calls.filter(([, method]) => method === 'layout.apply')
     ).toHaveLength(0)
-    expect(host.snapshot.panes.find((pane) => pane.pane_id === 'w1:p1')?.tokens).toEqual({
+    expect(host.snapshot.panes.find((pane) => pane.id === 'w1:p1')?.tokens).toEqual({
       [ORCA_BINDING_TOKEN]: orcaPaneBinding('project-1', 'new-leaf')
     })
   })
@@ -93,11 +96,13 @@ describe('HerdrRuntimeManager startup pane authority', () => {
     const tab = host.snapshot.tabs[0]
     expect(workspace).toBeTruthy()
     expect(tab).toBeTruthy()
-    host.snapshot.panes.push({
-      pane_id: 'w1:p-imported',
-      tab_id: tab.tab_id,
-      workspace_id: workspace.workspace_id
-    })
+    host.snapshot.panes.push(
+      testPane({
+        id: 'w1:p-imported',
+        tabId: tab.id,
+        workspaceId: workspace.id
+      })
+    )
 
     host.emit('pane.created', {})
     await new Promise((resolve) => setTimeout(resolve, 300))
