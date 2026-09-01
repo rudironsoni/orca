@@ -16,6 +16,7 @@ import {
 import type { HerdrHostTransport, HerdrSessionSnapshot } from './herdr-runtime-contract'
 import { reportPaneTokens } from './herdr-sdk-ops'
 import { closeUnboundStockHerdrTabs, ensureTabLayout } from './herdr-tab-layout'
+import { nextOrcaTerminalTitle } from './herdr-tab-title'
 
 export async function materializeHerdrLeafPane(args: {
   transport: HerdrHostTransport
@@ -82,10 +83,10 @@ export async function bindSpawnLeafPane(args: {
     return null
   }
   const snapshot = await args.snapshot()
+  const existingTabs = args.graph.tabsByWorktreeId[worktree.id] ?? []
   const tab =
-    args.graph.tabsByWorktreeId[worktree.id]?.find(
-      (candidate) => candidate.id === args.identity.tabId
-    ) ?? syntheticSpawnTab(args.identity.tabId, worktree.id)
+    existingTabs.find((candidate) => candidate.id === args.identity.tabId) ??
+    syntheticSpawnTab(args.identity.tabId, worktree.id, existingTabs)
   const layoutRoot = args.graph.layoutsByTabId[args.identity.tabId]?.root
   const root =
     layoutRoot && collectLeafIds(layoutRoot).includes(args.identity.leafId)
@@ -114,7 +115,8 @@ export async function bindSpawnLeafPane(args: {
     liveSnapshot,
     args.graph.persistedPaneIdsByLeafId,
     { tab: ensured.seedTab, pane: ensured.seedPane },
-    (args.graph.tabsByWorktreeId[worktree.id] ?? []).length <= 1
+    existingTabs.length <= 1,
+    existingTabs
   )
   liveSnapshot = await args.snapshot()
   const livePaneBindings = desiredLeafBindings(args.graph.project.id, args.graph)
@@ -136,12 +138,18 @@ export async function bindSpawnLeafPane(args: {
   return args.paneIdsBySessionAndBinding.get(paneBindingMapKey(args.sessionName, binding)) ?? null
 }
 
-function syntheticSpawnTab(tabId: string, worktreeId: string): TerminalTab {
+function syntheticSpawnTab(
+  tabId: string,
+  worktreeId: string,
+  existingTabs: readonly TerminalTab[]
+): TerminalTab {
+  const title = nextOrcaTerminalTitle(existingTabs)
   return {
     id: tabId,
     ptyId: null,
     worktreeId,
-    title: '1',
+    title,
+    defaultTitle: title,
     customTitle: null,
     color: null,
     sortOrder: 0,
