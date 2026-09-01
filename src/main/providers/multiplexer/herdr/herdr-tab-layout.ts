@@ -1,6 +1,11 @@
 import type { TerminalPaneLayoutNode, TerminalTab } from '../../../../shared/terminal-tab-types'
 import { firstTerminalLeafId } from '../../../../shared/horca/herdr-session-identity'
-import type { HerdrHostTransport, HerdrSessionSnapshot, HerdrTab } from './herdr-runtime-contract'
+import type {
+  HerdrHostTransport,
+  HerdrPane,
+  HerdrSessionSnapshot,
+  HerdrTab
+} from './herdr-runtime-contract'
 import { HerdrRuntimeError } from './herdr-runtime-contract'
 import { closeHerdrTab, renameHerdrTab } from './herdr-sdk-ops'
 import {
@@ -103,8 +108,16 @@ export async function ensureTabLayout(
   tab: TerminalTab,
   root: TerminalPaneLayoutNode,
   snapshot: HerdrSessionSnapshot,
-  persistedPaneIds: Record<string, string>
+  persistedPaneIds: Record<string, string>,
+  seed?: { tab?: HerdrTab; pane?: HerdrPane },
+  adoptExisting = false
 ): Promise<void> {
+  if (seed?.tab && !snapshot.tabs.some((candidate) => candidate.id === seed.tab?.id)) {
+    snapshot = { ...snapshot, tabs: [...snapshot.tabs, seed.tab] }
+  }
+  if (seed?.pane && !snapshot.panes.some((candidate) => candidate.id === seed.pane?.id)) {
+    snapshot = { ...snapshot, panes: [...snapshot.panes, seed.pane] }
+  }
   const rootLeafId = firstTerminalLeafId(root)
   if (!rootLeafId) {
     return
@@ -151,14 +164,15 @@ export async function ensureTabLayout(
   // Why: materializeLeafPane used to leave one tab labeled leaf-<id>. Orca
   // persists title "1", so label match fails and tab.create would duplicate.
   // A tab already bound to another leaf is not leftover — mint a new tab.
+  if (!herdrTab && seed?.tab) {
+    herdrTab = snapshot.tabs.find((candidate) => candidate.id === seed.tab?.id) ?? seed.tab
+  }
   if (!herdrTab) {
     const workspaceTabs = snapshot.tabs.filter((candidate) => candidate.workspaceId === workspaceId)
-    if (workspaceTabs.length === 1) {
-      const only = workspaceTabs[0]
-      if (!tabBoundToOtherLeaf(snapshot, only.id, rootBinding)) {
-        herdrTab = only
-      }
-    }
+    herdrTab =
+      workspaceTabs.find(
+        (candidate) => !tabBoundToOtherLeaf(snapshot, candidate.id, rootBinding)
+      ) ?? (adoptExisting ? workspaceTabs[0] : undefined)
   }
 
   if (herdrTab && !rootPane) {
