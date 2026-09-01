@@ -1,13 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { HERDR_PROTOCOL_VERSION, HERDR_SCHEMA_VERSION } from './herdr-runtime-contract'
+import { HERDR_SCHEMA_VERSION, SUPPORTED_HERDR_PROTOCOLS } from './herdr-runtime-contract'
 
-// Why: the stock herdr release the e2e downloads (see
-// config/horca/scripts/download-herdr-release.mjs) must speak the protocol and schema
-// the runtime contract asserts, or assertHerdrServerCompatible fails at the
-// first handshake. Pinning both in config/horca/herdr-version.json lets this test
-// catch a pin/code drift at unit-test time instead of in a live CI lane.
+// Why: the bundled herdr pin must be one of the protocols the SDK handshake accepts.
 describe('herdr release version pin', () => {
   it('matches the protocol and schema the runtime contract expects', () => {
     const pin = JSON.parse(
@@ -22,7 +18,7 @@ describe('herdr release version pin', () => {
 
     expect(pin.version).toMatch(/^\d+\.\d+\.\d+(?:-preview\.[0-9a-z.-]+)?$/)
     expect(pin.tag).toMatch(/^preview-/)
-    expect(pin.protocol).toBe(HERDR_PROTOCOL_VERSION)
+    expect(SUPPORTED_HERDR_PROTOCOLS).toContain(pin.protocol)
     expect(pin.schemaVersion).toBe(HERDR_SCHEMA_VERSION)
     expect(pin.sha256).toEqual({
       'herdr-linux-aarch64': expect.stringMatching(/^[a-f0-9]{64}$/),
