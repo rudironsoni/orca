@@ -29,7 +29,11 @@ function isForkOnly(path) {
 }
 
 function isDenied(path) {
-  return policy.deniedOverlayPrefixes.some((prefix) => path.startsWith(prefix))
+  const deniedPaths = policy.deniedOverlayPaths ?? []
+  return (
+    deniedPaths.includes(path) ||
+    policy.deniedOverlayPrefixes.some((prefix) => path.startsWith(prefix))
+  )
 }
 
 const failures = []
