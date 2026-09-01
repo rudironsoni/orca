@@ -36,13 +36,17 @@ export async function spawnHerdrPtyPane(args: {
 }): Promise<PtySpawnResult> {
   const { opts, target, persistedIdentity, runtime } = args
   await assertHerdrMigrationReady(target, args.fallback)
-  await runtime.manager.reconcileProjectHost(target.graph)
+  const snapshot = await runtime.manager.reconcileProjectHost(target.graph)
   const sessionName = herdrSessionNameForProject(target.project, args.sharedName)
+  const livePaneIds = new Set(snapshot.panes.map((pane) => pane.id))
   let paneId = runtime.manager.getPaneId(
     sessionName,
     target.identity.projectId,
     target.identity.leafId
   )
+  if (paneId && !livePaneIds.has(paneId)) {
+    paneId = null
+  }
   if (!paneId) {
     const worktree =
       target.graph.worktrees.find((candidate) => candidate.id === target.identity.worktreeId) ??
@@ -60,23 +64,21 @@ export async function spawnHerdrPtyPane(args: {
     paneId = await runtime.manager.bindSpawnLeafPane(target.graph, target.identity)
   }
   await target.activateHerdr?.()
-  const resolvedPaneId =
-    paneId ??
-    runtime.manager.getPaneId(sessionName, target.identity.projectId, target.identity.leafId)
-  if (!resolvedPaneId) {
+  const attachPaneId = paneId
+  if (!attachPaneId) {
     if (opts.attachOnly === true && persistedIdentity !== null) {
       throw new SessionNotFoundError(opts.sessionId ?? '')
     }
     throw new Error(`Herdr pane is not reconciled: ${target.identity.leafId}`)
   }
-  const controller = openSharedHerdrPaneController(runtime.transport, sessionName, resolvedPaneId, {
+  const controller = openSharedHerdrPaneController(runtime.transport, sessionName, attachPaneId, {
     cols: opts.cols,
     rows: opts.rows
   })
   const identity: HerdrPtyIdentity = {
     ...target.identity,
     version: 2,
-    paneId: resolvedPaneId
+    paneId: attachPaneId
   }
   const id = encodeHerdrPtyId(identity)
   const incarnationId = opts.expectedIncarnationId ?? randomUUID()
@@ -85,7 +87,7 @@ export async function spawnHerdrPtyPane(args: {
     controller,
     transport: runtime.transport,
     identity,
-    paneId: resolvedPaneId,
+    paneId: attachPaneId,
     sessionName,
     incarnationId,
     cwd: opts.cwd ?? '',
@@ -100,12 +102,12 @@ export async function spawnHerdrPtyPane(args: {
     command: opts.command,
     sessionName,
     leafId: target.identity.leafId,
-    paneId: resolvedPaneId,
+    paneId: attachPaneId,
     startAgent: (input) =>
       runtime.transport.sdk.run(sessionName, (herdr) => herdr.agents.start(input)),
     writeCommand: (text) => {
       void writeSharedHerdrInput(binding, text).catch((error: unknown) => {
-        console.warn(`[herdr] Failed to write startup command to pane ${resolvedPaneId}:`, error)
+        console.warn(`[herdr] Failed to write startup command to pane ${attachPaneId}:`, error)
       })
     }
   })

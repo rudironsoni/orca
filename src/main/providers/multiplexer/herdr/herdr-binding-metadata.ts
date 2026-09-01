@@ -228,6 +228,13 @@ export function rememberOrcaPaneBindings(
   _projectId: string,
   snapshot: { panes: readonly { id: string; tokens?: Record<string, string> }[] }
 ): void {
+  const prefix = `${sessionName}:`
+  const live = new Set(snapshot.panes.map((pane) => pane.id))
+  for (const [key, paneId] of paneIdsBySessionAndBinding) {
+    if (key.startsWith(prefix) && !live.has(paneId)) {
+      paneIdsBySessionAndBinding.delete(key)
+    }
+  }
   for (const pane of snapshot.panes) {
     const token = pane.tokens?.[ORCA_BINDING_TOKEN]
     if (token) {
