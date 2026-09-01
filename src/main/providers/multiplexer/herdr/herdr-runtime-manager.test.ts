@@ -619,6 +619,32 @@ describe('HerdrRuntimeManager stock reconciliation', () => {
       firstPane
     )
   })
+
+  it('adopts the workspace.create tab on spawn instead of minting a UUID-labeled tab', async () => {
+    const host = stockTransport()
+    const manager = new HerdrRuntimeManager(host.transport)
+    const leafId = '24f6c5d7-8592-4fd8-8f4c-363ba048a90b'
+    const paneId = await manager.bindSpawnLeafPane(
+      {
+        ...singleLeafGraph(),
+        tabsByWorktreeId: { 'worktree-1': [] },
+        layoutsByTabId: {}
+      },
+      {
+        projectId: 'project-1',
+        worktreeId: 'worktree-1',
+        tabId: leafId,
+        leafId
+      }
+    )
+
+    expect(paneId).toBe('w1:p1')
+    expect(host.snapshot.tabs).toHaveLength(1)
+    expect(host.snapshot.tabs[0]?.label).not.toBe(leafId)
+    expect(
+      host.requestMock.mock.calls.filter(([, method]) => method === 'tab.create')
+    ).toHaveLength(0)
+  })
 })
 
 describe('HerdrRuntimeManager event-driven reconcile', () => {
