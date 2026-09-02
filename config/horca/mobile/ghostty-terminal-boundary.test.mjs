@@ -14,8 +14,8 @@ const terminalPane = readFileSync(
   resolve(mobileRoot, 'src', 'session', 'TerminalPaneView.tsx'),
   'utf8'
 )
-const sessionRoute = readFileSync(
-  resolve(mobileRoot, 'app', 'h', '[hostId]', 'session', '[worktreeId].tsx'),
+const sessionResize = readFileSync(
+  resolve(mobileRoot, 'src', 'session', 'use-mobile-session-terminal-webview.ts'),
   'utf8'
 )
 
@@ -53,9 +53,9 @@ test('uses a mobile-sized default terminal font', () => {
 })
 
 test('updates the live subscriber before falling back to snapshot replay', () => {
-  const resizeStart = sessionRoute.indexOf('const handleTerminalNativeResize = useCallback(')
-  const resizeEnd = sessionRoute.indexOf('\n\n  useEffect(', resizeStart)
-  const resizeImplementation = sessionRoute.slice(resizeStart, resizeEnd)
+  const resizeStart = sessionResize.indexOf('const handleTerminalNativeResize = useCallback(')
+  const resizeEnd = sessionResize.indexOf('\n\n  useEffect(', resizeStart)
+  const resizeImplementation = sessionResize.slice(resizeStart, resizeEnd)
   const requestIndex = resizeImplementation.indexOf('.request(client, handle, deviceToken')
   const cacheIndex = resizeImplementation.indexOf(
     'client.updateTerminalSubscriptionViewport(handle, { cols, rows })'
