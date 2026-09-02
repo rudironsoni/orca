@@ -6,11 +6,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..')
 const outputRoot = join(repoRoot, 'out', 'horca-mobile')
 const mobileOutput = join(outputRoot, 'mobile')
-const downstreamPatches = [
-  join(import.meta.dirname, 'ghostty-port.patch'),
-  join(import.meta.dirname, 'horca-branding.patch'),
-  join(import.meta.dirname, 'ios-scene-lifecycle.patch')
-]
+const downstreamPatches = [join(import.meta.dirname, 'ghostty-port.patch')]
 const downstreamFiles = [
   {
     source: join(import.meta.dirname, 'ios-scene-lifecycle.js'),
