@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Create maintenance token
         id: app
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.HORCA_APP_ID }}
           private-key: ${{ secrets.HORCA_APP_PRIVATE_KEY }}
@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload conflict report
         if: steps.rebase.outcome == 'failure'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: horca-sync-conflict-${{ steps.state.outputs.upstream_sha }}
           path: |
@@ -176,7 +176,7 @@ jobs:
     steps:
       - name: Create maintenance token
         id: app
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.HORCA_APP_ID }}
           private-key: ${{ secrets.HORCA_APP_PRIVATE_KEY }}
