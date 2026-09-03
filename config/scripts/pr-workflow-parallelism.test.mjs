@@ -323,7 +323,7 @@ describe('PR workflow parallelism', () => {
     expect(dependencyInstall.run).toContain('--frozen-lockfile')
     expect(dependencyInstall.run).not.toContain('--no-frozen-lockfile')
     expect(dependencyInstall.run).toContain(
-      'git -C "$GITHUB_WORKSPACE" diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml'
+      'git -C "$GITHUB_WORKSPACE" -c diff.mnemonicPrefix=false -c diff.noprefix=false diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml'
     )
     expect(dependencyInstall.run).toContain('--ignore-scripts')
     expect(dependencyInstall.run).not.toContain('--os=')
