@@ -23,10 +23,14 @@ export async function commitChanges(
       }
       return null
     }
+    const stdout = readStringField('stdout')
+    const stderr = readStringField('stderr')
+    // Why: leftover hook banners land on stderr even when git already wrote
+    // "nothing to commit" on stdout. Prefer that git message so the UI is truthful.
     const errorMessage =
-      readStringField('stderr') ??
-      readStringField('stdout') ??
-      (error instanceof Error ? error.message : 'Commit failed')
+      stdout && /nothing to commit|working tree clean/i.test(stdout)
+        ? stdout
+        : (stderr ?? stdout ?? (error instanceof Error ? error.message : 'Commit failed'))
     return { success: false, error: errorMessage }
   } finally {
     invalidateGitReadCaches()
