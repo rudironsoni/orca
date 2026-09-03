@@ -29,43 +29,8 @@
   ],
   "deniedOverlayPrefixes": [".github/workflows/", "src/renderer/src/i18n/locales/", "tests/e2e/"],
   "deniedOverlayPaths": ["src/main/index.ts", "src/main/updater.ts"],
-  "temporarySubsystems": ["claude-upstream-pr-16673"],
+  "temporarySubsystems": [],
   "overlays": [
-    {
-      "path": "src/main/claude-accounts/claude-account-service-login-process.test.ts",
-      "subsystem": "claude-upstream-pr-16673",
-      "reason": "Carry the exact upstream contribution patch until it lands",
-      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
-      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
-    },
-    {
-      "path": "src/main/claude-accounts/claude-command-process.ts",
-      "subsystem": "claude-upstream-pr-16673",
-      "reason": "Carry the exact upstream contribution patch until it lands",
-      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
-      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
-    },
-    {
-      "path": "src/main/claude-accounts/claude-login-session.ts",
-      "subsystem": "claude-upstream-pr-16673",
-      "reason": "Carry the exact upstream contribution patch until it lands",
-      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
-      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
-    },
-    {
-      "path": "src/main/claude-accounts/keychain.test.ts",
-      "subsystem": "claude-upstream-pr-16673",
-      "reason": "Carry the exact upstream contribution patch until it lands",
-      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
-      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
-    },
-    {
-      "path": "src/main/claude-accounts/keychain.ts",
-      "subsystem": "claude-upstream-pr-16673",
-      "reason": "Carry the exact upstream contribution patch until it lands",
-      "upstreamPr": "https://github.com/stablyai/orca/pull/16673",
-      "dropWhen": "Upstream contains a patch-equivalent Claude account fix"
-    },
     {
       "path": "src/main/daemon/daemon-provider-state.ts",
       "subsystem": "terminal-backend-seam",
