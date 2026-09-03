@@ -57,6 +57,7 @@ export function createSshIpcMocks(): SshIpcMocks {
       attach: vi.fn(),
       attachForReconnect: vi.fn().mockResolvedValue({}),
       shutdown: vi.fn(),
+      dispose: vi.fn(),
       providerGeneration: 0
     },
     mockFsProvider: {},
