@@ -19,7 +19,8 @@ export function HorcaTerminalBackendSection(): React.JSX.Element | null {
       return
     }
     let active = true
-    void window.api.horcaTerminalSettings?.getHerdrHealth().then((next) => {
+    const healthApi = typeof window !== 'undefined' ? window.api?.horcaTerminalSettings : undefined
+    void healthApi?.getHerdrHealth().then((next) => {
       if (active) {
         setHealth(next)
       }
