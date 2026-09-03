@@ -128,31 +128,35 @@ describe('filesystem-watcher real @parcel/watcher integration', () => {
     15_000
   )
 
-  // Why: this is the end-to-end repro, and it fails differently per platform
-  // without the fix — Linux cannot inotify-watch the alias at all (IN_ONLYDIR),
-  // macOS watches it but reports paths under the resolved root. Both leave the
-  // renderer with events outside the root it subscribed with. One assertion
-  // covers both: the emitted paths must stay under the subscribed spelling.
-  it('reports events under an aliased worktree root, not its resolved path', async () => {
-    const root = await createAliasedWatcherRoot('orca-fswatch-alias-')
-    aliasedRoot = root
-    await mkdir(join(root.realRoot, 'src'), { recursive: true })
+  // Why: Linux cannot inotify-watch the alias (IN_ONLYDIR). macOS developer
+  // sandboxes load the addon while suppressing subscribe callbacks, so this
+  // would be an environment check rather than a rewrite check (same reason the
+  // create-event case above is linux-only). The rewrite itself is covered by
+  // filesystem-watcher-canonical-root-paths.test.ts.
+  it.runIf(process.platform === 'linux')(
+    'reports events under an aliased worktree root, not its resolved path',
+    async () => {
+      const root = await createAliasedWatcherRoot('orca-fswatch-alias-')
+      aliasedRoot = root
+      await mkdir(join(root.realRoot, 'src'), { recursive: true })
 
-    const sendMock = vi.fn()
-    const sender = { isDestroyed: () => false, send: sendMock, once: vi.fn(), id: 1 }
-    await handlers['fs:watchWorktree']({ sender }, { worktreePath: root.aliasRoot })
+      const sendMock = vi.fn()
+      const sender = { isDestroyed: () => false, send: sendMock, once: vi.fn(), id: 1 }
+      await handlers['fs:watchWorktree']({ sender }, { worktreePath: root.aliasRoot })
 
-    const expectedPath = join(root.aliasRoot, 'src', 'agent-edit.ts')
-    await writeFile(join(root.realRoot, 'src', 'agent-edit.ts'), 'hello')
+      const expectedPath = join(root.aliasRoot, 'src', 'agent-edit.ts')
+      await writeFile(join(root.realRoot, 'src', 'agent-edit.ts'), 'hello')
 
-    await waitFor(() =>
-      sendMock.mock.calls.some(
-        ([channel, payload]) =>
-          channel === 'fs:changed' &&
-          (payload as FsChangedCall).events.some((event) => event.absolutePath === expectedPath)
+      await waitFor(() =>
+        sendMock.mock.calls.some(
+          ([channel, payload]) =>
+            channel === 'fs:changed' &&
+            (payload as FsChangedCall).events.some((event) => event.absolutePath === expectedPath)
+        )
       )
-    )
 
-    await handlers['fs:unwatchWorktree']({ sender: { id: 1 } }, { worktreePath: root.aliasRoot })
-  }, 15_000)
+      await handlers['fs:unwatchWorktree']({ sender: { id: 1 } }, { worktreePath: root.aliasRoot })
+    },
+    15_000
+  )
 })
