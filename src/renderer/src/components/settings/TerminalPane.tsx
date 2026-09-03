@@ -63,7 +63,7 @@ export function TerminalPane({
     showWindowsHostSettings && windowsShell === 'powershell.exe'
 
   const visibleSections = [
-    matchesHorcaTerminalSettingsSearch(searchQuery) ? (
+    typeof window !== 'undefined' && matchesHorcaTerminalSettingsSearch(searchQuery) ? (
       <HorcaTerminalBackendSection key="horca-terminal-backend" />
     ) : null,
     showWindowsHostSettings &&

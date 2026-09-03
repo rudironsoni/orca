@@ -10,7 +10,7 @@ export function useHorcaTerminalSettings(): {
   updateDefaults(update: HorcaTerminalDefaultsUpdate): Promise<void>
   updateProject(projectId: string, update: HorcaProjectTerminalSettingsUpdate): Promise<void>
 } {
-  const api = window.api.horcaTerminalSettings
+  const api = typeof window !== 'undefined' ? window.api?.horcaTerminalSettings : undefined
   const [snapshot, setSnapshot] = useState<HorcaTerminalSettingsSnapshot | null>(null)
 
   useEffect(() => {
