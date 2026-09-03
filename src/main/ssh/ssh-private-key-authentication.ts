@@ -45,11 +45,13 @@ export function configurePrivateKeyAuthentication(
   passphraseKeyPath?: string
 ): void {
   const firstKey = keys[0]
-  if (firstKey) {
+  // Why: ssh2 parses config.privateKey at connect(), before authHandler. Encrypted
+  // keys must stay on the passphrase queue or connect throws before MFA can run.
+  if (firstKey && firstKey.path !== passphraseKeyPath) {
     config.privateKey = firstKey.contents
-    if (passphraseKeyPath) {
-      passphraseKeyPaths.set(config, passphraseKeyPath)
-    }
+  }
+  if (passphraseKeyPath) {
+    passphraseKeyPaths.set(config, passphraseKeyPath)
   }
 
   // Why this replaces ssh2's own handler for every target, not just multi-key ones: ssh2 walks one
