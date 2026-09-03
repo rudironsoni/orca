@@ -83,6 +83,7 @@ export function gitInit(dir: string): void {
   execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' })
   execFileSync('git', ['config', 'user.email', TEST_GIT_USER_EMAIL], { cwd: dir, stdio: 'pipe' })
   execFileSync('git', ['config', 'user.name', TEST_GIT_USER_NAME], { cwd: dir, stdio: 'pipe' })
+  execFileSync('git', ['config', 'core.hooksPath', '/dev/null'], { cwd: dir, stdio: 'pipe' })
 }
 
 export function gitCommit(dir: string, message: string): void {
