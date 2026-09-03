@@ -541,6 +541,111 @@
       "reason": "Use the active product name in renderer recovery copy",
       "upstreamPr": null,
       "dropWhen": "Upstream renders its product identity through a generic provider"
+    },
+    {
+      "path": ".github/actions/install-node-dependencies/action.yml",
+      "subsystem": "ci-git-diff-prefixes",
+      "reason": "Pin mnemonicPrefix=false and noprefix=false so the lockfile diff uses a/ b/ prefixes",
+      "upstreamPr": null,
+      "dropWhen": "Upstream pins those git config flags on the lockfile diff"
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "subsystem": "ci-git-diff-prefixes",
+      "reason": "Assert the lockfile diff pins mnemonicPrefix=false and noprefix=false",
+      "upstreamPr": null,
+      "dropWhen": "The action.yml overlay drops"
+    },
+    {
+      "path": "src/main/git/source-control/commit-changes.ts",
+      "subsystem": "git-commit-error-surface",
+      "reason": "Prefer nothing-to-commit stdout over leftover hook stderr",
+      "upstreamPr": null,
+      "dropWhen": "Upstream prefers that git stdout when hooks write leftover stderr"
+    },
+    {
+      "path": "src/main/git/commit.test.ts",
+      "subsystem": "git-commit-error-surface",
+      "reason": "Cover leftover hook stderr when git already wrote nothing-to-commit",
+      "upstreamPr": null,
+      "dropWhen": "The commit-changes.ts overlay drops"
+    },
+    {
+      "path": "src/relay/git-handler-worktree-ops.ts",
+      "subsystem": "git-commit-error-surface",
+      "reason": "Prefer nothing-to-commit stdout over leftover hook stderr on the relay path",
+      "upstreamPr": null,
+      "dropWhen": "Upstream prefers that git stdout when hooks write leftover stderr"
+    },
+    {
+      "path": "src/relay/git-handler-test-setup.ts",
+      "subsystem": "git-test-hook-isolation",
+      "reason": "Disable leftover host hooks in gitInit test repos",
+      "upstreamPr": null,
+      "dropWhen": "Upstream sets core.hooksPath=/dev/null in gitInit"
+    },
+    {
+      "path": "src/main/git/worktree-base-divergence-real-git.test.ts",
+      "subsystem": "git-test-hook-isolation",
+      "reason": "Disable leftover host hooks in real-git test repos",
+      "upstreamPr": null,
+      "dropWhen": "Upstream sets core.hooksPath=/dev/null in createRepo"
+    },
+    {
+      "path": "src/main/ipc/ssh-ipc-mock-shapes.ts",
+      "subsystem": "ssh-pty-dispose-stubs",
+      "reason": "Type PtyProvider.dispose on the SSH IPC test mock",
+      "upstreamPr": null,
+      "dropWhen": "Upstream stubs PtyProvider.dispose in SSH IPC tests"
+    },
+    {
+      "path": "src/main/ipc/ssh-ipc-module-mocks.ts",
+      "subsystem": "ssh-pty-dispose-stubs",
+      "reason": "Stub PtyProvider.dispose so SSH session teardown does not throw",
+      "upstreamPr": null,
+      "dropWhen": "Upstream stubs PtyProvider.dispose in SSH IPC tests"
+    },
+    {
+      "path": "src/main/ipc/ssh-ipc-test-harness.ts",
+      "subsystem": "ssh-pty-dispose-stubs",
+      "reason": "Reset PtyProvider.dispose between SSH IPC cases",
+      "upstreamPr": null,
+      "dropWhen": "Upstream stubs PtyProvider.dispose in SSH IPC tests"
+    },
+    {
+      "path": "src/main/ssh/ssh-private-key-authentication.ts",
+      "subsystem": "ssh-encrypted-key-auth",
+      "reason": "Do not set config.privateKey when the first key is the encrypted passphrase path",
+      "upstreamPr": null,
+      "dropWhen": "Upstream withholds encrypted keys from config.privateKey until passphrase auth"
+    },
+    {
+      "path": "src/main/ipc/filesystem-watcher-real.test.ts",
+      "subsystem": "parcel-watcher-sandbox",
+      "reason": "Skip the aliased-root real @parcel/watcher case on sandboxed macOS",
+      "upstreamPr": null,
+      "dropWhen": "Upstream skips that case off Linux or the sandbox delivers callbacks"
+    },
+    {
+      "path": "src/main/native-chat/agent-session-wire/structured-tui-transcript-catchup.test.ts",
+      "subsystem": "native-chat-catchup-arm",
+      "reason": "Wait for the native chat watcher after catchup activate before appending",
+      "upstreamPr": null,
+      "dropWhen": "Upstream waits for getActiveNativeChatWatcherCount after activate"
+    },
+    {
+      "path": "src/shared/pty-startup-reply-echo-shapes.ts",
+      "subsystem": "pty-readline-visible-bell",
+      "reason": "Match readline visible-bell DECSCNM residue on DSR and OSC echoes",
+      "upstreamPr": null,
+      "dropWhen": "Upstream matches CSI ?5h/?5l residue as well as BEL residue"
+    },
+    {
+      "path": "src/shared/pty-startup-reply-echo-shapes.test.ts",
+      "subsystem": "pty-readline-visible-bell",
+      "reason": "Cover readline visible-bell DSR and OSC echo shapes",
+      "upstreamPr": null,
+      "dropWhen": "The pty-startup-reply-echo-shapes.ts overlay drops"
     }
   ]
 }
