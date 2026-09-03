@@ -18,6 +18,10 @@ const PACKAGED_RUNTIME_PACKAGE_ROOTS = [
   '@electron-toolkit/utils',
   '@linear/sdk',
   '@parcel/watcher',
+  // Why: @herdr/sdk's compiled AJV validators emit runtime requires of
+  // ajv/dist/runtime/* helpers evaluated when herdr session messages are
+  // validated; they resolve against packaged node_modules at runtime.
+  'ajv',
   'electron-updater',
   'i18next',
   'jsonc-parser',
