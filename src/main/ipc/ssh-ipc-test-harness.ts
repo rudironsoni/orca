@@ -241,6 +241,7 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     mockPtyProvider.onReplay.mockReset()
     mockPtyProvider.attachForReconnect.mockReset().mockResolvedValue({})
     mockPtyProvider.shutdown.mockReset()
+    mockPtyProvider.dispose.mockReset()
     mockPtyProvider.providerGeneration = 0
     mockRegisterSshGitProvider.mockReset()
     mockPortForwardManager.addForward.mockReset()
