@@ -36,8 +36,16 @@ test('resets the existing Ghostty session without reporting a fake process exit'
 test('keeps the Ghostty surface fitted to the React Native view', () => {
   assert.match(
     nativeView,
-    /override func layoutSubviews\(\) \{[\s\S]*?terminalView\.frame = bounds[\s\S]*?\n  \}/
+    /override func layoutSubviews\(\) \{[\s\S]*?terminalView\.frame = bounds[\s\S]*?terminalView\.fitToSize\(\)/
   )
+  assert.match(nativeView, /UIView\.noIntrinsicMetric/)
+  assert.match(nativeView, /terminalView\.setSurfaceVisible\(surfaceVisible\)/)
+})
+
+test('hides inactive Ghostty panes without opacity', () => {
+  assert.match(terminalPane, /surfaceVisible=\{active\}/)
+  assert.match(terminalPane, /isUsableTerminalViewport/)
+  assert.doesNotMatch(terminalPane, /opacity:\s*0/)
 })
 
 test('closes the native Ghostty event delegate extension', () => {
