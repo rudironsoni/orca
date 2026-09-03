@@ -52,6 +52,7 @@ export type SshPtyProviderMock = {
   attach: Mock
   attachForReconnect: Mock
   shutdown: Mock
+  dispose: Mock
   providerGeneration: number
 }
 
