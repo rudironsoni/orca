@@ -62,13 +62,15 @@ function caretEncodeControls(reply: string): string {
 }
 
 /**
- * Readline swallows the escape introducer, rings the bell, and echoes the residue — BEL
- * replaces `ESC ]` for an OSC reply and `ESC [ ?` for a private DSR. The DSR shape had no
- * projection at all, so `CSI ? … n` was never matched at a readline prompt.
+ * Readline swallows the escape introducer and echoes the residue. Audible bell
+ * replaces the introducer with BEL. Visible bell flashes the screen with
+ * DECSCNM (`CSI ? 5 h` / `CSI ? 5 l`) then prints the same residue. Both are
+ * reachable: this Mac's bash used the visible form, so a BEL-only needle left
+ * `997;1n` painted on the prompt.
  */
-function readlineEchoProjection(reply: string): string | null {
+function readlineResidue(reply: string): string | null {
   if (reply.includes('\x1b]')) {
-    return reply.replaceAll('\x1b]', '\x07').replaceAll('\x1b\\', '')
+    return reply.replaceAll('\x1b]', '').replaceAll('\x1b\\', '')
   }
   // Keyed on the private-DSR grammar, not a bare `ESC [ ?` prefix: DA1 (`ESC [ ? 1 ; 2 c`)
   // shares that prefix and is kept off this path today only by a predicate one module away.
@@ -76,8 +78,25 @@ function readlineEchoProjection(reply: string): string | null {
   if (!PRIVATE_DSR_RE.test(reply)) {
     return null
   }
-  const needle = `\x07${reply.slice(3)}`
-  return needle.length >= MIN_READLINE_NEEDLE_LENGTH ? needle : null
+  return reply.slice(3)
+}
+
+function readlineEchoProjections(reply: string): EchoProjection[] {
+  const residue = readlineResidue(reply)
+  if (residue === null) {
+    return []
+  }
+  const projections: EchoProjection[] = []
+  const belNeedle = `\x07${residue}`
+  if (belNeedle.length >= MIN_READLINE_NEEDLE_LENGTH) {
+    projections.push({ needle: belNeedle, holdPartial: true })
+  }
+  const visibleBellNeedle = `\x1b[?5h\x1b[?5l${residue}`
+  if (visibleBellNeedle.length >= MIN_READLINE_NEEDLE_LENGTH) {
+    // Starts with ESC: complete-match only, same reason as the verbatim reply shape.
+    projections.push({ needle: visibleBellNeedle, holdPartial: false })
+  }
+  return projections
 }
 
 export function replyEchoProjections(
@@ -96,12 +115,11 @@ export function replyEchoProjections(
     // wsl.exe is ConPTY-hosted but its echo shape is unverified; suppress nothing.
     return []
   }
-  const readline = readlineEchoProjection(reply)
   return [
     // The kernel's ECHOCTL caret form — the POSIX default.
     { needle: caretEncodeControls(reply), holdPartial: true },
     // Readline rewrites the reply, and echoes it even while the kernel reports ECHO clear.
-    ...(readline === null ? [] : [{ needle: readline, holdPartial: true }]),
+    ...readlineEchoProjections(reply),
     // A `stty -echoctl` tty echoes the reply verbatim. Complete-match-only, because it
     // starts with ESC — see `holdPartial`. We just wrote these exact bytes, and we are
     // the terminal, so a child emitting the identical span in the same window is not a
