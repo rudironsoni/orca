@@ -24,6 +24,12 @@ const LIVE_ECHOES: readonly { name: string; reply: string; echo: string }[] = [
   { name: 'OSC 10 BEL / readline', reply: OSC10_BEL, echo: '\x0710;rgb:c6c6/c6c6/c6c6\x07' },
   { name: 'DSR 997 / readline', reply: DSR_997, echo: '\x07997;1n' },
   { name: 'DSR 996 / readline', reply: DSR_996, echo: '\x07996n' },
+  {
+    name: 'OSC 11 ST / readline visible bell',
+    reply: OSC11_ST,
+    echo: '\x1b[?5h\x1b[?5l11;rgb:2e2e/3434/3434'
+  },
+  { name: 'DSR 997 / readline visible bell', reply: DSR_997, echo: '\x1b[?5h\x1b[?5l997;1n' },
   { name: 'OSC 11 BEL / cooked', reply: OSC11_BEL, echo: '^[]11;rgb:2e2e/3434/3434^G' },
   { name: 'OSC 11 ST / cooked', reply: OSC11_ST, echo: '^[]11;rgb:2e2e/3434/3434^[\\' },
   { name: 'OSC 10 BEL / cooked', reply: OSC10_BEL, echo: '^[]10;rgb:c6c6/c6c6/c6c6^G' },
@@ -102,6 +108,7 @@ describe('replyEchoProjections on a POSIX pty', () => {
       (projection) => projection.needle
     )
     expect(needles).toContain('\x07997;1n')
+    expect(needles).toContain('\x1b[?5h\x1b[?5l997;1n')
   })
 
   // A needle starting with ESC must never be held as a partial: a read ending on a bare
