@@ -68,6 +68,20 @@ describe('commitChanges', () => {
     })
   })
 
+  it('prefers nothing-to-commit stdout over leftover hook stderr', async () => {
+    gitExecFileAsyncMock.mockRejectedValue({
+      stdout: 'On branch main\nnothing to commit, working tree clean\n',
+      stderr: 'no config files with names ["lefthook"] have been found\n'
+    })
+
+    const result = await commitChanges('/repo', 'feat: empty with hook noise')
+
+    expect(result).toEqual({
+      success: false,
+      error: 'On branch main\nnothing to commit, working tree clean\n'
+    })
+  })
+
   it('falls back to Error.message when stdout/stderr are empty', async () => {
     gitExecFileAsyncMock.mockRejectedValue(new Error('spawn git ENOENT'))
 
