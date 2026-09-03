@@ -415,7 +415,6 @@ describe('SortableTab rename shortcut signal', () => {
   })
 
   it('labels a Herdr-backed terminal tab', async () => {
-    storeState.renamingTabId = null
     const rendered = expandNode(await renderSortableTab({ ptyId: 'herdr:encoded' }))
     const roots = findElementsByType(rendered, 'div')
 
