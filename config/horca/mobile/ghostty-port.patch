@@ -1,5 +1,5 @@
 diff --git a/mobile/README.md b/mobile/README.md
-index 64f1081..9682d76 100644
+index 64f1081b73..9682d76351 100644
 --- a/mobile/README.md
 +++ b/mobile/README.md
 @@ -92,7 +92,7 @@ Use `snapshot` first to find the current element refs, then click/fill those ref
@@ -29,8 +29,101 @@ index 64f1081..9682d76 100644
  │   └── transport/         # WebSocket RPC client
  ├── scripts/
  │   ├── test-subscribe.ts  # Desktop streaming repro without a phone
+diff --git a/mobile/app/_layout.tsx b/mobile/app/_layout.tsx
+index 9080cdedcf..da70dc9752 100644
+--- a/mobile/app/_layout.tsx
++++ b/mobile/app/_layout.tsx
+@@ -44,7 +44,7 @@ export default function RootLayout() {
+     void recoverMobileRelayPairing()
+   }, [])
+ 
+-  // Why: route `orca://pair?...` deep links to the confirm screen so
++  // Why: route `horca://pair?...` deep links to the confirm screen so
+   // the same pairing flow runs whether the link arrived via QR scan,
+   // paste, AirDrop, Messages, or `xcrun simctl openurl`. getInitialURL
+   // covers cold-start (link tapped while app was closed); the listener
+@@ -54,7 +54,7 @@ export default function RootLayout() {
+       const code = extractPairingCodeFromUrl(url)
+       if (code) {
+         // Why: Android camera launches can leave Expo Router's unmatched
+-        // `orca://pair` route underneath this screen; replacing keeps cancel
++        // `horca://pair` route underneath this screen; replacing keeps cancel
+         // and edge-back from revealing the router error page.
+         router.replace({ pathname: '/pair-confirm', params: { code } })
+       }
+diff --git a/mobile/app/about.tsx b/mobile/app/about.tsx
+index 70a1effa44..64789b95f5 100644
+--- a/mobile/app/about.tsx
++++ b/mobile/app/about.tsx
+@@ -51,7 +51,7 @@ export default function AboutScreen() {
+ 
+       <View style={styles.brand}>
+         <OrcaLogo size={28} />
+-        <Text style={styles.brandName}>Orca</Text>
++        <Text style={styles.brandName}>Horca</Text>
+         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
+       </View>
+ 
+diff --git a/mobile/app/mobile-onboarding.tsx b/mobile/app/mobile-onboarding.tsx
+index 50957a465f..32e2bdf538 100644
+--- a/mobile/app/mobile-onboarding.tsx
++++ b/mobile/app/mobile-onboarding.tsx
+@@ -144,7 +144,7 @@ function MobileOnboardingFlow({
+     <SafeAreaView style={styles.container}>
+       <View style={styles.brandRow}>
+         <OrcaLogo size={22} />
+-        <Text style={styles.brandName}>Orca</Text>
++        <Text style={styles.brandName}>Horca</Text>
+         {steps.length > 1 ? (
+           <View
+             accessible
+diff --git a/mobile/app/pair-scan.tsx b/mobile/app/pair-scan.tsx
+index 61e99f19f2..ef6d8539ce 100644
+--- a/mobile/app/pair-scan.tsx
++++ b/mobile/app/pair-scan.tsx
+@@ -251,7 +251,7 @@ export default function PairScanScreen() {
+           visible={pasteVisible}
+           title="Paste pairing code"
+           message="Copy the code shown under the QR on your computer."
+-          placeholder="orca://pair?code=... or paste the code"
++          placeholder="horca://pair?code=... or paste the code"
+           onSubmit={handlePasteSubmit}
+           onCancel={() => setPasteVisible(false)}
+         />
+@@ -266,7 +266,7 @@ export default function PairScanScreen() {
+       </Pressable>
+ 
+       <View style={styles.steps}>
+-        <Step number={1} text="Open Orca on your computer" />
++        <Step number={1} text="Open Horca on your computer" />
+         <Step number={2} text="Go to Settings → Mobile" />
+         <Step number={3} text="Scan the QR code" />
+       </View>
+@@ -349,7 +349,7 @@ export default function PairScanScreen() {
+         visible={pasteVisible}
+         title="Paste pairing code"
+         message="Copy the code shown under the QR on your computer."
+-        placeholder="orca://pair?code=... or paste the code"
++        placeholder="horca://pair?code=... or paste the code"
+         onSubmit={handlePasteSubmit}
+         onCancel={() => setPasteVisible(false)}
+       />
+diff --git a/mobile/app/terminal-settings.tsx b/mobile/app/terminal-settings.tsx
+index 860f906e77..2bdbdc32ac 100644
+--- a/mobile/app/terminal-settings.tsx
++++ b/mobile/app/terminal-settings.tsx
+@@ -29,8 +29,7 @@ type RestoreValue = 'indefinite' | '60s' | '5m' | '30m'
+ 
+ type TextSizeValue = 'smallest' | 'smaller' | 'default' | 'large' | 'larger' | 'largest'
+ 
+-// scale = baseline zoom the terminal WebView applies on top of fit-to-width.
+-// Keep in sync with TERMINAL_TEXT_SCALES; pinch-to-zoom snaps to these values.
++// Keep in sync with TERMINAL_TEXT_SCALES.
+ const TEXT_SIZE_OPTIONS: (PickerOption<TextSizeValue> & { scale: number })[] = [
+   { value: 'smallest', label: 'Smallest (50%)', scale: 0.5 },
+   { value: 'smaller', label: 'Smaller (75%)', scale: 0.75 },
 diff --git a/mobile/app.json b/mobile/app.json
-index d5a420c..5824914 100644
+index d5a420cc74..5824914fdb 100644
 --- a/mobile/app.json
 +++ b/mobile/app.json
 @@ -1,26 +1,20 @@
@@ -117,101 +210,8 @@ index d5a420c..5824914 100644
            }
          }
        ]
-diff --git a/mobile/app/_layout.tsx b/mobile/app/_layout.tsx
-index 9080cde..da70dc9 100644
---- a/mobile/app/_layout.tsx
-+++ b/mobile/app/_layout.tsx
-@@ -44,7 +44,7 @@ export default function RootLayout() {
-     void recoverMobileRelayPairing()
-   }, [])
- 
--  // Why: route `orca://pair?...` deep links to the confirm screen so
-+  // Why: route `horca://pair?...` deep links to the confirm screen so
-   // the same pairing flow runs whether the link arrived via QR scan,
-   // paste, AirDrop, Messages, or `xcrun simctl openurl`. getInitialURL
-   // covers cold-start (link tapped while app was closed); the listener
-@@ -54,7 +54,7 @@ export default function RootLayout() {
-       const code = extractPairingCodeFromUrl(url)
-       if (code) {
-         // Why: Android camera launches can leave Expo Router's unmatched
--        // `orca://pair` route underneath this screen; replacing keeps cancel
-+        // `horca://pair` route underneath this screen; replacing keeps cancel
-         // and edge-back from revealing the router error page.
-         router.replace({ pathname: '/pair-confirm', params: { code } })
-       }
-diff --git a/mobile/app/about.tsx b/mobile/app/about.tsx
-index 70a1eff..64789b9 100644
---- a/mobile/app/about.tsx
-+++ b/mobile/app/about.tsx
-@@ -51,7 +51,7 @@ export default function AboutScreen() {
- 
-       <View style={styles.brand}>
-         <OrcaLogo size={28} />
--        <Text style={styles.brandName}>Orca</Text>
-+        <Text style={styles.brandName}>Horca</Text>
-         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
-       </View>
- 
-diff --git a/mobile/app/mobile-onboarding.tsx b/mobile/app/mobile-onboarding.tsx
-index 50957a4..32e2bdf 100644
---- a/mobile/app/mobile-onboarding.tsx
-+++ b/mobile/app/mobile-onboarding.tsx
-@@ -144,7 +144,7 @@ function MobileOnboardingFlow({
-     <SafeAreaView style={styles.container}>
-       <View style={styles.brandRow}>
-         <OrcaLogo size={22} />
--        <Text style={styles.brandName}>Orca</Text>
-+        <Text style={styles.brandName}>Horca</Text>
-         {steps.length > 1 ? (
-           <View
-             accessible
-diff --git a/mobile/app/pair-scan.tsx b/mobile/app/pair-scan.tsx
-index 61e99f1..ef6d853 100644
---- a/mobile/app/pair-scan.tsx
-+++ b/mobile/app/pair-scan.tsx
-@@ -251,7 +251,7 @@ export default function PairScanScreen() {
-           visible={pasteVisible}
-           title="Paste pairing code"
-           message="Copy the code shown under the QR on your computer."
--          placeholder="orca://pair?code=... or paste the code"
-+          placeholder="horca://pair?code=... or paste the code"
-           onSubmit={handlePasteSubmit}
-           onCancel={() => setPasteVisible(false)}
-         />
-@@ -266,7 +266,7 @@ export default function PairScanScreen() {
-       </Pressable>
- 
-       <View style={styles.steps}>
--        <Step number={1} text="Open Orca on your computer" />
-+        <Step number={1} text="Open Horca on your computer" />
-         <Step number={2} text="Go to Settings → Mobile" />
-         <Step number={3} text="Scan the QR code" />
-       </View>
-@@ -349,7 +349,7 @@ export default function PairScanScreen() {
-         visible={pasteVisible}
-         title="Paste pairing code"
-         message="Copy the code shown under the QR on your computer."
--        placeholder="orca://pair?code=... or paste the code"
-+        placeholder="horca://pair?code=... or paste the code"
-         onSubmit={handlePasteSubmit}
-         onCancel={() => setPasteVisible(false)}
-       />
-diff --git a/mobile/app/terminal-settings.tsx b/mobile/app/terminal-settings.tsx
-index 860f906..2bdbdc3 100644
---- a/mobile/app/terminal-settings.tsx
-+++ b/mobile/app/terminal-settings.tsx
-@@ -29,8 +29,7 @@ type RestoreValue = 'indefinite' | '60s' | '5m' | '30m'
- 
- type TextSizeValue = 'smallest' | 'smaller' | 'default' | 'large' | 'larger' | 'largest'
- 
--// scale = baseline zoom the terminal WebView applies on top of fit-to-width.
--// Keep in sync with TERMINAL_TEXT_SCALES; pinch-to-zoom snaps to these values.
-+// Keep in sync with TERMINAL_TEXT_SCALES.
- const TEXT_SIZE_OPTIONS: (PickerOption<TextSizeValue> & { scale: number })[] = [
-   { value: 'smallest', label: 'Smallest (50%)', scale: 0.5 },
-   { value: 'smaller', label: 'Smaller (75%)', scale: 0.75 },
 diff --git a/mobile/fastlane/Appfile b/mobile/fastlane/Appfile
-index 318a617..23bf0d1 100644
+index 318a617681..23bf0d1cff 100644
 --- a/mobile/fastlane/Appfile
 +++ b/mobile/fastlane/Appfile
 @@ -1,2 +1,2 @@
@@ -219,7 +219,7 @@ index 318a617..23bf0d1 100644
 +app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.rudironsoni.horca")
  team_id(ENV["APPLE_TEAM_ID"])
 diff --git a/mobile/fastlane/Fastfile b/mobile/fastlane/Fastfile
-index bcca602..eda02c2 100644
+index bcca6026b8..eda02c256a 100644
 --- a/mobile/fastlane/Fastfile
 +++ b/mobile/fastlane/Fastfile
 @@ -1,4 +1,4 @@
@@ -277,7 +277,7 @@ index bcca602..eda02c2 100644
      build_and_upload
  
 diff --git a/mobile/package.json b/mobile/package.json
-index 159028c..65289a6 100644
+index 159028c978..65289a6825 100644
 --- a/mobile/package.json
 +++ b/mobile/package.json
 @@ -1,5 +1,5 @@
@@ -408,7 +408,7 @@ index 159028c..65289a6 100644
 +  "packageManager": "pnpm@12.0.0"
  }
 diff --git a/mobile/packages/expo-two-way-audio/ios/ExpoTwoWayAudioModule.swift b/mobile/packages/expo-two-way-audio/ios/ExpoTwoWayAudioModule.swift
-index 1df32f8..60d9cf9 100644
+index 1df32f8cea..60d9cf9528 100644
 --- a/mobile/packages/expo-two-way-audio/ios/ExpoTwoWayAudioModule.swift
 +++ b/mobile/packages/expo-two-way-audio/ios/ExpoTwoWayAudioModule.swift
 @@ -135,7 +135,7 @@ public class ExpoTwoWayAudioModule: Module {
@@ -430,7 +430,7 @@ index 1df32f8..60d9cf9 100644
              )
          }
 diff --git a/mobile/packages/expo-two-way-audio/package.json b/mobile/packages/expo-two-way-audio/package.json
-index 639d9c6..b573ac3 100644
+index 639d9c65d2..b573ac3062 100644
 --- a/mobile/packages/expo-two-way-audio/package.json
 +++ b/mobile/packages/expo-two-way-audio/package.json
 @@ -23,20 +23,16 @@
@@ -461,7 +461,7 @@ index 639d9c6..b573ac3 100644
    "peerDependencies": {
      "expo": "*",
 diff --git a/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.ts b/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.ts
-index 09b61f1..5b82e57 100644
+index 09b61f19c4..5b82e57f99 100644
 --- a/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.ts
 +++ b/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.ts
 @@ -1,4 +1,4 @@
@@ -471,7 +471,7 @@ index 09b61f1..5b82e57 100644
  // It loads the native module object from the JSI or falls back to
  // the bridge module (from NativeModulesProxy) if the remote debugger is on.
 diff --git a/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts b/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts
-index 5684579..5d7fe81 100644
+index 5684579fd4..5d7fe81e02 100644
 --- a/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts
 +++ b/mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts
 @@ -1,4 +1,4 @@
@@ -481,7 +481,7 @@ index 5684579..5d7fe81 100644
  type EventSubscription = {
    remove: () => void
 diff --git a/mobile/packages/expo-two-way-audio/src/core.ts b/mobile/packages/expo-two-way-audio/src/core.ts
-index a1c2c15..36a8a37 100644
+index a1c2c15681..36a8a37b1f 100644
 --- a/mobile/packages/expo-two-way-audio/src/core.ts
 +++ b/mobile/packages/expo-two-way-audio/src/core.ts
 @@ -1,4 +1,4 @@
@@ -491,7 +491,7 @@ index a1c2c15..36a8a37 100644
  
  export async function initialize() {
 diff --git a/mobile/packages/expo-two-way-audio/src/hooks.ts b/mobile/packages/expo-two-way-audio/src/hooks.ts
-index 03c2468..3ab4502 100644
+index 03c2468aba..3ab4502dfb 100644
 --- a/mobile/packages/expo-two-way-audio/src/hooks.ts
 +++ b/mobile/packages/expo-two-way-audio/src/hooks.ts
 @@ -1,4 +1,4 @@
@@ -501,7 +501,7 @@ index 03c2468..3ab4502 100644
  import {
    getMicrophonePermissionsAsync,
 diff --git a/mobile/packages/expo-two-way-audio/tsconfig.json b/mobile/packages/expo-two-way-audio/tsconfig.json
-index 727c1c7..dd9507f 100644
+index 727c1c723d..dd9507f7b8 100644
 --- a/mobile/packages/expo-two-way-audio/tsconfig.json
 +++ b/mobile/packages/expo-two-way-audio/tsconfig.json
 @@ -1,10 +1,16 @@
@@ -526,7 +526,7 @@ index 727c1c7..dd9507f 100644
    "exclude": ["**/__mocks__/*", "**/__tests__/*"]
 diff --git a/mobile/packages/libghostty-terminal/.gitignore b/mobile/packages/libghostty-terminal/.gitignore
 new file mode 100644
-index 0000000..c2e66fb
+index 0000000000..c2e66fb737
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/.gitignore
 @@ -0,0 +1,6 @@
@@ -538,7 +538,7 @@ index 0000000..c2e66fb
 +/node_modules/
 diff --git a/mobile/packages/libghostty-terminal/.npmignore b/mobile/packages/libghostty-terminal/.npmignore
 new file mode 100644
-index 0000000..da25ab4
+index 0000000000..da25ab4b8c
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/.npmignore
 @@ -0,0 +1,27 @@
@@ -571,7 +571,7 @@ index 0000000..da25ab4
 +/android/src/test/
 diff --git a/mobile/packages/libghostty-terminal/LICENSE b/mobile/packages/libghostty-terminal/LICENSE
 new file mode 100644
-index 0000000..fe559f5
+index 0000000000..fe559f58d3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/LICENSE
 @@ -0,0 +1,21 @@
@@ -598,7 +598,7 @@ index 0000000..fe559f5
 +SOFTWARE.
 diff --git a/mobile/packages/libghostty-terminal/README.md b/mobile/packages/libghostty-terminal/README.md
 new file mode 100644
-index 0000000..e2b90e5
+index 0000000000..e2b90e52e1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/README.md
 @@ -0,0 +1,165 @@
@@ -769,7 +769,7 @@ index 0000000..e2b90e5
 +their licenses ship alongside the vendored sources.
 diff --git a/mobile/packages/libghostty-terminal/android/CMakeLists.txt b/mobile/packages/libghostty-terminal/android/CMakeLists.txt
 new file mode 100644
-index 0000000..e569060
+index 0000000000..e5690606e9
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/CMakeLists.txt
 @@ -0,0 +1,31 @@
@@ -806,7 +806,7 @@ index 0000000..e569060
 +target_link_libraries(expolibghostty ghostty-vt log)
 diff --git a/mobile/packages/libghostty-terminal/android/build.gradle b/mobile/packages/libghostty-terminal/android/build.gradle
 new file mode 100644
-index 0000000..324bad7
+index 0000000000..324bad751f
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/build.gradle
 @@ -0,0 +1,41 @@
@@ -853,7 +853,7 @@ index 0000000..324bad7
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/AndroidManifest.xml b/mobile/packages/libghostty-terminal/android/src/main/AndroidManifest.xml
 new file mode 100644
-index 0000000..a2f47b6
+index 0000000000..a2f47b6057
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/AndroidManifest.xml
 @@ -0,0 +1,2 @@
@@ -861,7 +861,7 @@ index 0000000..a2f47b6
 +</manifest>
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/cpp/ghostty_jni.cpp b/mobile/packages/libghostty-terminal/android/src/main/cpp/ghostty_jni.cpp
 new file mode 100644
-index 0000000..f77b76e
+index 0000000000..f77b76e33a
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/cpp/ghostty_jni.cpp
 @@ -0,0 +1,949 @@
@@ -1816,10 +1816,10 @@ index 0000000..f77b76e
 +}  // extern "C"
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyModule.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyModule.kt
 new file mode 100644
-index 0000000..93f8c7f
+index 0000000000..9078b841f4
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyModule.kt
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,82 @@
 +package expo.modules.libghostty
 +
 +import android.util.Base64
@@ -1848,6 +1848,10 @@ index 0000000..93f8c7f
 +
 +      Prop("keyboardEnabled") { view: ExpoLibghosttyView, enabled: Boolean ->
 +        view.setKeyboardEnabled(enabled)
++      }
++
++      Prop("surfaceVisible") { view: ExpoLibghosttyView, visible: Boolean ->
++        view.setSurfaceVisible(visible)
 +      }
 +
 +      // PTY output bytes (base64) → terminal grid.
@@ -1900,10 +1904,10 @@ index 0000000..93f8c7f
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyView.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyView.kt
 new file mode 100644
-index 0000000..9d39c9e
+index 0000000000..f49d926f40
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/ExpoLibghosttyView.kt
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,123 @@
 +package expo.modules.libghostty
 +
 +import android.content.Context
@@ -2000,6 +2004,11 @@ index 0000000..9d39c9e
 +
 +  fun setKeyboardEnabled(enabled: Boolean) = terminal.setKeyboardEnabled(enabled)
 +
++  fun setSurfaceVisible(visible: Boolean) {
++    visibility = if (visible) VISIBLE else INVISIBLE
++    terminal.visibility = if (visible) VISIBLE else INVISIBLE
++  }
++
 +  /** Apply theme colors; a null record clears back to the defaults. */
 +  internal fun setTheme(theme: TerminalThemeRecord?) = terminal.setTheme(
 +    foreground = theme?.foreground,
@@ -2024,7 +2033,7 @@ index 0000000..9d39c9e
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyTerminalView.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyTerminalView.kt
 new file mode 100644
-index 0000000..e5a37ff
+index 0000000000..e5a37ff18a
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyTerminalView.kt
 @@ -0,0 +1,1204 @@
@@ -3234,7 +3243,7 @@ index 0000000..e5a37ff
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyVt.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyVt.kt
 new file mode 100644
-index 0000000..62b3002
+index 0000000000..62b3002ba7
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/GhosttyVt.kt
 @@ -0,0 +1,124 @@
@@ -3364,7 +3373,7 @@ index 0000000..62b3002
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/SnapshotFormat.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/SnapshotFormat.kt
 new file mode 100644
-index 0000000..fd37f2e
+index 0000000000..fd37f2e930
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/SnapshotFormat.kt
 @@ -0,0 +1,108 @@
@@ -3478,7 +3487,7 @@ index 0000000..fd37f2e
 +internal fun packedBg(packed: Long): Int = packed.toInt()
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/StickyModifier.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/StickyModifier.kt
 new file mode 100644
-index 0000000..efec8c0
+index 0000000000..efec8c0c95
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/StickyModifier.kt
 @@ -0,0 +1,40 @@
@@ -3524,7 +3533,7 @@ index 0000000..efec8c0
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/TerminalAccessoryBar.kt b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/TerminalAccessoryBar.kt
 new file mode 100644
-index 0000000..5aa0b3e
+index 0000000000..5aa0b3ebe1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/main/java/expo/modules/libghostty/TerminalAccessoryBar.kt
 @@ -0,0 +1,195 @@
@@ -3725,7 +3734,7 @@ index 0000000..5aa0b3e
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/SnapshotFormatTest.kt b/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/SnapshotFormatTest.kt
 new file mode 100644
-index 0000000..7d1f3d6
+index 0000000000..7d1f3d6d91
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/SnapshotFormatTest.kt
 @@ -0,0 +1,147 @@
@@ -3878,7 +3887,7 @@ index 0000000..7d1f3d6
 +}
 diff --git a/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/StickyModifierTest.kt b/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/StickyModifierTest.kt
 new file mode 100644
-index 0000000..d3a8828
+index 0000000000..d3a8828824
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/android/src/test/java/expo/modules/libghostty/StickyModifierTest.kt
 @@ -0,0 +1,91 @@
@@ -3975,7 +3984,7 @@ index 0000000..d3a8828
 +}
 diff --git a/mobile/packages/libghostty-terminal/expo-module.config.json b/mobile/packages/libghostty-terminal/expo-module.config.json
 new file mode 100644
-index 0000000..509f164
+index 0000000000..509f164e45
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/expo-module.config.json
 @@ -0,0 +1,9 @@
@@ -3990,7 +3999,7 @@ index 0000000..509f164
 +}
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/build.js b/mobile/packages/libghostty-terminal/internal/module_scripts/build.js
 new file mode 100644
-index 0000000..27643a1
+index 0000000000..27643a1a4d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/build.js
 @@ -0,0 +1,32 @@
@@ -4028,7 +4037,7 @@ index 0000000..27643a1
 +process.exit(result.status ?? 0)
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/clean.js b/mobile/packages/libghostty-terminal/internal/module_scripts/clean.js
 new file mode 100644
-index 0000000..c8ac629
+index 0000000000..c8ac6296f4
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/clean.js
 @@ -0,0 +1,12 @@
@@ -4046,7 +4055,7 @@ index 0000000..c8ac629
 +}
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/open-android.js b/mobile/packages/libghostty-terminal/internal/module_scripts/open-android.js
 new file mode 100644
-index 0000000..5e3b131
+index 0000000000..5e3b1315bc
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/open-android.js
 @@ -0,0 +1,123 @@
@@ -4175,7 +4184,7 @@ index 0000000..5e3b131
 +}
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/open-ios.js b/mobile/packages/libghostty-terminal/internal/module_scripts/open-ios.js
 new file mode 100644
-index 0000000..0d9dd72
+index 0000000000..0d9dd720c7
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/open-ios.js
 @@ -0,0 +1,18 @@
@@ -4199,7 +4208,7 @@ index 0000000..0d9dd72
 +})
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/prepare.js b/mobile/packages/libghostty-terminal/internal/module_scripts/prepare.js
 new file mode 100644
-index 0000000..646ed77
+index 0000000000..646ed77673
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/prepare.js
 @@ -0,0 +1,27 @@
@@ -4232,7 +4241,7 @@ index 0000000..646ed77
 +}
 diff --git a/mobile/packages/libghostty-terminal/internal/module_scripts/util.js b/mobile/packages/libghostty-terminal/internal/module_scripts/util.js
 new file mode 100644
-index 0000000..69aa5a9
+index 0000000000..69aa5a9f1d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/internal/module_scripts/util.js
 @@ -0,0 +1,10 @@
@@ -4248,7 +4257,7 @@ index 0000000..69aa5a9
 +module.exports = { spawnSyncWithAutoShell }
 diff --git a/mobile/packages/libghostty-terminal/ios/ExpoLibghostty.podspec b/mobile/packages/libghostty-terminal/ios/ExpoLibghostty.podspec
 new file mode 100644
-index 0000000..184f717
+index 0000000000..184f7177fa
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/ExpoLibghostty.podspec
 @@ -0,0 +1,30 @@
@@ -4284,10 +4293,10 @@ index 0000000..184f717
 +end
 diff --git a/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyModule.swift b/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyModule.swift
 new file mode 100644
-index 0000000..1416361
+index 0000000000..5a21afc062
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyModule.swift
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,74 @@
 +import ExpoModulesCore
 +
 +public class ExpoLibghosttyModule: Module {
@@ -4311,6 +4320,10 @@ index 0000000..1416361
 +
 +      Prop("keyboardEnabled") { (view: ExpoLibghosttyView, enabled: Bool) in
 +        view.keyboardEnabled = enabled
++      }
++
++      Prop("surfaceVisible") { (view: ExpoLibghosttyView, visible: Bool) in
++        view.surfaceVisible = visible
 +      }
 +
 +      // PTY output bytes (base64) → terminal grid.
@@ -4360,10 +4373,10 @@ index 0000000..1416361
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift b/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift
 new file mode 100644
-index 0000000..fddc379
+index 0000000000..05170b4c1a
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/ExpoLibghosttyView.swift
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,220 @@
 +import ExpoModulesCore
 +import GhosttyTerminal
 +import UIKit
@@ -4371,6 +4384,12 @@ index 0000000..fddc379
 +private final class OrcaTerminalView: TerminalView {
 +  var keyboardEnabled = false
 +  var onCleanTap: ((CGPoint) -> Void)?
++
++  // Why: Fabric sizes Expo views from intrinsicContentSize; a Metal grid
++  // width here keeps the terminal at ~half the pane and wraps at ~35 cols.
++  override var intrinsicContentSize: CGSize {
++    CGSize(width: UIView.noIntrinsicMetric, height: UIView.noIntrinsicMetric)
++  }
 +
 +  override func toggleSoftwareKeyboard() {
 +    guard keyboardEnabled else { return }
@@ -4439,6 +4458,20 @@ index 0000000..fddc379
 +    set { terminalView.keyboardEnabled = newValue }
 +  }
 +
++  /// Hosts keep inactive tabs mounted. `opacity: 0` does not hide CAMetalLayer,
++  /// so a second surface paints beside the active one. Stop drawing and hide.
++  var surfaceVisible = true {
++    didSet {
++      guard surfaceVisible != oldValue else { return }
++      terminalView.isHidden = !surfaceVisible
++      terminalView.setSurfaceVisible(surfaceVisible)
++    }
++  }
++
++  override var intrinsicContentSize: CGSize {
++    CGSize(width: UIView.noIntrinsicMetric, height: UIView.noIntrinsicMetric)
++  }
++
 +  /// Theme colors, applied through the shared controller's ghostty config —
 +  /// on iOS the theme is app-wide (every terminal view of the controller),
 +  /// unlike Android's per-view application. Colors accept ghostty config
@@ -4491,6 +4524,9 @@ index 0000000..fddc379
 +  override func layoutSubviews() {
 +    super.layoutSubviews()
 +    terminalView.frame = bounds
++    if bounds.width > 0, bounds.height > 0 {
++      terminalView.fitToSize()
++    }
 +  }
 +
 +  /// Feed PTY output (terminal.output on the wire) into the grid.
@@ -4563,7 +4599,7 @@ index 0000000..fddc379
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/GhosttyKit.podspec b/mobile/packages/libghostty-terminal/ios/GhosttyKit.podspec
 new file mode 100644
-index 0000000..dc3e585
+index 0000000000..dc3e585b1b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/GhosttyKit.podspec
 @@ -0,0 +1,21 @@
@@ -4590,7 +4626,7 @@ index 0000000..dc3e585
 +end
 diff --git a/mobile/packages/libghostty-terminal/ios/GhosttyTerminal.podspec b/mobile/packages/libghostty-terminal/ios/GhosttyTerminal.podspec
 new file mode 100644
-index 0000000..8f2dfd3
+index 0000000000..8f2dfd3ac6
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/GhosttyTerminal.podspec
 @@ -0,0 +1,21 @@
@@ -4617,7 +4653,7 @@ index 0000000..8f2dfd3
 +end
 diff --git a/mobile/packages/libghostty-terminal/ios/MSDisplayLink.podspec b/mobile/packages/libghostty-terminal/ios/MSDisplayLink.podspec
 new file mode 100644
-index 0000000..56de120
+index 0000000000..56de1206b2
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/MSDisplayLink.podspec
 @@ -0,0 +1,18 @@
@@ -4641,7 +4677,7 @@ index 0000000..56de120
 +end
 diff --git a/mobile/packages/libghostty-terminal/ios/privacy/ExpoLibghostty/PrivacyInfo.xcprivacy b/mobile/packages/libghostty-terminal/ios/privacy/ExpoLibghostty/PrivacyInfo.xcprivacy
 new file mode 100644
-index 0000000..23a9697
+index 0000000000..23a9697f38
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/privacy/ExpoLibghostty/PrivacyInfo.xcprivacy
 @@ -0,0 +1,12 @@
@@ -4659,7 +4695,7 @@ index 0000000..23a9697
 +</plist>
 diff --git a/mobile/packages/libghostty-terminal/ios/privacy/GhosttyKit/PrivacyInfo.xcprivacy b/mobile/packages/libghostty-terminal/ios/privacy/GhosttyKit/PrivacyInfo.xcprivacy
 new file mode 100644
-index 0000000..d92205c
+index 0000000000..d92205cb4d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/privacy/GhosttyKit/PrivacyInfo.xcprivacy
 @@ -0,0 +1,23 @@
@@ -4688,7 +4724,7 @@ index 0000000..d92205c
 +</plist>
 diff --git a/mobile/packages/libghostty-terminal/ios/privacy/GhosttyTerminal/PrivacyInfo.xcprivacy b/mobile/packages/libghostty-terminal/ios/privacy/GhosttyTerminal/PrivacyInfo.xcprivacy
 new file mode 100644
-index 0000000..106cc90
+index 0000000000..106cc9018b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/privacy/GhosttyTerminal/PrivacyInfo.xcprivacy
 @@ -0,0 +1,22 @@
@@ -4716,7 +4752,7 @@ index 0000000..106cc90
 +</plist>
 diff --git a/mobile/packages/libghostty-terminal/ios/privacy/MSDisplayLink/PrivacyInfo.xcprivacy b/mobile/packages/libghostty-terminal/ios/privacy/MSDisplayLink/PrivacyInfo.xcprivacy
 new file mode 100644
-index 0000000..23a9697
+index 0000000000..23a9697f38
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/privacy/MSDisplayLink/PrivacyInfo.xcprivacy
 @@ -0,0 +1,12 @@
@@ -4734,7 +4770,7 @@ index 0000000..23a9697
 +</plist>
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyKit/GhosttyKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyKit/GhosttyKit.swift
 new file mode 100644
-index 0000000..bf55adf
+index 0000000000..bf55adf2b5
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyKit/GhosttyKit.swift
 @@ -0,0 +1,8 @@
@@ -4748,7 +4784,7 @@ index 0000000..bf55adf
 +@_exported import libghostty
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyConfigRenderer.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyConfigRenderer.swift
 new file mode 100644
-index 0000000..d174098
+index 0000000000..d1740986dc
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyConfigRenderer.swift
 @@ -0,0 +1,40 @@
@@ -4794,7 +4830,7 @@ index 0000000..d174098
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyRuntimeResources.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyRuntimeResources.swift
 new file mode 100644
-index 0000000..e88df4e
+index 0000000000..e88df4ee05
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/GhosttyRuntimeResources.swift
 @@ -0,0 +1,27 @@
@@ -4827,7 +4863,7 @@ index 0000000..e88df4e
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme+SwiftUI.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme+SwiftUI.swift
 new file mode 100644
-index 0000000..4c00be2
+index 0000000000..4c00be2e46
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme+SwiftUI.swift
 @@ -0,0 +1,21 @@
@@ -4854,7 +4890,7 @@ index 0000000..4c00be2
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme.swift
 new file mode 100644
-index 0000000..8de2f04
+index 0000000000..8de2f0409a
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalColorScheme.swift
 @@ -0,0 +1,18 @@
@@ -4878,7 +4914,7 @@ index 0000000..8de2f04
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalConfiguration.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalConfiguration.swift
 new file mode 100644
-index 0000000..fafe5b5
+index 0000000000..fafe5b5cf8
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalConfiguration.swift
 @@ -0,0 +1,360 @@
@@ -5244,7 +5280,7 @@ index 0000000..fafe5b5
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme+Defaults.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme+Defaults.swift
 new file mode 100644
-index 0000000..7cd627b
+index 0000000000..7cd627b994
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme+Defaults.swift
 @@ -0,0 +1,70 @@
@@ -5320,7 +5356,7 @@ index 0000000..7cd627b
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme.swift
 new file mode 100644
-index 0000000..0ef44cc
+index 0000000000..0ef44cc685
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Configuration/TerminalTheme.swift
 @@ -0,0 +1,32 @@
@@ -5358,7 +5394,7 @@ index 0000000..0ef44cc
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Callbacks.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Callbacks.swift
 new file mode 100644
-index 0000000..227db37
+index 0000000000..227db37e6c
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Callbacks.swift
 @@ -0,0 +1,264 @@
@@ -5628,7 +5664,7 @@ index 0000000..227db37
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Config.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Config.swift
 new file mode 100644
-index 0000000..60a35a8
+index 0000000000..60a35a859d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Config.swift
 @@ -0,0 +1,218 @@
@@ -5852,7 +5888,7 @@ index 0000000..60a35a8
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Surface.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Surface.swift
 new file mode 100644
-index 0000000..1d6f466
+index 0000000000..1d6f4664c8
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController+Surface.swift
 @@ -0,0 +1,183 @@
@@ -6041,7 +6077,7 @@ index 0000000..1d6f466
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController.swift
 new file mode 100644
-index 0000000..e05c3ed
+index 0000000000..e05c3ed148
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Controller/TerminalController.swift
 @@ -0,0 +1,334 @@
@@ -6381,7 +6417,7 @@ index 0000000..e05c3ed
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Debug/TerminalDebugLog.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Debug/TerminalDebugLog.swift
 new file mode 100644
-index 0000000..c954f5c
+index 0000000000..c954f5cda1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Debug/TerminalDebugLog.swift
 @@ -0,0 +1,293 @@
@@ -6680,7 +6716,7 @@ index 0000000..c954f5c
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSession.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSession.swift
 new file mode 100644
-index 0000000..b7f2cdf
+index 0000000000..b7f2cdfa30
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSession.swift
 @@ -0,0 +1,324 @@
@@ -7010,7 +7046,7 @@ index 0000000..b7f2cdf
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSurfaceAccess.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSurfaceAccess.swift
 new file mode 100644
-index 0000000..bbd2f7c
+index 0000000000..bbd2f7c2b6
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalSurfaceAccess.swift
 @@ -0,0 +1,176 @@
@@ -7192,7 +7228,7 @@ index 0000000..bbd2f7c
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalViewport.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalViewport.swift
 new file mode 100644
-index 0000000..81e72dc
+index 0000000000..81e72dc797
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/InMemoryTerminalViewport.swift
 @@ -0,0 +1,31 @@
@@ -7229,7 +7265,7 @@ index 0000000..81e72dc
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalCallbackBridge.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalCallbackBridge.swift
 new file mode 100644
-index 0000000..02b5a88
+index 0000000000..02b5a8865c
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalCallbackBridge.swift
 @@ -0,0 +1,194 @@
@@ -7429,7 +7465,7 @@ index 0000000..02b5a88
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalSessionBackend.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalSessionBackend.swift
 new file mode 100644
-index 0000000..51310b0
+index 0000000000..51310b0bd1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/InMemory/TerminalSessionBackend.swift
 @@ -0,0 +1,22 @@
@@ -7457,7 +7493,7 @@ index 0000000..51310b0
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalGridMetrics.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalGridMetrics.swift
 new file mode 100644
-index 0000000..fc55cfc
+index 0000000000..fc55cfca63
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalGridMetrics.swift
 @@ -0,0 +1,44 @@
@@ -7507,7 +7543,7 @@ index 0000000..fc55cfc
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalInputModifiers.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalInputModifiers.swift
 new file mode 100644
-index 0000000..03fa0e4
+index 0000000000..03fa0e4d7b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalInputModifiers.swift
 @@ -0,0 +1,62 @@
@@ -7575,7 +7611,7 @@ index 0000000..03fa0e4
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalScrollModifiers.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalScrollModifiers.swift
 new file mode 100644
-index 0000000..0326623
+index 0000000000..0326623ced
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalScrollModifiers.swift
 @@ -0,0 +1,51 @@
@@ -7632,7 +7668,7 @@ index 0000000..0326623
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalViewportMetrics.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalViewportMetrics.swift
 new file mode 100644
-index 0000000..0844278
+index 0000000000..0844278585
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Metrics/TerminalViewportMetrics.swift
 @@ -0,0 +1,13 @@
@@ -7651,7 +7687,7 @@ index 0000000..0844278
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Input.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Input.swift
 new file mode 100644
-index 0000000..245cff0
+index 0000000000..245cff0ae3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Input.swift
 @@ -0,0 +1,307 @@
@@ -7964,7 +8000,7 @@ index 0000000..245cff0
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Lifecycle.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Lifecycle.swift
 new file mode 100644
-index 0000000..5be2609
+index 0000000000..5be260911d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Lifecycle.swift
 @@ -0,0 +1,242 @@
@@ -8212,7 +8248,7 @@ index 0000000..5be2609
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+NSTextInputClient.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+NSTextInputClient.swift
 new file mode 100644
-index 0000000..28faf9b
+index 0000000000..28faf9bd57
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+NSTextInputClient.swift
 @@ -0,0 +1,82 @@
@@ -8300,7 +8336,7 @@ index 0000000..28faf9b
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+PublicInput.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+PublicInput.swift
 new file mode 100644
-index 0000000..7981fbd
+index 0000000000..7981fbde04
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+PublicInput.swift
 @@ -0,0 +1,84 @@
@@ -8390,7 +8426,7 @@ index 0000000..7981fbd
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Snapshot.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Snapshot.swift
 new file mode 100644
-index 0000000..a18e262
+index 0000000000..a18e262941
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView+Snapshot.swift
 @@ -0,0 +1,24 @@
@@ -8420,7 +8456,7 @@ index 0000000..a18e262
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView.swift
 new file mode 100644
-index 0000000..dac8f38
+index 0000000000..dac8f3822c
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/AppTerminalView.swift
 @@ -0,0 +1,187 @@
@@ -8613,7 +8649,7 @@ index 0000000..dac8f38
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/KeyboardLayout.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/KeyboardLayout.swift
 new file mode 100644
-index 0000000..6df0d5b
+index 0000000000..6df0d5b337
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/KeyboardLayout.swift
 @@ -0,0 +1,22 @@
@@ -8641,7 +8677,7 @@ index 0000000..6df0d5b
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalKeyEventHandler@AppKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalKeyEventHandler@AppKit.swift
 new file mode 100644
-index 0000000..f3deb3b
+index 0000000000..f3deb3bf56
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalKeyEventHandler@AppKit.swift
 @@ -0,0 +1,303 @@
@@ -8950,7 +8986,7 @@ index 0000000..f3deb3b
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalTextInputHandler@AppKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalTextInputHandler@AppKit.swift
 new file mode 100644
-index 0000000..2b0ba24
+index 0000000000..2b0ba248ee
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/AppKit/TerminalTextInputHandler@AppKit.swift
 @@ -0,0 +1,130 @@
@@ -9086,7 +9122,7 @@ index 0000000..2b0ba24
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/PlatformSupport.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/PlatformSupport.swift
 new file mode 100644
-index 0000000..8c1a110
+index 0000000000..8c1a1105d1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/PlatformSupport.swift
 @@ -0,0 +1,18 @@
@@ -9110,7 +9146,7 @@ index 0000000..8c1a110
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalFileStaging.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalFileStaging.swift
 new file mode 100644
-index 0000000..966b1b2
+index 0000000000..966b1b2f4d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalFileStaging.swift
 @@ -0,0 +1,278 @@
@@ -9394,7 +9430,7 @@ index 0000000..966b1b2
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalHardwareKeyRouter.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalHardwareKeyRouter.swift
 new file mode 100644
-index 0000000..27cffa7
+index 0000000000..27cffa754e
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalHardwareKeyRouter.swift
 @@ -0,0 +1,264 @@
@@ -9664,7 +9700,7 @@ index 0000000..27cffa7
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalIMEComposition.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalIMEComposition.swift
 new file mode 100644
-index 0000000..d736e57
+index 0000000000..d736e57129
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalIMEComposition.swift
 @@ -0,0 +1,48 @@
@@ -9718,7 +9754,7 @@ index 0000000..d736e57
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalInputText.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalInputText.swift
 new file mode 100644
-index 0000000..180d639
+index 0000000000..180d639f0b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalInputText.swift
 @@ -0,0 +1,67 @@
@@ -9791,7 +9827,7 @@ index 0000000..180d639
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMainActor.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMainActor.swift
 new file mode 100644
-index 0000000..b95b26e
+index 0000000000..b95b26e714
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMainActor.swift
 @@ -0,0 +1,45 @@
@@ -9842,7 +9878,7 @@ index 0000000..b95b26e
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMarkedTextState.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMarkedTextState.swift
 new file mode 100644
-index 0000000..ca3ffeb
+index 0000000000..ca3ffebe83
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalMarkedTextState.swift
 @@ -0,0 +1,86 @@
@@ -9934,7 +9970,7 @@ index 0000000..ca3ffeb
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalPasteboardContent.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalPasteboardContent.swift
 new file mode 100644
-index 0000000..6dc3852
+index 0000000000..6dc3852e89
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalPasteboardContent.swift
 @@ -0,0 +1,142 @@
@@ -10082,7 +10118,7 @@ index 0000000..6dc3852
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalShellEscape.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalShellEscape.swift
 new file mode 100644
-index 0000000..a39cca6
+index 0000000000..a39cca6f5f
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalShellEscape.swift
 @@ -0,0 +1,35 @@
@@ -10123,7 +10159,7 @@ index 0000000..a39cca6
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalView+Process.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalView+Process.swift
 new file mode 100644
-index 0000000..9ba254e
+index 0000000000..9ba254e5a2
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/Shared/TerminalView+Process.swift
 @@ -0,0 +1,27 @@
@@ -10156,7 +10192,7 @@ index 0000000..9ba254e
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryStyle.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryStyle.swift
 new file mode 100644
-index 0000000..dfb49b2
+index 0000000000..dfb49b227f
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryStyle.swift
 @@ -0,0 +1,31 @@
@@ -10193,7 +10229,7 @@ index 0000000..dfb49b2
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryView.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryView.swift
 new file mode 100644
-index 0000000..a24a34a
+index 0000000000..a24a34a6a2
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputAccessoryView.swift
 @@ -0,0 +1,406 @@
@@ -10605,7 +10641,7 @@ index 0000000..a24a34a
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputBarKey.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputBarKey.swift
 new file mode 100644
-index 0000000..38ef991
+index 0000000000..38ef991dca
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalInputBarKey.swift
 @@ -0,0 +1,97 @@
@@ -10708,7 +10744,7 @@ index 0000000..38ef991
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalStickyModifierState.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalStickyModifierState.swift
 new file mode 100644
-index 0000000..d282c6a
+index 0000000000..d282c6a479
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalStickyModifierState.swift
 @@ -0,0 +1,83 @@
@@ -10797,7 +10833,7 @@ index 0000000..d282c6a
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextInputHandler@UIKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextInputHandler@UIKit.swift
 new file mode 100644
-index 0000000..5790a28
+index 0000000000..5790a286ad
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextInputHandler@UIKit.swift
 @@ -0,0 +1,305 @@
@@ -11108,7 +11144,7 @@ index 0000000..5790a28
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextPosition.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextPosition.swift
 new file mode 100644
-index 0000000..2dee2eb
+index 0000000000..2dee2eb5f1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/TerminalTextPosition.swift
 @@ -0,0 +1,55 @@
@@ -11169,7 +11205,7 @@ index 0000000..2dee2eb
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Drop.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Drop.swift
 new file mode 100644
-index 0000000..737d4ac
+index 0000000000..737d4acca1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Drop.swift
 @@ -0,0 +1,72 @@
@@ -11247,7 +11283,7 @@ index 0000000..737d4ac
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+InputAccessory.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+InputAccessory.swift
 new file mode 100644
-index 0000000..5e6a255
+index 0000000000..5e6a2559d3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+InputAccessory.swift
 @@ -0,0 +1,295 @@
@@ -11548,7 +11584,7 @@ index 0000000..5e6a255
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Interaction.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Interaction.swift
 new file mode 100644
-index 0000000..5baeb3f
+index 0000000000..5baeb3f5b5
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Interaction.swift
 @@ -0,0 +1,814 @@
@@ -12368,7 +12404,7 @@ index 0000000..5baeb3f
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Keyboard.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Keyboard.swift
 new file mode 100644
-index 0000000..6a6d264
+index 0000000000..6a6d2645b7
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Keyboard.swift
 @@ -0,0 +1,696 @@
@@ -13070,7 +13106,7 @@ index 0000000..6a6d264
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Lifecycle.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Lifecycle.swift
 new file mode 100644
-index 0000000..094e0a9
+index 0000000000..094e0a9dd2
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Lifecycle.swift
 @@ -0,0 +1,225 @@
@@ -13301,7 +13337,7 @@ index 0000000..094e0a9
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PinchZoom.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PinchZoom.swift
 new file mode 100644
-index 0000000..e9b76f0
+index 0000000000..e9b76f0f5d
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PinchZoom.swift
 @@ -0,0 +1,90 @@
@@ -13397,7 +13433,7 @@ index 0000000..e9b76f0
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicInput.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicInput.swift
 new file mode 100644
-index 0000000..2f94855
+index 0000000000..2f948552e4
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicInput.swift
 @@ -0,0 +1,79 @@
@@ -13482,7 +13518,7 @@ index 0000000..2f94855
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicSticky.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicSticky.swift
 new file mode 100644
-index 0000000..90221fb
+index 0000000000..90221fb3fd
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicSticky.swift
 @@ -0,0 +1,109 @@
@@ -13597,7 +13633,7 @@ index 0000000..90221fb
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Snapshot.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Snapshot.swift
 new file mode 100644
-index 0000000..94d313c
+index 0000000000..94d313c1f1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+Snapshot.swift
 @@ -0,0 +1,30 @@
@@ -13633,7 +13669,7 @@ index 0000000..94d313c
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+UITextInput.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+UITextInput.swift
 new file mode 100644
-index 0000000..edf2f76
+index 0000000000..edf2f766ea
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView+UITextInput.swift
 @@ -0,0 +1,519 @@
@@ -14158,7 +14194,7 @@ index 0000000..edf2f76
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView.swift
 new file mode 100644
-index 0000000..7fc4197
+index 0000000000..7fc4197284
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Platform/UIKit/UITerminalView.swift
 @@ -0,0 +1,332 @@
@@ -14496,7 +14532,7 @@ index 0000000..7fc4197
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Delegate.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Delegate.swift
 new file mode 100644
-index 0000000..ebb6a19
+index 0000000000..ebb6a197d6
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Delegate.swift
 @@ -0,0 +1,137 @@
@@ -14639,7 +14675,7 @@ index 0000000..ebb6a19
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Mutation.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Mutation.swift
 new file mode 100644
-index 0000000..e28401a
+index 0000000000..e28401ad5e
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState+Mutation.swift
 @@ -0,0 +1,37 @@
@@ -14682,7 +14718,7 @@ index 0000000..e28401a
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState.swift
 new file mode 100644
-index 0000000..d3b1d97
+index 0000000000..d3b1d9769f
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/State/TerminalViewState.swift
 @@ -0,0 +1,224 @@
@@ -14912,7 +14948,7 @@ index 0000000..d3b1d97
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKey.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKey.swift
 new file mode 100644
-index 0000000..07bfc1c
+index 0000000000..07bfc1cc0e
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKey.swift
 @@ -0,0 +1,519 @@
@@ -15437,7 +15473,7 @@ index 0000000..07bfc1c
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKeyPress.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKeyPress.swift
 new file mode 100644
-index 0000000..eb3c236
+index 0000000000..eb3c2364d3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalKeyPress.swift
 @@ -0,0 +1,125 @@
@@ -15568,7 +15604,7 @@ index 0000000..eb3c236
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSelectionAnchor.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSelectionAnchor.swift
 new file mode 100644
-index 0000000..d37430f
+index 0000000000..d37430fc9f
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSelectionAnchor.swift
 @@ -0,0 +1,91 @@
@@ -15665,7 +15701,7 @@ index 0000000..d37430f
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurface.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurface.swift
 new file mode 100644
-index 0000000..6403639
+index 0000000000..64036393b3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurface.swift
 @@ -0,0 +1,409 @@
@@ -16080,7 +16116,7 @@ index 0000000..6403639
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceContext.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceContext.swift
 new file mode 100644
-index 0000000..a7bdbae
+index 0000000000..a7bdbaea9b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceContext.swift
 @@ -0,0 +1,18 @@
@@ -16104,7 +16140,7 @@ index 0000000..a7bdbae
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift
 new file mode 100644
-index 0000000..0c91bf8
+index 0000000000..0c91bf8ac9
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift
 @@ -0,0 +1,616 @@
@@ -16726,7 +16762,7 @@ index 0000000..0c91bf8
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceOptions.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceOptions.swift
 new file mode 100644
-index 0000000..593b278
+index 0000000000..593b278de3
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceOptions.swift
 @@ -0,0 +1,84 @@
@@ -16816,7 +16852,7 @@ index 0000000..593b278
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceView.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceView.swift
 new file mode 100644
-index 0000000..61e8068
+index 0000000000..61e8068457
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceView.swift
 @@ -0,0 +1,83 @@
@@ -16905,7 +16941,7 @@ index 0000000..61e8068
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceViewDelegate.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceViewDelegate.swift
 new file mode 100644
-index 0000000..3f2af73
+index 0000000000..3f2af7307c
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/Surface/TerminalSurfaceViewDelegate.swift
 @@ -0,0 +1,231 @@
@@ -17142,7 +17178,7 @@ index 0000000..3f2af73
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalView.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalView.swift
 new file mode 100644
-index 0000000..d94e574
+index 0000000000..d94e5744c0
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalView.swift
 @@ -0,0 +1,16 @@
@@ -17164,7 +17200,7 @@ index 0000000..d94e574
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable.swift
 new file mode 100644
-index 0000000..99d9d40
+index 0000000000..99d9d407e7
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable.swift
 @@ -0,0 +1,136 @@
@@ -17306,7 +17342,7 @@ index 0000000..99d9d40
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@AppKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@AppKit.swift
 new file mode 100644
-index 0000000..5bcec7f
+index 0000000000..5bcec7f305
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@AppKit.swift
 @@ -0,0 +1,35 @@
@@ -17347,7 +17383,7 @@ index 0000000..5bcec7f
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@UIKit.swift b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@UIKit.swift
 new file mode 100644
-index 0000000..6083280
+index 0000000000..60832800cc
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/GhosttyTerminal/View/TerminalViewRepresentable@UIKit.swift
 @@ -0,0 +1,69 @@
@@ -17422,7 +17458,7 @@ index 0000000..6083280
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-MSDisplayLink.txt b/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-MSDisplayLink.txt
 new file mode 100644
-index 0000000..d3c70d5
+index 0000000000..d3c70d5cb0
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-MSDisplayLink.txt
 @@ -0,0 +1,21 @@
@@ -17449,7 +17485,7 @@ index 0000000..d3c70d5
 +SOFTWARE.
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-libghostty-spm.txt b/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-libghostty-spm.txt
 new file mode 100644
-index 0000000..cfc9ac9
+index 0000000000..cfc9ac9eba
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/LICENSE-libghostty-spm.txt
 @@ -0,0 +1,21 @@
@@ -17476,7 +17512,7 @@ index 0000000..cfc9ac9
 +SOFTWARE.
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink+SwiftUI.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink+SwiftUI.swift
 new file mode 100644
-index 0000000..30a1b18
+index 0000000000..30a1b1891b
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink+SwiftUI.swift
 @@ -0,0 +1,67 @@
@@ -17549,7 +17585,7 @@ index 0000000..30a1b18
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink.swift
 new file mode 100644
-index 0000000..5427fb4
+index 0000000000..5427fb433a
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLink.swift
 @@ -0,0 +1,51 @@
@@ -17606,7 +17642,7 @@ index 0000000..5427fb4
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkCallbackContext.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkCallbackContext.swift
 new file mode 100644
-index 0000000..2a284af
+index 0000000000..2a284af4e8
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkCallbackContext.swift
 @@ -0,0 +1,23 @@
@@ -17635,7 +17671,7 @@ index 0000000..2a284af
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CA.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CA.swift
 new file mode 100644
-index 0000000..966168d
+index 0000000000..966168dfd6
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CA.swift
 @@ -0,0 +1,87 @@
@@ -17728,7 +17764,7 @@ index 0000000..966168d
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CV.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CV.swift
 new file mode 100644
-index 0000000..5bce6fc
+index 0000000000..5bce6fcead
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+CV.swift
 @@ -0,0 +1,43 @@
@@ -17777,7 +17813,7 @@ index 0000000..5bce6fc
 +#endif
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+Helper.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+Helper.swift
 new file mode 100644
-index 0000000..667820d
+index 0000000000..667820d7a8
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver+Helper.swift
 @@ -0,0 +1,79 @@
@@ -17862,7 +17898,7 @@ index 0000000..667820d
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver.swift
 new file mode 100644
-index 0000000..6022bdb
+index 0000000000..6022bdb4b7
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkDriver.swift
 @@ -0,0 +1,41 @@
@@ -17909,7 +17945,7 @@ index 0000000..6022bdb
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkFrameRateRange.swift b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkFrameRateRange.swift
 new file mode 100644
-index 0000000..bfb0c05
+index 0000000000..bfb0c05510
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/MSDisplayLink/DisplayLinkFrameRateRange.swift
 @@ -0,0 +1,51 @@
@@ -17966,7 +18002,7 @@ index 0000000..bfb0c05
 +}
 diff --git a/mobile/packages/libghostty-terminal/ios/vendor/README.md b/mobile/packages/libghostty-terminal/ios/vendor/README.md
 new file mode 100644
-index 0000000..4cb1951
+index 0000000000..4cb1951524
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/ios/vendor/README.md
 @@ -0,0 +1,13 @@
@@ -17985,7 +18021,7 @@ index 0000000..4cb1951
 +`scripts/download-xcframework.mjs` and is not committed.
 diff --git a/mobile/packages/libghostty-terminal/package.json b/mobile/packages/libghostty-terminal/package.json
 new file mode 100644
-index 0000000..c1768a9
+index 0000000000..c1768a91f9
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/package.json
 @@ -0,0 +1,50 @@
@@ -18041,7 +18077,7 @@ index 0000000..c1768a9
 +}
 diff --git a/mobile/packages/libghostty-terminal/scripts/download-android-libs.mjs b/mobile/packages/libghostty-terminal/scripts/download-android-libs.mjs
 new file mode 100644
-index 0000000..0c4bbe6
+index 0000000000..0c4bbe6ea9
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/scripts/download-android-libs.mjs
 @@ -0,0 +1,64 @@
@@ -18111,7 +18147,7 @@ index 0000000..0c4bbe6
 +console.log('[expo-libghostty] android libghostty-vt ready')
 diff --git a/mobile/packages/libghostty-terminal/scripts/download-xcframework.mjs b/mobile/packages/libghostty-terminal/scripts/download-xcframework.mjs
 new file mode 100644
-index 0000000..2529408
+index 0000000000..2529408748
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/scripts/download-xcframework.mjs
 @@ -0,0 +1,52 @@
@@ -18169,7 +18205,7 @@ index 0000000..2529408
 +console.log('[expo-libghostty] GhosttyKit.xcframework ready')
 diff --git a/mobile/packages/libghostty-terminal/scripts/sync-vendor.sh b/mobile/packages/libghostty-terminal/scripts/sync-vendor.sh
 new file mode 100644
-index 0000000..b73cbdd
+index 0000000000..b73cbdd9d5
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/scripts/sync-vendor.sh
 @@ -0,0 +1,62 @@
@@ -18237,7 +18273,7 @@ index 0000000..b73cbdd
 +find "$VENDOR" -name '*.swift' | wc -l | xargs echo "    swift files:"
 diff --git a/mobile/packages/libghostty-terminal/scripts/vendor-watch.sh b/mobile/packages/libghostty-terminal/scripts/vendor-watch.sh
 new file mode 100644
-index 0000000..11984ba
+index 0000000000..11984ba954
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/scripts/vendor-watch.sh
 @@ -0,0 +1,88 @@
@@ -18331,10 +18367,10 @@ index 0000000..11984ba
 +fi
 diff --git a/mobile/packages/libghostty-terminal/src/ExpoLibghostty.types.ts b/mobile/packages/libghostty-terminal/src/ExpoLibghostty.types.ts
 new file mode 100644
-index 0000000..26ef2e5
+index 0000000000..e0299f4531
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/src/ExpoLibghostty.types.ts
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,109 @@
 +import type { Ref } from 'react'
 +import type { StyleProp, ViewStyle } from 'react-native'
 +
@@ -18421,6 +18457,11 @@ index 0000000..26ef2e5
 +  theme?: TerminalTheme
 +  /** Allow the native surface to open its own software keyboard. */
 +  keyboardEnabled?: boolean
++  /**
++   * Keep the native surface drawing. Inactive tabs stay mounted but must
++   * set this false: RN `opacity: 0` does not hide the iOS Metal layer.
++   */
++  surfaceVisible?: boolean
 +  /** A clean tap on the terminal surface. */
 +  onTap?: (event: { nativeEvent: TerminalTapEvent }) => void
 +  /** User keyboard/IME input to forward to the PTY. */
@@ -18441,7 +18482,7 @@ index 0000000..26ef2e5
 +}
 diff --git a/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.tsx b/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.tsx
 new file mode 100644
-index 0000000..10d6813
+index 0000000000..10d68135e4
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.tsx
 @@ -0,0 +1,53 @@
@@ -18500,7 +18541,7 @@ index 0000000..10d6813
 +}
 diff --git a/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.web.tsx b/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.web.tsx
 new file mode 100644
-index 0000000..c95f0e0
+index 0000000000..c95f0e0640
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/src/ExpoLibghosttyView.web.tsx
 @@ -0,0 +1,6 @@
@@ -18512,7 +18553,7 @@ index 0000000..c95f0e0
 +}
 diff --git a/mobile/packages/libghostty-terminal/src/__tests__/ExpoLibghosttyView.test.tsx b/mobile/packages/libghostty-terminal/src/__tests__/ExpoLibghosttyView.test.tsx
 new file mode 100644
-index 0000000..e5e15a7
+index 0000000000..e5e15a77b1
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/src/__tests__/ExpoLibghosttyView.test.tsx
 @@ -0,0 +1,147 @@
@@ -18665,7 +18706,7 @@ index 0000000..e5e15a7
 +})
 diff --git a/mobile/packages/libghostty-terminal/src/index.ts b/mobile/packages/libghostty-terminal/src/index.ts
 new file mode 100644
-index 0000000..8bbad8e
+index 0000000000..8bbad8e01e
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/src/index.ts
 @@ -0,0 +1,2 @@
@@ -18673,7 +18714,7 @@ index 0000000..8bbad8e
 +export * from './ExpoLibghostty.types'
 diff --git a/mobile/packages/libghostty-terminal/tsconfig.json b/mobile/packages/libghostty-terminal/tsconfig.json
 new file mode 100644
-index 0000000..bc15955
+index 0000000000..bc159559bb
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/tsconfig.json
 @@ -0,0 +1,26 @@
@@ -18705,7 +18746,7 @@ index 0000000..bc15955
 +}
 diff --git a/mobile/packages/libghostty-terminal/vendor-manifest.json b/mobile/packages/libghostty-terminal/vendor-manifest.json
 new file mode 100644
-index 0000000..54b846f
+index 0000000000..54b846fc80
 --- /dev/null
 +++ b/mobile/packages/libghostty-terminal/vendor-manifest.json
 @@ -0,0 +1,23 @@
@@ -18734,7 +18775,7 @@ index 0000000..54b846f
 +}
 diff --git a/mobile/patches/react-native-webview@13.16.2.patch b/mobile/patches/react-native-webview@13.16.2.patch
 deleted file mode 100644
-index 963f888..0000000
+index 963f8884f3..0000000000
 --- a/mobile/patches/react-native-webview@13.16.2.patch
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -18753,7 +18794,7 @@ index 963f888..0000000
 -    */
 diff --git a/mobile/patches/react-native@0.83.10.patch b/mobile/patches/react-native@0.83.10.patch
 deleted file mode 100644
-index 9bda1b2..0000000
+index 9bda1b252f..0000000000
 --- a/mobile/patches/react-native@0.83.10.patch
 +++ /dev/null
 @@ -1,60 +0,0 @@
@@ -18819,7 +18860,7 @@ index 9bda1b2..0000000
 - }
 diff --git a/mobile/patches/react-native@0.86.3.patch b/mobile/patches/react-native@0.86.3.patch
 new file mode 100644
-index 0000000..1dfdfc5
+index 0000000000..1dfdfc5048
 --- /dev/null
 +++ b/mobile/patches/react-native@0.86.3.patch
 @@ -0,0 +1,12 @@
@@ -18836,7 +18877,7 @@ index 0000000..1dfdfc5
 +   _accessibilityProvider = nil;
 + }
 diff --git a/mobile/pnpm-lock.yaml b/mobile/pnpm-lock.yaml
-index 60ccee9..9e3c7d7 100644
+index 60ccee97d2..9e3c7d7419 100644
 --- a/mobile/pnpm-lock.yaml
 +++ b/mobile/pnpm-lock.yaml
 @@ -1,3 +1,104 @@
@@ -40265,7 +40306,7 @@ index 60ccee9..9e3c7d7 100644
 -      type-fest: 5.6.0
 +      type-fest: 5.8.0
 diff --git a/mobile/pnpm-workspace.yaml b/mobile/pnpm-workspace.yaml
-index 8f29993..20f7636 100644
+index 8f29993b7b..20f7636691 100644
 --- a/mobile/pnpm-workspace.yaml
 +++ b/mobile/pnpm-workspace.yaml
 @@ -1,11 +1,22 @@
@@ -40295,7 +40336,7 @@ index 8f29993..20f7636 100644
 +  react-native@0.86.3: patches/react-native@0.86.3.patch
 diff --git a/mobile/scripts/build-terminal-webview-engine.mjs b/mobile/scripts/build-terminal-webview-engine.mjs
 deleted file mode 100644
-index ef6bf0d..0000000
+index ef6bf0dc1b..0000000000
 --- a/mobile/scripts/build-terminal-webview-engine.mjs
 +++ /dev/null
 @@ -1,108 +0,0 @@
@@ -40408,7 +40449,7 @@ index ef6bf0d..0000000
 -
 -await main()
 diff --git a/mobile/scripts/mock-server-terminal-stream.ts b/mobile/scripts/mock-server-terminal-stream.ts
-index f747ec5..1a2adf2 100644
+index f747ec59b2..1a2adf2e4b 100644
 --- a/mobile/scripts/mock-server-terminal-stream.ts
 +++ b/mobile/scripts/mock-server-terminal-stream.ts
 @@ -75,7 +75,7 @@ export function handleMockTerminalRequest(
@@ -40421,7 +40462,7 @@ index f747ec5..1a2adf2 100644
        const tuiPreamble =
          process.env.MOCK_TUI === '1'
 diff --git a/mobile/scripts/prepare-android-release.mjs b/mobile/scripts/prepare-android-release.mjs
-index e318d7c..70f3c10 100644
+index e318d7c600..70f3c10b05 100644
 --- a/mobile/scripts/prepare-android-release.mjs
 +++ b/mobile/scripts/prepare-android-release.mjs
 @@ -93,6 +93,6 @@ writeOutput('android_version_code', String(currentVersionCode))
@@ -40433,7 +40474,7 @@ index e318d7c..70f3c10 100644
  console.log(`Release tag: ${tag}`)
  console.log(`Publish GitHub Release: ${publishRelease ? 'yes' : 'no'}`)
 diff --git a/mobile/scripts/repro-mobile-foreground-stall.sh b/mobile/scripts/repro-mobile-foreground-stall.sh
-index 5fc0e05..c98eb58 100755
+index 5fc0e05cc6..c98eb58e2f 100755
 --- a/mobile/scripts/repro-mobile-foreground-stall.sh
 +++ b/mobile/scripts/repro-mobile-foreground-stall.sh
 @@ -26,11 +26,11 @@ set -euo pipefail
@@ -40451,7 +40492,7 @@ index 5fc0e05..c98eb58 100755
  : "${APP:?mobile app is not running in the simulator}"
  : "${DESK:?headless desktop runtime is not running}"
 diff --git a/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx b/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
-index 4f1d9ec..db16ace 100644
+index 4f1d9ecf65..db16aced18 100644
 --- a/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
 +++ b/mobile/src/agent-history/MobileAgentSessionHistoryPanel.tsx
 @@ -280,7 +280,7 @@ export function MobileAgentSessionHistoryPanel({
@@ -40464,7 +40505,7 @@ index 4f1d9ec..db16ace 100644
          </View>
        ) : screenState.kind === 'error' ? (
 diff --git a/mobile/src/browser/MobileBrowserAddressField.tsx b/mobile/src/browser/MobileBrowserAddressField.tsx
-index ebb3211..df453a5 100644
+index ebb32110b3..df453a5012 100644
 --- a/mobile/src/browser/MobileBrowserAddressField.tsx
 +++ b/mobile/src/browser/MobileBrowserAddressField.tsx
 @@ -76,7 +76,7 @@ const styles = StyleSheet.create({
@@ -40477,7 +40518,7 @@ index ebb3211..df453a5 100644
      paddingHorizontal: spacing.sm,
      borderRadius: radii.input,
 diff --git a/mobile/src/browser/mobile-browser-pane-styles.ts b/mobile/src/browser/mobile-browser-pane-styles.ts
-index b414285..1cc9ca8 100644
+index b41428516b..1cc9ca8862 100644
 --- a/mobile/src/browser/mobile-browser-pane-styles.ts
 +++ b/mobile/src/browser/mobile-browser-pane-styles.ts
 @@ -25,7 +25,7 @@ export const mobileBrowserPaneStyles = StyleSheet.create({
@@ -40517,7 +40558,7 @@ index b414285..1cc9ca8 100644
      alignItems: 'center',
      justifyContent: 'center',
 diff --git a/mobile/src/components/HostProtocolGate.test.ts b/mobile/src/components/HostProtocolGate.test.ts
-index 44a2265..14c3498 100644
+index 44a2265ccb..14c349829a 100644
 --- a/mobile/src/components/HostProtocolGate.test.ts
 +++ b/mobile/src/components/HostProtocolGate.test.ts
 @@ -98,7 +98,7 @@ describe('HostProtocolGate', () => {
@@ -40559,7 +40600,7 @@ index 44a2265..14c3498 100644
    })
  
 diff --git a/mobile/src/components/HostProtocolGate.tsx b/mobile/src/components/HostProtocolGate.tsx
-index 4d9c0c0..e6a7214 100644
+index 4d9c0c019f..e6a7214a26 100644
 --- a/mobile/src/components/HostProtocolGate.tsx
 +++ b/mobile/src/components/HostProtocolGate.tsx
 @@ -111,7 +111,7 @@ const styles = StyleSheet.create({
@@ -40572,7 +40613,7 @@ index 4d9c0c0..e6a7214 100644
      justifyContent: 'center',
      backgroundColor: colors.bgBase,
 diff --git a/mobile/src/components/ProtocolBlockScreen.tsx b/mobile/src/components/ProtocolBlockScreen.tsx
-index ed8fc2b..dd75efc 100644
+index ed8fc2bcdd..dd75efc4ce 100644
 --- a/mobile/src/components/ProtocolBlockScreen.tsx
 +++ b/mobile/src/components/ProtocolBlockScreen.tsx
 @@ -21,10 +21,10 @@ export function ProtocolBlockScreen({ verdict }: Props) {
@@ -40590,7 +40631,7 @@ index ed8fc2b..dd75efc 100644
      'Already updated? Go back to Hosts and refresh the connection. If this message stays, remove this host and pair it again.'
  
 diff --git a/mobile/src/components/RightDrawer.tsx b/mobile/src/components/RightDrawer.tsx
-index eeeeccb..c05722d 100644
+index eeeeccb0a2..c05722d1cd 100644
 --- a/mobile/src/components/RightDrawer.tsx
 +++ b/mobile/src/components/RightDrawer.tsx
 @@ -215,14 +215,14 @@ function MountedRightDrawer({
@@ -40611,7 +40652,7 @@ index eeeeccb..c05722d 100644
    },
    anchor: {
 diff --git a/mobile/src/components/bottom-drawer-styles.ts b/mobile/src/components/bottom-drawer-styles.ts
-index ce74ac5..a2cf979 100644
+index ce74ac5a50..a2cf979b61 100644
 --- a/mobile/src/components/bottom-drawer-styles.ts
 +++ b/mobile/src/components/bottom-drawer-styles.ts
 @@ -3,18 +3,18 @@ import { colors, spacing } from '../theme/mobile-theme'
@@ -40637,7 +40678,7 @@ index ce74ac5..a2cf979 100644
    anchor: {
      flex: 1,
 diff --git a/mobile/src/diagnostics/connection-diagnostics-report.test.ts b/mobile/src/diagnostics/connection-diagnostics-report.test.ts
-index 35a1425..18521cb 100644
+index 35a1425165..18521cb87a 100644
 --- a/mobile/src/diagnostics/connection-diagnostics-report.test.ts
 +++ b/mobile/src/diagnostics/connection-diagnostics-report.test.ts
 @@ -26,7 +26,7 @@ describe('buildConnectionDiagnosticsReport', () => {
@@ -40650,7 +40691,7 @@ index 35a1425..18521cb 100644
      expect(report).toContain('Endpoint: 100.65.9.106:6768 (Tailscale)')
      expect(report).toContain('State: reconnecting (reconnect attempts: 12)')
 diff --git a/mobile/src/diagnostics/connection-diagnostics-report.ts b/mobile/src/diagnostics/connection-diagnostics-report.ts
-index 0507b44..029672c 100644
+index 0507b44349..029672c6de 100644
 --- a/mobile/src/diagnostics/connection-diagnostics-report.ts
 +++ b/mobile/src/diagnostics/connection-diagnostics-report.ts
 @@ -39,9 +39,9 @@ export function buildConnectionDiagnosticsReport(args: {
@@ -40666,7 +40707,7 @@ index 0507b44..029672c 100644
    lines.push(`Host Orca version: ${desktopAppVersion ?? 'unknown'}`)
    lines.push(`Host: ${redactConnectionLogText(args.hostName)}`)
 diff --git a/mobile/src/diagnostics/connection-diagnostics-submission.test.ts b/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
-index f2977b6..e1857ce 100644
+index f2977b6055..e1857ceb96 100644
 --- a/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
 +++ b/mobile/src/diagnostics/connection-diagnostics-submission.test.ts
 @@ -35,7 +35,7 @@ describe('submitConnectionDiagnostics', () => {
@@ -40688,7 +40729,7 @@ index f2977b6..e1857ce 100644
        '',
        'Recent connection history (2 events, oldest first):',
 diff --git a/mobile/src/home/MobileHomeEmptyState.tsx b/mobile/src/home/MobileHomeEmptyState.tsx
-index eda2496..9cd107c 100644
+index eda2496094..9cd107cf17 100644
 --- a/mobile/src/home/MobileHomeEmptyState.tsx
 +++ b/mobile/src/home/MobileHomeEmptyState.tsx
 @@ -4,7 +4,7 @@ import { colors, radii, spacing } from '../theme/mobile-theme'
@@ -40701,7 +40742,7 @@ index eda2496..9cd107c 100644
    },
    {
 diff --git a/mobile/src/home/MobileHomeTopBar.tsx b/mobile/src/home/MobileHomeTopBar.tsx
-index ac6d800..186d926 100644
+index ac6d800c7f..186d92604a 100644
 --- a/mobile/src/home/MobileHomeTopBar.tsx
 +++ b/mobile/src/home/MobileHomeTopBar.tsx
 @@ -10,7 +10,7 @@ export function MobileHomeTopBar({ onOpenSettings }: { onOpenSettings: () => voi
@@ -40714,7 +40755,7 @@ index ac6d800..186d926 100644
        <Pressable
          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
 diff --git a/mobile/src/mobile-release/prepare-android-release-script.test.ts b/mobile/src/mobile-release/prepare-android-release-script.test.ts
-index 668b468..c15946b 100644
+index 668b4689bb..c15946b7c3 100644
 --- a/mobile/src/mobile-release/prepare-android-release-script.test.ts
 +++ b/mobile/src/mobile-release/prepare-android-release-script.test.ts
 @@ -49,7 +49,7 @@ describe('prepare Android release script', () => {
@@ -40727,7 +40768,7 @@ index 668b468..c15946b 100644
      expect(readFileSync(configPath, 'utf8')).toBe(contents)
    })
 diff --git a/mobile/src/mock-server-key-pair.test.ts b/mobile/src/mock-server-key-pair.test.ts
-index bf4f764..8151587 100644
+index bf4f764dd3..8151587b71 100644
 --- a/mobile/src/mock-server-key-pair.test.ts
 +++ b/mobile/src/mock-server-key-pair.test.ts
 @@ -29,7 +29,9 @@ function runConcurrentCreator(keyFile: string): ConcurrentCreator {
@@ -40742,7 +40783,7 @@ index bf4f764..8151587 100644
      await new Promise((resolve) => process.stdin.once('data', resolve))
      process.stdout.write('CALLING\\n')
 diff --git a/mobile/src/pair-scan-styles.ts b/mobile/src/pair-scan-styles.ts
-index af1b936..cf19b04 100644
+index af1b936fb5..cf19b04a65 100644
 --- a/mobile/src/pair-scan-styles.ts
 +++ b/mobile/src/pair-scan-styles.ts
 @@ -56,10 +56,10 @@ export const pairScanStyles = StyleSheet.create({
@@ -40759,7 +40800,7 @@ index af1b936..cf19b04 100644
      justifyContent: 'center'
    },
 diff --git a/mobile/src/session/MobileNativeChatOverlay.tsx b/mobile/src/session/MobileNativeChatOverlay.tsx
-index 2372430..faf3443 100644
+index 23724300dd..faf3443c84 100644
 --- a/mobile/src/session/MobileNativeChatOverlay.tsx
 +++ b/mobile/src/session/MobileNativeChatOverlay.tsx
 @@ -116,5 +116,5 @@ export function MobileNativeChatOverlay({
@@ -40770,7 +40811,7 @@ index 2372430..faf3443 100644
 +  overlay: StyleSheet.absoluteFill
  })
 diff --git a/mobile/src/session/MobileSessionActiveContent.tsx b/mobile/src/session/MobileSessionActiveContent.tsx
-index 7dd0997..2318ee6 100644
+index 7dd09977c4..2318ee634b 100644
 --- a/mobile/src/session/MobileSessionActiveContent.tsx
 +++ b/mobile/src/session/MobileSessionActiveContent.tsx
 @@ -1,5 +1,4 @@
@@ -40860,10 +40901,10 @@ index 7dd0997..2318ee6 100644
            onOpenUrl={handleTerminalOpenUrl}
          />
 diff --git a/mobile/src/session/TerminalPaneView.tsx b/mobile/src/session/TerminalPaneView.tsx
-index 06174cd..5a02480 100644
+index 06174cd037..299c82f650 100644
 --- a/mobile/src/session/TerminalPaneView.tsx
 +++ b/mobile/src/session/TerminalPaneView.tsx
-@@ -1,33 +1,62 @@
+@@ -1,33 +1,63 @@
 -import { useCallback } from 'react'
 +import {
 +  TerminalView,
@@ -40882,6 +40923,7 @@ index 06174cd..5a02480 100644
 -  TerminalWebViewHandle
 -} from '../terminal/terminal-webview-contract'
 +import type { RuntimeMobileTerminalTheme } from '../../../src/shared/runtime-types'
++import { isUsableTerminalViewport } from '../terminal/terminal-native-viewport-update'
 +import { resolveTerminalTapTarget } from '../terminal/terminal-tap-target'
  
  type TerminalPaneViewProps = {
@@ -40947,7 +40989,7 @@ index 06174cd..5a02480 100644
  }
  
  export function TerminalPaneView({
-@@ -37,31 +66,37 @@ export function TerminalPaneView({
+@@ -37,31 +67,37 @@ export function TerminalPaneView({
    terminalTheme,
    textScale,
    onRef,
@@ -41003,7 +41045,7 @@ index 06174cd..5a02480 100644
        pointerEvents={active ? 'auto' : 'none'}
        style={[
          styles.terminalPane,
-@@ -69,24 +104,23 @@ export function TerminalPaneView({
+@@ -69,24 +105,27 @@ export function TerminalPaneView({
          !active && styles.terminalPaneHidden
        ]}
      >
@@ -41030,10 +41072,14 @@ index 06174cd..5a02480 100644
 +        fontSize={8 * textScale}
 +        theme={theme}
 +        keyboardEnabled={false}
++        surfaceVisible={active}
 +        onTap={({ nativeEvent }) => handleTap(nativeEvent)}
 +        onInput={({ nativeEvent }) => onInput(handle, nativeEvent)}
 +        onResize={({ nativeEvent }) => {
 +          const { cols, rows } = nativeEvent
++          if (!isUsableTerminalViewport({ cols, rows })) {
++            return
++          }
 +          if (!readyRef.current) {
 +            readyRef.current = true
 +            onReady(handle, cols, rows)
@@ -41044,24 +41090,36 @@ index 06174cd..5a02480 100644
        />
      </View>
    )
-@@ -94,12 +128,12 @@ export function TerminalPaneView({
+@@ -94,12 +133,22 @@ export function TerminalPaneView({
  
  const styles = StyleSheet.create({
    terminalPane: {
 -    ...StyleSheet.absoluteFillObject
-+    ...StyleSheet.absoluteFill
++    position: 'absolute',
++    top: 0,
++    right: 0,
++    bottom: 0,
++    left: 0
    },
    terminalPaneHidden: {
-     opacity: 0
+-    opacity: 0
++    width: 0,
++    height: 0,
++    overflow: 'hidden'
    },
 -  terminalWebView: {
+-    flex: 1
 +  terminal: {
-     flex: 1
++    position: 'absolute',
++    top: 0,
++    right: 0,
++    bottom: 0,
++    left: 0
    }
  })
 diff --git a/mobile/src/session/mobile-reconnect-timers.test.ts b/mobile/src/session/mobile-reconnect-timers.test.ts
 new file mode 100644
-index 0000000..720ebe6
+index 0000000000..720ebe6ca9
 --- /dev/null
 +++ b/mobile/src/session/mobile-reconnect-timers.test.ts
 @@ -0,0 +1,31 @@
@@ -41098,7 +41156,7 @@ index 0000000..720ebe6
 +})
 diff --git a/mobile/src/session/mobile-reconnect-timers.ts b/mobile/src/session/mobile-reconnect-timers.ts
 new file mode 100644
-index 0000000..6554af3
+index 0000000000..6554af3b8e
 --- /dev/null
 +++ b/mobile/src/session/mobile-reconnect-timers.ts
 @@ -0,0 +1,29 @@
@@ -41132,7 +41190,7 @@ index 0000000..6554af3
 +  }
 +}
 diff --git a/mobile/src/session/mobile-session-frame-styles.ts b/mobile/src/session/mobile-session-frame-styles.ts
-index a02c14b..977d2ec 100644
+index a02c14be01..977d2ec786 100644
 --- a/mobile/src/session/mobile-session-frame-styles.ts
 +++ b/mobile/src/session/mobile-session-frame-styles.ts
 @@ -149,7 +149,7 @@ export const mobileSessionFrameStyles = StyleSheet.create({
@@ -41145,7 +41203,7 @@ index a02c14b..977d2ec 100644
    terminalPaneHidden: {
      opacity: 0
 diff --git a/mobile/src/session/mobile-session-route-helpers.ts b/mobile/src/session/mobile-session-route-helpers.ts
-index 413e131..bc49879 100644
+index 413e1316be..bc49879227 100644
 --- a/mobile/src/session/mobile-session-route-helpers.ts
 +++ b/mobile/src/session/mobile-session-route-helpers.ts
 @@ -1,4 +1,4 @@
@@ -41155,7 +41213,7 @@ index 413e131..bc49879 100644
  
  export const MOBILE_SESSION_STATUS_LABELS: Record<ConnectionState, string> = {
 diff --git a/mobile/src/session/mobile-session-route-types.ts b/mobile/src/session/mobile-session-route-types.ts
-index a61b653..7bed161 100644
+index a61b653a0e..7bed16103d 100644
 --- a/mobile/src/session/mobile-session-route-types.ts
 +++ b/mobile/src/session/mobile-session-route-types.ts
 @@ -2,7 +2,7 @@ import type { DiffComment } from '../../../src/shared/diff-comment-types'
@@ -41168,7 +41226,7 @@ index a61b653..7bed161 100644
  import type { MobileHighlightedDiffLine, MobileSyntaxSegment } from './mobile-file-syntax'
  import type { TerminalRecord } from './mobile-terminal-records'
 diff --git a/mobile/src/session/mobile-session-startup-source.test.ts b/mobile/src/session/mobile-session-startup-source.test.ts
-index acab1d5..2d52051 100644
+index acab1d5e7c..2d520519cd 100644
 --- a/mobile/src/session/mobile-session-startup-source.test.ts
 +++ b/mobile/src/session/mobile-session-startup-source.test.ts
 @@ -143,7 +143,7 @@ describe('mobile session startup', () => {
@@ -41181,7 +41239,7 @@ index acab1d5..2d52051 100644
  
    it('fails runtime capability gates closed before probing a replacement client', () => {
 diff --git a/mobile/src/session/mobile-terminal-records.ts b/mobile/src/session/mobile-terminal-records.ts
-index 0942686..5475a49 100644
+index 09426863b9..5475a492ed 100644
 --- a/mobile/src/session/mobile-terminal-records.ts
 +++ b/mobile/src/session/mobile-terminal-records.ts
 @@ -1,4 +1,4 @@
@@ -41201,7 +41259,7 @@ index 0942686..5475a49 100644
        terminalTheme:
 diff --git a/mobile/src/session/mobile-terminal-viewport-resubscribe.test.ts b/mobile/src/session/mobile-terminal-viewport-resubscribe.test.ts
 deleted file mode 100644
-index 35aac89..0000000
+index 35aac89f6f..0000000000
 --- a/mobile/src/session/mobile-terminal-viewport-resubscribe.test.ts
 +++ /dev/null
 @@ -1,472 +0,0 @@
@@ -41679,7 +41737,7 @@ index 35aac89..0000000
 -})
 diff --git a/mobile/src/session/mobile-terminal-viewport-resubscribe.ts b/mobile/src/session/mobile-terminal-viewport-resubscribe.ts
 deleted file mode 100644
-index 8ad3c99..0000000
+index 8ad3c99c13..0000000000
 --- a/mobile/src/session/mobile-terminal-viewport-resubscribe.ts
 +++ /dev/null
 @@ -1,293 +0,0 @@
@@ -41977,7 +42035,7 @@ index 8ad3c99..0000000
 -  })()
 -}
 diff --git a/mobile/src/session/use-mobile-native-chat-terminal-stream.test.ts b/mobile/src/session/use-mobile-native-chat-terminal-stream.test.ts
-index 47b3d98..618984b 100644
+index 47b3d98209..618984b237 100644
 --- a/mobile/src/session/use-mobile-native-chat-terminal-stream.test.ts
 +++ b/mobile/src/session/use-mobile-native-chat-terminal-stream.test.ts
 @@ -153,7 +153,7 @@ describe('useMobileNativeChatTerminalStream', () => {
@@ -41999,7 +42057,7 @@ index 47b3d98..618984b 100644
        subscribe.mockImplementation(() => {})
        for (let revision = 1; revision <= 5; revision += 1) {
 diff --git a/mobile/src/session/use-mobile-native-chat-terminal-stream.ts b/mobile/src/session/use-mobile-native-chat-terminal-stream.ts
-index b5663b8..989e74c 100644
+index b5663b8dc8..989e74ca60 100644
 --- a/mobile/src/session/use-mobile-native-chat-terminal-stream.ts
 +++ b/mobile/src/session/use-mobile-native-chat-terminal-stream.ts
 @@ -172,7 +172,7 @@ export function useMobileNativeChatTerminalStream(args: {
@@ -42030,7 +42088,7 @@ index b5663b8..989e74c 100644
        // terminal would stay blank through the resubscribe.
        args.initializedRef.current.delete(handle)
 diff --git a/mobile/src/session/use-mobile-session-accessory-selection.ts b/mobile/src/session/use-mobile-session-accessory-selection.ts
-index 356bf11..e74234e 100644
+index 356bf11952..e74234e846 100644
 --- a/mobile/src/session/use-mobile-session-accessory-selection.ts
 +++ b/mobile/src/session/use-mobile-session-accessory-selection.ts
 @@ -8,10 +8,7 @@ import {
@@ -42072,7 +42130,7 @@ index 356bf11..e74234e 100644
          triggerError()
          const err = e as { name?: string; message?: string }
 diff --git a/mobile/src/session/use-mobile-session-attachments.ts b/mobile/src/session/use-mobile-session-attachments.ts
-index 6669154..5365580 100644
+index 6669154511..5365580118 100644
 --- a/mobile/src/session/use-mobile-session-attachments.ts
 +++ b/mobile/src/session/use-mobile-session-attachments.ts
 @@ -1,4 +1,4 @@
@@ -42145,7 +42203,7 @@ index 6669154..5365580 100644
    useEffect(() => {
      const shouldLoadAgentOptions = showCreateTabDrawer || pendingDiffNotesDelivery !== null
 diff --git a/mobile/src/session/use-mobile-session-keyboard-state.ts b/mobile/src/session/use-mobile-session-keyboard-state.ts
-index 41b453b..ff71882 100644
+index 41b453bada..ff7188270b 100644
 --- a/mobile/src/session/use-mobile-session-keyboard-state.ts
 +++ b/mobile/src/session/use-mobile-session-keyboard-state.ts
 @@ -1,7 +1,6 @@
@@ -42233,7 +42291,7 @@ index 41b453b..ff71882 100644
      handleDeleteCustomKey,
      handleManageShortcuts
 diff --git a/mobile/src/session/use-mobile-session-lifecycle.ts b/mobile/src/session/use-mobile-session-lifecycle.ts
-index 912ebdb..8821e48 100644
+index 912ebdb492..8821e48f2b 100644
 --- a/mobile/src/session/use-mobile-session-lifecycle.ts
 +++ b/mobile/src/session/use-mobile-session-lifecycle.ts
 @@ -1,31 +1,13 @@
@@ -42335,7 +42393,7 @@ index 912ebdb..8821e48 100644
  
  export type MobileSessionLifecycleModel = MobileSessionTabReconciliationModel &
 diff --git a/mobile/src/session/use-mobile-session-screen-state.ts b/mobile/src/session/use-mobile-session-screen-state.ts
-index 107ac31..6f725ef 100644
+index 107ac3181d..6f725ef6cd 100644
 --- a/mobile/src/session/use-mobile-session-screen-state.ts
 +++ b/mobile/src/session/use-mobile-session-screen-state.ts
 @@ -1,7 +1,7 @@
@@ -42348,7 +42406,7 @@ index 107ac31..6f725ef 100644
    getDefaultTerminalAccessoryBuiltInIds,
    getVisibleTerminalAccessoryKeys
 diff --git a/mobile/src/session/use-mobile-session-startup.ts b/mobile/src/session/use-mobile-session-startup.ts
-index f33d081..93f984b 100644
+index f33d081f2c..93f984bec6 100644
 --- a/mobile/src/session/use-mobile-session-startup.ts
 +++ b/mobile/src/session/use-mobile-session-startup.ts
 @@ -118,7 +118,7 @@ export function useMobileSessionStartup(scope: MobileSessionKeyboardStateModel)
@@ -42361,7 +42419,7 @@ index f33d081..93f984b 100644
        }
        if (client && created !== '1' && !isFloatingWorkspaceRoute) {
 diff --git a/mobile/src/session/use-mobile-session-terminal-input.ts b/mobile/src/session/use-mobile-session-terminal-input.ts
-index 0290609..27ce226 100644
+index 02906099e7..27ce2268dc 100644
 --- a/mobile/src/session/use-mobile-session-terminal-input.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-input.ts
 @@ -1,4 +1,6 @@
@@ -42440,7 +42498,7 @@ index 0290609..27ce226 100644
        await client.sendRequest('terminal.clearBuffer', {
          terminal: target.handle
 diff --git a/mobile/src/session/use-mobile-session-terminal-list.ts b/mobile/src/session/use-mobile-session-terminal-list.ts
-index 1056775..a5c5e19 100644
+index 105677533d..a5c5e19fc0 100644
 --- a/mobile/src/session/use-mobile-session-terminal-list.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-list.ts
 @@ -26,7 +26,6 @@ export function useMobileSessionTerminalList(scope: MobileSessionTerminalStreamD
@@ -42469,7 +42527,7 @@ index 1056775..a5c5e19 100644
              // Why: dedupe duplicate handles (rename/split race) to avoid a React duplicate-key throw; keep first for tab-strip order.
              const seen = new Set<string>()
 diff --git a/mobile/src/session/use-mobile-session-terminal-runtime.ts b/mobile/src/session/use-mobile-session-terminal-runtime.ts
-index 8ef472f..61758e1 100644
+index 8ef472fb84..61758e1b61 100644
 --- a/mobile/src/session/use-mobile-session-terminal-runtime.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-runtime.ts
 @@ -3,13 +3,14 @@ import type { Keyboard, TextInput } from 'react-native'
@@ -42541,7 +42599,7 @@ index 8ef472f..61758e1 100644
      activeSessionTabTypeRef,
      pendingActiveSessionTabIdRef,
 diff --git a/mobile/src/session/use-mobile-session-terminal-subscription-foundation.ts b/mobile/src/session/use-mobile-session-terminal-subscription-foundation.ts
-index 76d8229..0f9b84a 100644
+index 76d8229b28..0f9b84a7d9 100644
 --- a/mobile/src/session/use-mobile-session-terminal-subscription-foundation.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-subscription-foundation.ts
 @@ -8,20 +8,16 @@ export function useMobileSessionTerminalSubscriptionFoundation(
@@ -42611,7 +42669,7 @@ index 76d8229..0f9b84a 100644
  }
  
 diff --git a/mobile/src/session/use-mobile-session-terminal-subscription.ts b/mobile/src/session/use-mobile-session-terminal-subscription.ts
-index 8ad0bb7..66450e2 100644
+index 8ad0bb7383..66450e29f4 100644
 --- a/mobile/src/session/use-mobile-session-terminal-subscription.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-subscription.ts
 @@ -1,11 +1,6 @@
@@ -42784,13 +42842,14 @@ index 8ad0bb7..66450e2 100644
    return {
      subscribeToTerminal
 diff --git a/mobile/src/session/use-mobile-session-terminal-webview.ts b/mobile/src/session/use-mobile-session-terminal-webview.ts
-index 56af08c..3d179f8 100644
+index 56af08c630..a221d3db5b 100644
 --- a/mobile/src/session/use-mobile-session-terminal-webview.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-webview.ts
-@@ -1,31 +1,36 @@
+@@ -1,31 +1,37 @@
  import { useEffect, useCallback } from 'react'
 -import type { TerminalWebViewHandle } from '../terminal/terminal-webview-contract'
 +import type { TerminalViewRef } from '@orca/libghostty-terminal'
++import { isUsableTerminalViewport } from '../terminal/terminal-native-viewport-update'
  import type { MobileSessionTabSwitchingModel } from './use-mobile-session-tab-switching'
  
  export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitchingModel) {
@@ -42829,7 +42888,7 @@ index 56af08c..3d179f8 100644
      terminalDiagnosticsRef.current.webViewRef(handle, ref != null)
      if (ref) {
        terminalRefs.current.set(handle, ref)
-@@ -41,10 +46,12 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
+@@ -41,10 +47,14 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
      }
    }, [])
  
@@ -42841,12 +42900,14 @@ index 56af08c..3d179f8 100644
 +    (handle: string, cols: number, rows: number) => {
 +      const wasAlreadyReady = nativeReadyHandlesRef.current.has(handle)
 +      nativeReadyHandlesRef.current.add(handle)
-+      viewportRef.current = { cols, rows }
-+      viewportMeasuredRef.current = true
++      if (isUsableTerminalViewport({ cols, rows })) {
++        viewportRef.current = { cols, rows }
++        viewportMeasuredRef.current = true
++      }
        nativeChatStream.notifyWebReady(handle, wasAlreadyReady)
        terminalDiagnosticsRef.current.webViewReady(
          handle,
-@@ -52,7 +59,6 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
+@@ -52,7 +62,6 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
          handle === activeHandleRef.current
        )
        if (wasAlreadyReady && initializedHandlesRef.current.has(handle)) {
@@ -42854,7 +42915,7 @@ index 56af08c..3d179f8 100644
          unsubscribeTerminal(handle)
          initializedHandlesRef.current.delete(handle)
          if (handle === activeHandleRef.current) {
-@@ -60,20 +66,56 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
+@@ -60,20 +69,59 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
          }
          return
        }
@@ -42870,14 +42931,16 @@ index 56af08c..3d179f8 100644
 -          }
 -        })()
 +        subscribeToTerminal(handle)
-       }
-     },
--    [measureViewportOnce, nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
++      }
++    },
 +    [nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
 +  )
 +
 +  const handleTerminalNativeResize = useCallback(
 +    (handle: string, cols: number, rows: number) => {
++      if (!isUsableTerminalViewport({ cols, rows })) {
++        return
++      }
 +      const current = viewportRef.current
 +      if (current?.cols === cols && current.rows === rows) {
 +        return
@@ -42896,7 +42959,7 @@ index 56af08c..3d179f8 100644
 +      const deviceToken = deviceTokenRef.current
 +      if (!client || !deviceToken) {
 +        return
-+      }
+       }
 +      void terminalViewportUpdateRef.current
 +        .request(client, handle, deviceToken, { cols, rows })
 +        .then((updated) => {
@@ -42915,12 +42978,13 @@ index 56af08c..3d179f8 100644
 +          initializedHandlesRef.current.delete(handle)
 +          subscribeToTerminal(handle)
 +        })
-+    },
+     },
+-    [measureViewportOnce, nativeChatStream, subscribeToTerminal, unsubscribeTerminal]
 +    [client, subscribeToTerminal, unsubscribeTerminal]
    )
  
    useEffect(() => {
-@@ -96,8 +138,9 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
+@@ -96,8 +144,9 @@ export function useMobileSessionTerminalWebview(scope: MobileSessionTabSwitching
      }
    }, [activeSessionTab, fileDocs, readFileTab])
    return {
@@ -42933,7 +42997,7 @@ index 56af08c..3d179f8 100644
  }
  
 diff --git a/mobile/src/session/use-mobile-terminal-paste.ts b/mobile/src/session/use-mobile-terminal-paste.ts
-index 57ea720..31257f8 100644
+index 57ea720c4c..31257f8da7 100644
 --- a/mobile/src/session/use-mobile-terminal-paste.ts
 +++ b/mobile/src/session/use-mobile-terminal-paste.ts
 @@ -2,11 +2,9 @@ import { useCallback, type RefObject } from 'react'
@@ -43049,7 +43113,7 @@ index 57ea720..31257f8 100644
      showToast
    ])
 diff --git a/mobile/src/storage/preferences.ts b/mobile/src/storage/preferences.ts
-index 5173ac5..c45833f 100644
+index 5173ac5bc8..c45833f731 100644
 --- a/mobile/src/storage/preferences.ts
 +++ b/mobile/src/storage/preferences.ts
 @@ -32,13 +32,8 @@ export async function savePushNotificationsEnabled(enabled: boolean): Promise<vo
@@ -43069,7 +43133,7 @@ index 5173ac5..c45833f 100644
  const DEFAULT_TEXT_SCALE = 1
  
 diff --git a/mobile/src/tasks/mobile-tasks-github-project-pickers.tsx b/mobile/src/tasks/mobile-tasks-github-project-pickers.tsx
-index 90affaf..43f06d7 100644
+index 90affafa53..43f06d7446 100644
 --- a/mobile/src/tasks/mobile-tasks-github-project-pickers.tsx
 +++ b/mobile/src/tasks/mobile-tasks-github-project-pickers.tsx
 @@ -309,7 +309,7 @@ export function renderMobileTasksGitHubProjectViewPicker(model: ConnectionPresen
@@ -43082,7 +43146,7 @@ index 90affaf..43f06d7 100644
          }
          if (pendingGitHubProjectViewSelection) {
 diff --git a/mobile/src/tasks/mobile-tasks-refactor-parity.test.ts b/mobile/src/tasks/mobile-tasks-refactor-parity.test.ts
-index 8d35398..50a8143 100644
+index 8d35398c3d..50a8143bf9 100644
 --- a/mobile/src/tasks/mobile-tasks-refactor-parity.test.ts
 +++ b/mobile/src/tasks/mobile-tasks-refactor-parity.test.ts
 @@ -18,9 +18,9 @@ const hash = (parts: string[] | string): string =>
@@ -43098,7 +43162,7 @@ index 8d35398..50a8143 100644
  const PRE_REFACTOR_RENDER_TREE = '2111145136b1e4fbca150d4792d735a90e992488e9934cfc1a8b8f3be981f39f'
  
 diff --git a/mobile/src/tasks/use-mobile-tasks-project-loading-actions.tsx b/mobile/src/tasks/use-mobile-tasks-project-loading-actions.tsx
-index 221134e..085d884 100644
+index 221134e46e..085d88404b 100644
 --- a/mobile/src/tasks/use-mobile-tasks-project-loading-actions.tsx
 +++ b/mobile/src/tasks/use-mobile-tasks-project-loading-actions.tsx
 @@ -212,7 +212,7 @@ export function useMobileTasksProjectLoadingActions(model: TaskPaginationActions
@@ -43112,7 +43176,7 @@ index 221134e..085d884 100644
            // Why: desktop asks which Project view to open the first time a project
 diff --git a/mobile/src/terminal/TerminalWebView.tsx b/mobile/src/terminal/TerminalWebView.tsx
 deleted file mode 100644
-index d09c066..0000000
+index d09c066124..0000000000
 --- a/mobile/src/terminal/TerminalWebView.tsx
 +++ /dev/null
 @@ -1,396 +0,0 @@
@@ -43513,7 +43577,7 @@ index d09c066..0000000
 -  )
 -})
 diff --git a/mobile/src/terminal/mobile-terminal-query-reply.ts b/mobile/src/terminal/mobile-terminal-query-reply.ts
-index 4dd7ae7..483c773 100644
+index 4dd7ae7a8a..483c773dc8 100644
 --- a/mobile/src/terminal/mobile-terminal-query-reply.ts
 +++ b/mobile/src/terminal/mobile-terminal-query-reply.ts
 @@ -25,7 +25,7 @@ export function sendMobileTerminalQueryReply({
@@ -43526,7 +43590,7 @@ index 4dd7ae7..483c773 100644
    // Hosts without terminal.query-reply-input.v1 strip inputKind and would take
    // reply bytes as floor-stealing shell input, so drop (pre-fix behavior).
 diff --git a/mobile/src/terminal/terminal-accessory-keys.ts b/mobile/src/terminal/terminal-accessory-keys.ts
-index c02f265..e7a8ed1 100644
+index c02f265fba..e7a8ed10b4 100644
 --- a/mobile/src/terminal/terminal-accessory-keys.ts
 +++ b/mobile/src/terminal/terminal-accessory-keys.ts
 @@ -150,7 +150,7 @@ function buildShortcutBytes(key: string, modifiers: TerminalShortcutModifier[]):
@@ -43540,7 +43604,7 @@ index c02f265..e7a8ed1 100644
        return `${ESC}O${csiFinal}`
 diff --git a/mobile/src/terminal/terminal-caret-rendering-oracle.test.ts b/mobile/src/terminal/terminal-caret-rendering-oracle.test.ts
 deleted file mode 100644
-index d2cf51d..0000000
+index d2cf51df3b..0000000000
 --- a/mobile/src/terminal/terminal-caret-rendering-oracle.test.ts
 +++ /dev/null
 @@ -1,194 +0,0 @@
@@ -43740,7 +43804,7 @@ index d2cf51d..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-foreground-recovery.test.ts b/mobile/src/terminal/terminal-foreground-recovery.test.ts
 deleted file mode 100644
-index abf1bd0..0000000
+index abf1bd0104..0000000000
 --- a/mobile/src/terminal/terminal-foreground-recovery.test.ts
 +++ /dev/null
 @@ -1,175 +0,0 @@
@@ -43921,7 +43985,7 @@ index abf1bd0..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-foreground-recovery.ts b/mobile/src/terminal/terminal-foreground-recovery.ts
 deleted file mode 100644
-index 7abfe48..0000000
+index 7abfe48b8c..0000000000
 --- a/mobile/src/terminal/terminal-foreground-recovery.ts
 +++ /dev/null
 @@ -1,79 +0,0 @@
@@ -44005,7 +44069,7 @@ index 7abfe48..0000000
 -  return 'recovered'
 -}
 diff --git a/mobile/src/terminal/terminal-keyboard-avoidance-lift.test.ts b/mobile/src/terminal/terminal-keyboard-avoidance-lift.test.ts
-index 4c11320..a26a4eb 100644
+index 4c11320db2..a26a4eb111 100644
 --- a/mobile/src/terminal/terminal-keyboard-avoidance-lift.test.ts
 +++ b/mobile/src/terminal/terminal-keyboard-avoidance-lift.test.ts
 @@ -1,8 +1,10 @@
@@ -44022,7 +44086,7 @@ index 4c11320..a26a4eb 100644
  const FRAME_HEIGHT = 800
  const ROWS = 40
 diff --git a/mobile/src/terminal/terminal-keyboard-avoidance-lift.ts b/mobile/src/terminal/terminal-keyboard-avoidance-lift.ts
-index 6ada640..1995d63 100644
+index 6ada640430..1995d63948 100644
 --- a/mobile/src/terminal/terminal-keyboard-avoidance-lift.ts
 +++ b/mobile/src/terminal/terminal-keyboard-avoidance-lift.ts
 @@ -1,4 +1,4 @@
@@ -44033,7 +44097,7 @@ index 6ada640..1995d63 100644
    keyboardLift: number
 diff --git a/mobile/src/terminal/terminal-keyboard-avoidance-webview.test.ts b/mobile/src/terminal/terminal-keyboard-avoidance-webview.test.ts
 deleted file mode 100644
-index 203db63..0000000
+index 203db63bc6..0000000000
 --- a/mobile/src/terminal/terminal-keyboard-avoidance-webview.test.ts
 +++ /dev/null
 @@ -1,213 +0,0 @@
@@ -44252,14 +44316,17 @@ index 203db63..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-native-viewport-update.test.ts b/mobile/src/terminal/terminal-native-viewport-update.test.ts
 new file mode 100644
-index 0000000..12832e2
+index 0000000000..bd8db52c4e
 --- /dev/null
 +++ b/mobile/src/terminal/terminal-native-viewport-update.test.ts
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,83 @@
 +import { describe, expect, it, vi } from 'vitest'
 +import type { RpcClient } from '../transport/rpc-client'
 +import type { RpcResponse } from '../transport/types'
-+import { TerminalNativeViewportUpdate } from './terminal-native-viewport-update'
++import {
++  isUsableTerminalViewport,
++  TerminalNativeViewportUpdate
++} from './terminal-native-viewport-update'
 +
 +function makeClient(responses: RpcResponse[]): RpcClient {
 +  return {
@@ -44276,6 +44343,14 @@ index 0000000..12832e2
 +}
 +
 +const viewport = { cols: 72, rows: 36 }
++
++describe('isUsableTerminalViewport', () => {
++  it('rejects a half-laid-out grid so the PTY keeps the last good size', () => {
++    expect(isUsableTerminalViewport({ cols: 19, rows: 24 })).toBe(false)
++    expect(isUsableTerminalViewport({ cols: 40, rows: 7 })).toBe(false)
++    expect(isUsableTerminalViewport({ cols: 20, rows: 8 })).toBe(true)
++  })
++})
 +
 +describe('TerminalNativeViewportUpdate', () => {
 +  it('updates the existing mobile subscriber in place', async () => {
@@ -44330,14 +44405,23 @@ index 0000000..12832e2
 +})
 diff --git a/mobile/src/terminal/terminal-native-viewport-update.ts b/mobile/src/terminal/terminal-native-viewport-update.ts
 new file mode 100644
-index 0000000..f414c66
+index 0000000000..6a69049a70
 --- /dev/null
 +++ b/mobile/src/terminal/terminal-native-viewport-update.ts
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,50 @@
 +import type { RpcClient } from '../transport/rpc-client'
 +
 +type TerminalViewport = { cols: number; rows: number }
 +type ViewportCapability = 'unknown' | 'supported' | 'unsupported'
++
++// Why: match the xterm MIN_FIT_COLS/rows floor. A 0×0 layout pass must not
++// shrink the PTY; the screenshot wrap at ~35 cols was a half-width surface.
++export const MIN_TERMINAL_FIT_COLS = 20
++export const MIN_TERMINAL_FIT_ROWS = 8
++
++export function isUsableTerminalViewport(viewport: TerminalViewport): boolean {
++  return viewport.cols >= MIN_TERMINAL_FIT_COLS && viewport.rows >= MIN_TERMINAL_FIT_ROWS
++}
 +
 +export class TerminalNativeViewportUpdate {
 +  private readonly capabilities = new WeakMap<RpcClient, ViewportCapability>()
@@ -44377,7 +44461,7 @@ index 0000000..f414c66
 +}
 diff --git a/mobile/src/terminal/terminal-path-tap-injected.ts b/mobile/src/terminal/terminal-path-tap-injected.ts
 deleted file mode 100644
-index 766c381..0000000
+index 766c381ea2..0000000000
 --- a/mobile/src/terminal/terminal-path-tap-injected.ts
 +++ /dev/null
 @@ -1,134 +0,0 @@
@@ -44516,7 +44600,7 @@ index 766c381..0000000
 -  }
 -`
 diff --git a/mobile/src/terminal/terminal-path-tap.test.ts b/mobile/src/terminal/terminal-path-tap.test.ts
-index ebb8e0b..9d02c73 100644
+index ebb8e0b9ec..9d02c7315d 100644
 --- a/mobile/src/terminal/terminal-path-tap.test.ts
 +++ b/mobile/src/terminal/terminal-path-tap.test.ts
 @@ -1,14 +1,10 @@
@@ -44561,7 +44645,7 @@ index ebb8e0b..9d02c73 100644
 -}
 diff --git a/mobile/src/terminal/terminal-state.ts b/mobile/src/terminal/terminal-state.ts
 new file mode 100644
-index 0000000..371a280
+index 0000000000..371a280491
 --- /dev/null
 +++ b/mobile/src/terminal/terminal-state.ts
 @@ -0,0 +1,41 @@
@@ -44608,7 +44692,7 @@ index 0000000..371a280
 +export type MobileTerminalTheme = RuntimeMobileTerminalTheme
 diff --git a/mobile/src/terminal/terminal-tap-target.test.ts b/mobile/src/terminal/terminal-tap-target.test.ts
 new file mode 100644
-index 0000000..2f8594c
+index 0000000000..2f8594cce9
 --- /dev/null
 +++ b/mobile/src/terminal/terminal-tap-target.test.ts
 @@ -0,0 +1,25 @@
@@ -44639,7 +44723,7 @@ index 0000000..2f8594c
 +})
 diff --git a/mobile/src/terminal/terminal-tap-target.ts b/mobile/src/terminal/terminal-tap-target.ts
 new file mode 100644
-index 0000000..8029a1a
+index 0000000000..8029a1a68b
 --- /dev/null
 +++ b/mobile/src/terminal/terminal-tap-target.ts
 @@ -0,0 +1,32 @@
@@ -44677,7 +44761,7 @@ index 0000000..8029a1a
 +}
 diff --git a/mobile/src/terminal/terminal-viewport-refit-state.ts b/mobile/src/terminal/terminal-viewport-refit-state.ts
 deleted file mode 100644
-index dfa4daa..0000000
+index dfa4daadf4..0000000000
 --- a/mobile/src/terminal/terminal-viewport-refit-state.ts
 +++ /dev/null
 @@ -1,104 +0,0 @@
@@ -44787,7 +44871,7 @@ index dfa4daa..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-viewport-refit.test.ts b/mobile/src/terminal/terminal-viewport-refit.test.ts
 deleted file mode 100644
-index 81ca306..0000000
+index 81ca306f3a..0000000000
 --- a/mobile/src/terminal/terminal-viewport-refit.test.ts
 +++ /dev/null
 @@ -1,334 +0,0 @@
@@ -45127,7 +45211,7 @@ index 81ca306..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-viewport-refit.ts b/mobile/src/terminal/terminal-viewport-refit.ts
 deleted file mode 100644
-index 8a9ab28..0000000
+index 8a9ab28145..0000000000
 --- a/mobile/src/terminal/terminal-viewport-refit.ts
 +++ /dev/null
 @@ -1,315 +0,0 @@
@@ -45448,7 +45532,7 @@ index 8a9ab28..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-contract.test.ts b/mobile/src/terminal/terminal-webview-contract.test.ts
 deleted file mode 100644
-index 0a35271..0000000
+index 0a3527111e..0000000000
 --- a/mobile/src/terminal/terminal-webview-contract.test.ts
 +++ /dev/null
 @@ -1,52 +0,0 @@
@@ -45506,7 +45590,7 @@ index 0a35271..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-contract.ts b/mobile/src/terminal/terminal-webview-contract.ts
 deleted file mode 100644
-index 45b9a38..0000000
+index 45b9a38c05..0000000000
 --- a/mobile/src/terminal/terminal-webview-contract.ts
 +++ /dev/null
 @@ -1,103 +0,0 @@
@@ -45615,7 +45699,7 @@ index 45b9a38..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-engine-error-state.tsx b/mobile/src/terminal/terminal-webview-engine-error-state.tsx
 deleted file mode 100644
-index 0ba3e79..0000000
+index 0ba3e79db8..0000000000
 --- a/mobile/src/terminal/terminal-webview-engine-error-state.tsx
 +++ /dev/null
 @@ -1,130 +0,0 @@
@@ -45751,7 +45835,7 @@ index 0ba3e79..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-engine-error.test.ts b/mobile/src/terminal/terminal-webview-engine-error.test.ts
 deleted file mode 100644
-index 2a1ba5d..0000000
+index 2a1ba5df93..0000000000
 --- a/mobile/src/terminal/terminal-webview-engine-error.test.ts
 +++ /dev/null
 @@ -1,255 +0,0 @@
@@ -46012,7 +46096,7 @@ index 2a1ba5d..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-engine.test.ts b/mobile/src/terminal/terminal-webview-engine.test.ts
 deleted file mode 100644
-index ac41592..0000000
+index ac41592285..0000000000
 --- a/mobile/src/terminal/terminal-webview-engine.test.ts
 +++ /dev/null
 @@ -1,241 +0,0 @@
@@ -46259,7 +46343,7 @@ index ac41592..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-frame-styles.ts b/mobile/src/terminal/terminal-webview-frame-styles.ts
 deleted file mode 100644
-index 907a1f3..0000000
+index 907a1f3326..0000000000
 --- a/mobile/src/terminal/terminal-webview-frame-styles.ts
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -46276,90 +46360,9 @@ index 907a1f3..0000000
 -    backgroundColor: colors.terminalBg
 -  }
 -})
-diff --git a/mobile/src/terminal/terminal-webview-html-source.test-support.ts b/mobile/src/terminal/terminal-webview-html-source.test-support.ts
-deleted file mode 100644
-index 19a9cfc..0000000
---- a/mobile/src/terminal/terminal-webview-html-source.test-support.ts
-+++ /dev/null
-@@ -1,31 +0,0 @@
--import { readFileSync } from 'node:fs'
--
--const COMPOSER_FILE = './terminal-webview-html.ts'
--const SLICE_IMPORT_RE = /^import \{[^}]*\} from '(\.\/terminal-webview-html\/[\w-]+)'$/gm
--const COMPOSED_ENTRY_RE = /^ {2}TERMINAL_HTML_\w+,?$/gm
--
--function readSource(relativePath: string): string {
--  return readFileSync(new URL(relativePath, import.meta.url), 'utf8')
--}
--
--/**
-- * Reads the TypeScript source that assembles the in-WebView document.
-- *
-- * Why: the slice list is derived from the composer's own imports rather than duplicated, so a
-- * new slice cannot join the emitted document while staying invisible to the tests that search
-- * this source. The count cross-check catches an import shape the regex cannot see.
-- */
--export function readTerminalWebViewHtmlSource(): string {
--  const composer = readSource(COMPOSER_FILE)
--  const slices = [...composer.matchAll(SLICE_IMPORT_RE)].map((match) => `${match[1]}.ts`)
--  const composedCount = [...composer.matchAll(COMPOSED_ENTRY_RE)].length
--  if (composedCount === 0) {
--    throw new Error('no composed WebView document slices found')
--  }
--  if (slices.length !== composedCount) {
--    throw new Error(
--      `WebView document slice imports (${slices.length}) do not match composed entries (${composedCount})`
--    )
--  }
--  return [composer, ...slices.map(readSource)].join('\n')
--}
-diff --git a/mobile/src/terminal/terminal-webview-html.ts b/mobile/src/terminal/terminal-webview-html.ts
-deleted file mode 100644
-index 17fadd4..0000000
---- a/mobile/src/terminal/terminal-webview-html.ts
-+++ /dev/null
-@@ -1,38 +0,0 @@
--import { TERMINAL_HTML_DOCUMENT_SHELL } from './terminal-webview-html/document-shell'
--import { TERMINAL_HTML_RUNTIME_STATE_AND_TEXT_SCALING } from './terminal-webview-html/runtime-state-and-text-scaling'
--import { TERMINAL_HTML_FIT_SCALE } from './terminal-webview-html/terminal-fit-scale'
--import { TERMINAL_HTML_MOUSE_MODE_DECSET_SCAN } from './terminal-webview-html/mouse-mode-decset-scan'
--import { TERMINAL_HTML_WRITE_QUEUE } from './terminal-webview-html/write-queue'
--import { TERMINAL_HTML_INIT_AND_WRITE } from './terminal-webview-html/terminal-init-and-write'
--import { TERMINAL_HTML_HOST_MESSAGE_ROUTER } from './terminal-webview-html/host-message-router'
--import { TERMINAL_HTML_SELECTION_STATE_AND_EVICTION } from './terminal-webview-html/selection-state-and-eviction'
--import { TERMINAL_HTML_OBSERVERS_AND_MODE_MIRRORING } from './terminal-webview-html/term-observers-and-mode-mirroring'
--import { TERMINAL_HTML_MOUSE_REPORT_AND_SCROLL_ROUTING } from './terminal-webview-html/mouse-report-and-scroll-routing'
--import { TERMINAL_HTML_SMOOTH_SCROLL_AND_CELL_GEOMETRY } from './terminal-webview-html/smooth-scroll-and-cell-geometry'
--import { TERMINAL_HTML_SELECTION_OVERLAY } from './terminal-webview-html/selection-overlay'
--import { TERMINAL_HTML_SURFACE_TOUCH_GESTURES } from './terminal-webview-html/surface-touch-gestures'
--import { TERMINAL_HTML_MESSAGE_BRIDGE_AND_DOCUMENT_CLOSE } from './terminal-webview-html/message-bridge-and-document-close'
--
--export { MOBILE_TERMINAL_CARET_OPTIONS } from './terminal-webview-html/theme'
--
--// Why: keep the document source stable while each script/style concern remains independently
--// reviewable. Boundaries can only fall where the emitted document allows, so a few modules
--// carry a second concern noted at the top of the file.
--export const XTERM_HTML = [
--  TERMINAL_HTML_DOCUMENT_SHELL,
--  TERMINAL_HTML_RUNTIME_STATE_AND_TEXT_SCALING,
--  TERMINAL_HTML_FIT_SCALE,
--  TERMINAL_HTML_MOUSE_MODE_DECSET_SCAN,
--  TERMINAL_HTML_WRITE_QUEUE,
--  TERMINAL_HTML_INIT_AND_WRITE,
--  TERMINAL_HTML_HOST_MESSAGE_ROUTER,
--  TERMINAL_HTML_SELECTION_STATE_AND_EVICTION,
--  TERMINAL_HTML_OBSERVERS_AND_MODE_MIRRORING,
--  TERMINAL_HTML_MOUSE_REPORT_AND_SCROLL_ROUTING,
--  TERMINAL_HTML_SMOOTH_SCROLL_AND_CELL_GEOMETRY,
--  TERMINAL_HTML_SELECTION_OVERLAY,
--  TERMINAL_HTML_SURFACE_TOUCH_GESTURES,
--  TERMINAL_HTML_MESSAGE_BRIDGE_AND_DOCUMENT_CLOSE
--].join('')
--
--export const XTERM_WEBVIEW_SOURCE = { html: XTERM_HTML }
 diff --git a/mobile/src/terminal/terminal-webview-html/document-shell.ts b/mobile/src/terminal/terminal-webview-html/document-shell.ts
 deleted file mode 100644
-index d6e733c..0000000
+index d6e733cdd7..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/document-shell.ts
 +++ /dev/null
 @@ -1,173 +0,0 @@
@@ -46538,7 +46541,7 @@ index d6e733c..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/host-message-router.ts b/mobile/src/terminal/terminal-webview-html/host-message-router.ts
 deleted file mode 100644
-index 29cba25..0000000
+index 29cba25df3..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/host-message-router.ts
 +++ /dev/null
 @@ -1,189 +0,0 @@
@@ -46733,7 +46736,7 @@ index 29cba25..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/message-bridge-and-document-close.ts b/mobile/src/terminal/terminal-webview-html/message-bridge-and-document-close.ts
 deleted file mode 100644
-index 49cd3b4..0000000
+index 49cd3b4d84..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/message-bridge-and-document-close.ts
 +++ /dev/null
 @@ -1,43 +0,0 @@
@@ -46782,7 +46785,7 @@ index 49cd3b4..0000000
 -</html>`
 diff --git a/mobile/src/terminal/terminal-webview-html/mouse-mode-decset-scan.ts b/mobile/src/terminal/terminal-webview-html/mouse-mode-decset-scan.ts
 deleted file mode 100644
-index 6f0685d..0000000
+index 6f0685df87..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/mouse-mode-decset-scan.ts
 +++ /dev/null
 @@ -1,52 +0,0 @@
@@ -46840,7 +46843,7 @@ index 6f0685d..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/mouse-report-and-scroll-routing.ts b/mobile/src/terminal/terminal-webview-html/mouse-report-and-scroll-routing.ts
 deleted file mode 100644
-index 3b7e7f2..0000000
+index 3b7e7f24cf..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/mouse-report-and-scroll-routing.ts
 +++ /dev/null
 @@ -1,188 +0,0 @@
@@ -47034,7 +47037,7 @@ index 3b7e7f2..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/runtime-state-and-text-scaling.ts b/mobile/src/terminal/terminal-webview-html/runtime-state-and-text-scaling.ts
 deleted file mode 100644
-index 44ce1d3..0000000
+index 44ce1d3904..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/runtime-state-and-text-scaling.ts
 +++ /dev/null
 @@ -1,181 +0,0 @@
@@ -47221,7 +47224,7 @@ index 44ce1d3..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/selection-overlay.ts b/mobile/src/terminal/terminal-webview-html/selection-overlay.ts
 deleted file mode 100644
-index 335407a..0000000
+index 335407af51..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/selection-overlay.ts
 +++ /dev/null
 @@ -1,195 +0,0 @@
@@ -47422,7 +47425,7 @@ index 335407a..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/selection-state-and-eviction.ts b/mobile/src/terminal/terminal-webview-html/selection-state-and-eviction.ts
 deleted file mode 100644
-index 48c05b6..0000000
+index 48c05b6ad8..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/selection-state-and-eviction.ts
 +++ /dev/null
 @@ -1,71 +0,0 @@
@@ -47499,7 +47502,7 @@ index 48c05b6..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/smooth-scroll-and-cell-geometry.ts b/mobile/src/terminal/terminal-webview-html/smooth-scroll-and-cell-geometry.ts
 deleted file mode 100644
-index de9db15..0000000
+index de9db152fb..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/smooth-scroll-and-cell-geometry.ts
 +++ /dev/null
 @@ -1,110 +0,0 @@
@@ -47615,7 +47618,7 @@ index de9db15..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/surface-touch-gestures.ts b/mobile/src/terminal/terminal-webview-html/surface-touch-gestures.ts
 deleted file mode 100644
-index 515d7fd..0000000
+index 515d7fd9d2..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/surface-touch-gestures.ts
 +++ /dev/null
 @@ -1,228 +0,0 @@
@@ -47849,7 +47852,7 @@ index 515d7fd..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/term-observers-and-mode-mirroring.ts b/mobile/src/terminal/terminal-webview-html/term-observers-and-mode-mirroring.ts
 deleted file mode 100644
-index b69547a..0000000
+index b69547affb..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/term-observers-and-mode-mirroring.ts
 +++ /dev/null
 @@ -1,67 +0,0 @@
@@ -47922,7 +47925,7 @@ index b69547a..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/terminal-fit-scale.ts b/mobile/src/terminal/terminal-webview-html/terminal-fit-scale.ts
 deleted file mode 100644
-index b756bcb..0000000
+index b756bcb550..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/terminal-fit-scale.ts
 +++ /dev/null
 @@ -1,130 +0,0 @@
@@ -48058,7 +48061,7 @@ index b756bcb..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/terminal-init-and-write.ts b/mobile/src/terminal/terminal-webview-html/terminal-init-and-write.ts
 deleted file mode 100644
-index 90dba7c..0000000
+index 90dba7cbdb..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/terminal-init-and-write.ts
 +++ /dev/null
 @@ -1,139 +0,0 @@
@@ -48203,7 +48206,7 @@ index 90dba7c..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-html/theme.ts b/mobile/src/terminal/terminal-webview-html/theme.ts
 deleted file mode 100644
-index 185405f..0000000
+index 185405f04d..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/theme.ts
 +++ /dev/null
 @@ -1,34 +0,0 @@
@@ -48243,7 +48246,7 @@ index 185405f..0000000
 -} as const
 diff --git a/mobile/src/terminal/terminal-webview-html/write-queue.ts b/mobile/src/terminal/terminal-webview-html/write-queue.ts
 deleted file mode 100644
-index ae8ed85..0000000
+index ae8ed85297..0000000000
 --- a/mobile/src/terminal/terminal-webview-html/write-queue.ts
 +++ /dev/null
 @@ -1,110 +0,0 @@
@@ -48357,9 +48360,90 @@ index ae8ed85..0000000
 -  }
 -
 -`
+diff --git a/mobile/src/terminal/terminal-webview-html-source.test-support.ts b/mobile/src/terminal/terminal-webview-html-source.test-support.ts
+deleted file mode 100644
+index 19a9cfc07b..0000000000
+--- a/mobile/src/terminal/terminal-webview-html-source.test-support.ts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-import { readFileSync } from 'node:fs'
+-
+-const COMPOSER_FILE = './terminal-webview-html.ts'
+-const SLICE_IMPORT_RE = /^import \{[^}]*\} from '(\.\/terminal-webview-html\/[\w-]+)'$/gm
+-const COMPOSED_ENTRY_RE = /^ {2}TERMINAL_HTML_\w+,?$/gm
+-
+-function readSource(relativePath: string): string {
+-  return readFileSync(new URL(relativePath, import.meta.url), 'utf8')
+-}
+-
+-/**
+- * Reads the TypeScript source that assembles the in-WebView document.
+- *
+- * Why: the slice list is derived from the composer's own imports rather than duplicated, so a
+- * new slice cannot join the emitted document while staying invisible to the tests that search
+- * this source. The count cross-check catches an import shape the regex cannot see.
+- */
+-export function readTerminalWebViewHtmlSource(): string {
+-  const composer = readSource(COMPOSER_FILE)
+-  const slices = [...composer.matchAll(SLICE_IMPORT_RE)].map((match) => `${match[1]}.ts`)
+-  const composedCount = [...composer.matchAll(COMPOSED_ENTRY_RE)].length
+-  if (composedCount === 0) {
+-    throw new Error('no composed WebView document slices found')
+-  }
+-  if (slices.length !== composedCount) {
+-    throw new Error(
+-      `WebView document slice imports (${slices.length}) do not match composed entries (${composedCount})`
+-    )
+-  }
+-  return [composer, ...slices.map(readSource)].join('\n')
+-}
+diff --git a/mobile/src/terminal/terminal-webview-html.ts b/mobile/src/terminal/terminal-webview-html.ts
+deleted file mode 100644
+index 17fadd4d26..0000000000
+--- a/mobile/src/terminal/terminal-webview-html.ts
++++ /dev/null
+@@ -1,38 +0,0 @@
+-import { TERMINAL_HTML_DOCUMENT_SHELL } from './terminal-webview-html/document-shell'
+-import { TERMINAL_HTML_RUNTIME_STATE_AND_TEXT_SCALING } from './terminal-webview-html/runtime-state-and-text-scaling'
+-import { TERMINAL_HTML_FIT_SCALE } from './terminal-webview-html/terminal-fit-scale'
+-import { TERMINAL_HTML_MOUSE_MODE_DECSET_SCAN } from './terminal-webview-html/mouse-mode-decset-scan'
+-import { TERMINAL_HTML_WRITE_QUEUE } from './terminal-webview-html/write-queue'
+-import { TERMINAL_HTML_INIT_AND_WRITE } from './terminal-webview-html/terminal-init-and-write'
+-import { TERMINAL_HTML_HOST_MESSAGE_ROUTER } from './terminal-webview-html/host-message-router'
+-import { TERMINAL_HTML_SELECTION_STATE_AND_EVICTION } from './terminal-webview-html/selection-state-and-eviction'
+-import { TERMINAL_HTML_OBSERVERS_AND_MODE_MIRRORING } from './terminal-webview-html/term-observers-and-mode-mirroring'
+-import { TERMINAL_HTML_MOUSE_REPORT_AND_SCROLL_ROUTING } from './terminal-webview-html/mouse-report-and-scroll-routing'
+-import { TERMINAL_HTML_SMOOTH_SCROLL_AND_CELL_GEOMETRY } from './terminal-webview-html/smooth-scroll-and-cell-geometry'
+-import { TERMINAL_HTML_SELECTION_OVERLAY } from './terminal-webview-html/selection-overlay'
+-import { TERMINAL_HTML_SURFACE_TOUCH_GESTURES } from './terminal-webview-html/surface-touch-gestures'
+-import { TERMINAL_HTML_MESSAGE_BRIDGE_AND_DOCUMENT_CLOSE } from './terminal-webview-html/message-bridge-and-document-close'
+-
+-export { MOBILE_TERMINAL_CARET_OPTIONS } from './terminal-webview-html/theme'
+-
+-// Why: keep the document source stable while each script/style concern remains independently
+-// reviewable. Boundaries can only fall where the emitted document allows, so a few modules
+-// carry a second concern noted at the top of the file.
+-export const XTERM_HTML = [
+-  TERMINAL_HTML_DOCUMENT_SHELL,
+-  TERMINAL_HTML_RUNTIME_STATE_AND_TEXT_SCALING,
+-  TERMINAL_HTML_FIT_SCALE,
+-  TERMINAL_HTML_MOUSE_MODE_DECSET_SCAN,
+-  TERMINAL_HTML_WRITE_QUEUE,
+-  TERMINAL_HTML_INIT_AND_WRITE,
+-  TERMINAL_HTML_HOST_MESSAGE_ROUTER,
+-  TERMINAL_HTML_SELECTION_STATE_AND_EVICTION,
+-  TERMINAL_HTML_OBSERVERS_AND_MODE_MIRRORING,
+-  TERMINAL_HTML_MOUSE_REPORT_AND_SCROLL_ROUTING,
+-  TERMINAL_HTML_SMOOTH_SCROLL_AND_CELL_GEOMETRY,
+-  TERMINAL_HTML_SELECTION_OVERLAY,
+-  TERMINAL_HTML_SURFACE_TOUCH_GESTURES,
+-  TERMINAL_HTML_MESSAGE_BRIDGE_AND_DOCUMENT_CLOSE
+-].join('')
+-
+-export const XTERM_WEBVIEW_SOURCE = { html: XTERM_HTML }
 diff --git a/mobile/src/terminal/terminal-webview-init-surface.test.ts b/mobile/src/terminal/terminal-webview-init-surface.test.ts
 deleted file mode 100644
-index b32d7e6..0000000
+index b32d7e6858..0000000000
 --- a/mobile/src/terminal/terminal-webview-init-surface.test.ts
 +++ /dev/null
 @@ -1,188 +0,0 @@
@@ -48553,7 +48637,7 @@ index b32d7e6..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-messages.ts b/mobile/src/terminal/terminal-webview-messages.ts
 deleted file mode 100644
-index 35c6e99..0000000
+index 35c6e991b6..0000000000
 --- a/mobile/src/terminal/terminal-webview-messages.ts
 +++ /dev/null
 @@ -1,28 +0,0 @@
@@ -48587,7 +48671,7 @@ index 35c6e99..0000000
 -  | { type: 'set-theme'; id?: number; terminalTheme?: RuntimeMobileTerminalTheme }
 diff --git a/mobile/src/terminal/terminal-webview-mouse-click-drag-injected.ts b/mobile/src/terminal/terminal-webview-mouse-click-drag-injected.ts
 deleted file mode 100644
-index 54ee8d4..0000000
+index 54ee8d430a..0000000000
 --- a/mobile/src/terminal/terminal-webview-mouse-click-drag-injected.ts
 +++ /dev/null
 @@ -1,198 +0,0 @@
@@ -48791,7 +48875,7 @@ index 54ee8d4..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-mouse-click.test.ts b/mobile/src/terminal/terminal-webview-mouse-click.test.ts
 deleted file mode 100644
-index 4c519de..0000000
+index 4c519deeef..0000000000
 --- a/mobile/src/terminal/terminal-webview-mouse-click.test.ts
 +++ /dev/null
 @@ -1,91 +0,0 @@
@@ -48888,7 +48972,7 @@ index 4c519de..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-mouse-drag.test.ts b/mobile/src/terminal/terminal-webview-mouse-drag.test.ts
 deleted file mode 100644
-index e4fac51..0000000
+index e4fac51287..0000000000
 --- a/mobile/src/terminal/terminal-webview-mouse-drag.test.ts
 +++ /dev/null
 @@ -1,87 +0,0 @@
@@ -48981,7 +49065,7 @@ index e4fac51..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-mouse-report-cell-injected.ts b/mobile/src/terminal/terminal-webview-mouse-report-cell-injected.ts
 deleted file mode 100644
-index 14baeea..0000000
+index 14baeeaf32..0000000000
 --- a/mobile/src/terminal/terminal-webview-mouse-report-cell-injected.ts
 +++ /dev/null
 @@ -1,29 +0,0 @@
@@ -49016,7 +49100,7 @@ index 14baeea..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-mouse-test-harness.ts b/mobile/src/terminal/terminal-webview-mouse-test-harness.ts
 deleted file mode 100644
-index 29500d3..0000000
+index 29500d3c71..0000000000
 --- a/mobile/src/terminal/terminal-webview-mouse-test-harness.ts
 +++ /dev/null
 @@ -1,248 +0,0 @@
@@ -49270,7 +49354,7 @@ index 29500d3..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-notification-dispatch.test.ts b/mobile/src/terminal/terminal-webview-notification-dispatch.test.ts
 deleted file mode 100644
-index bcd777a..0000000
+index bcd777a2e8..0000000000
 --- a/mobile/src/terminal/terminal-webview-notification-dispatch.test.ts
 +++ /dev/null
 @@ -1,39 +0,0 @@
@@ -49315,7 +49399,7 @@ index bcd777a..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-notification-dispatch.ts b/mobile/src/terminal/terminal-webview-notification-dispatch.ts
 deleted file mode 100644
-index 77019d3..0000000
+index 77019d3f99..0000000000
 --- a/mobile/src/terminal/terminal-webview-notification-dispatch.ts
 +++ /dev/null
 @@ -1,84 +0,0 @@
@@ -49405,7 +49489,7 @@ index 77019d3..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-payload-hash.test.ts b/mobile/src/terminal/terminal-webview-payload-hash.test.ts
 deleted file mode 100644
-index f8bfa4b..0000000
+index f8bfa4bd13..0000000000
 --- a/mobile/src/terminal/terminal-webview-payload-hash.test.ts
 +++ /dev/null
 @@ -1,17 +0,0 @@
@@ -49428,7 +49512,7 @@ index f8bfa4b..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-pending-messages.ts b/mobile/src/terminal/terminal-webview-pending-messages.ts
 deleted file mode 100644
-index 5aa49e2..0000000
+index 5aa49e2e94..0000000000
 --- a/mobile/src/terminal/terminal-webview-pending-messages.ts
 +++ /dev/null
 @@ -1,55 +0,0 @@
@@ -49489,7 +49573,7 @@ index 5aa49e2..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-query-reply-injected.ts b/mobile/src/terminal/terminal-webview-query-reply-injected.ts
 deleted file mode 100644
-index a4ac34e..0000000
+index a4ac34e580..0000000000
 --- a/mobile/src/terminal/terminal-webview-query-reply-injected.ts
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -49539,7 +49623,7 @@ index a4ac34e..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-query-reply-routing.test.ts b/mobile/src/terminal/terminal-webview-query-reply-routing.test.ts
 deleted file mode 100644
-index af53772..0000000
+index af53772d48..0000000000
 --- a/mobile/src/terminal/terminal-webview-query-reply-routing.test.ts
 +++ /dev/null
 @@ -1,69 +0,0 @@
@@ -49614,7 +49698,7 @@ index af53772..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-query-reply-routing.ts b/mobile/src/terminal/terminal-webview-query-reply-routing.ts
 deleted file mode 100644
-index cf79fb7..0000000
+index cf79fb71b7..0000000000
 --- a/mobile/src/terminal/terminal-webview-query-reply-routing.ts
 +++ /dev/null
 @@ -1,14 +0,0 @@
@@ -49634,7 +49718,7 @@ index cf79fb7..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-query-reply.test.ts b/mobile/src/terminal/terminal-webview-query-reply.test.ts
 deleted file mode 100644
-index 4e8add3..0000000
+index 4e8add33f2..0000000000
 --- a/mobile/src/terminal/terminal-webview-query-reply.test.ts
 +++ /dev/null
 @@ -1,126 +0,0 @@
@@ -49766,7 +49850,7 @@ index 4e8add3..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-ready-watchdog.ts b/mobile/src/terminal/terminal-webview-ready-watchdog.ts
 deleted file mode 100644
-index f111679..0000000
+index f111679ba2..0000000000
 --- a/mobile/src/terminal/terminal-webview-ready-watchdog.ts
 +++ /dev/null
 @@ -1,48 +0,0 @@
@@ -49820,7 +49904,7 @@ index f111679..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-reflow-injected.ts b/mobile/src/terminal/terminal-webview-reflow-injected.ts
 deleted file mode 100644
-index ef70452..0000000
+index ef704529e4..0000000000
 --- a/mobile/src/terminal/terminal-webview-reflow-injected.ts
 +++ /dev/null
 @@ -1,33 +0,0 @@
@@ -49859,7 +49943,7 @@ index ef70452..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-reflow.test.ts b/mobile/src/terminal/terminal-webview-reflow.test.ts
 deleted file mode 100644
-index 9011274..0000000
+index 90112740d1..0000000000
 --- a/mobile/src/terminal/terminal-webview-reflow.test.ts
 +++ /dev/null
 @@ -1,94 +0,0 @@
@@ -49959,7 +50043,7 @@ index 9011274..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-scroll-routing.test.ts b/mobile/src/terminal/terminal-webview-scroll-routing.test.ts
 deleted file mode 100644
-index 9218e5d..0000000
+index 9218e5d6ad..0000000000
 --- a/mobile/src/terminal/terminal-webview-scroll-routing.test.ts
 +++ /dev/null
 @@ -1,284 +0,0 @@
@@ -50249,7 +50333,7 @@ index 9218e5d..0000000
 -}
 diff --git a/mobile/src/terminal/terminal-webview-surface-swap-injected.ts b/mobile/src/terminal/terminal-webview-surface-swap-injected.ts
 deleted file mode 100644
-index 0f7b1c9..0000000
+index 0f7b1c9a21..0000000000
 --- a/mobile/src/terminal/terminal-webview-surface-swap-injected.ts
 +++ /dev/null
 @@ -1,49 +0,0 @@
@@ -50304,7 +50388,7 @@ index 0f7b1c9..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-tap-dispatch-injected.ts b/mobile/src/terminal/terminal-webview-tap-dispatch-injected.ts
 deleted file mode 100644
-index 23036f8..0000000
+index 23036f84df..0000000000
 --- a/mobile/src/terminal/terminal-webview-tap-dispatch-injected.ts
 +++ /dev/null
 @@ -1,188 +0,0 @@
@@ -50498,7 +50582,7 @@ index 23036f8..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-tap-routing.test.ts b/mobile/src/terminal/terminal-webview-tap-routing.test.ts
 deleted file mode 100644
-index 13a81ef..0000000
+index 13a81ef61a..0000000000
 --- a/mobile/src/terminal/terminal-webview-tap-routing.test.ts
 +++ /dev/null
 @@ -1,297 +0,0 @@
@@ -50801,7 +50885,7 @@ index 13a81ef..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-text-zoom.test.ts b/mobile/src/terminal/terminal-webview-text-zoom.test.ts
 deleted file mode 100644
-index d775237..0000000
+index d775237ddc..0000000000
 --- a/mobile/src/terminal/terminal-webview-text-zoom.test.ts
 +++ /dev/null
 @@ -1,214 +0,0 @@
@@ -51021,7 +51105,7 @@ index d775237..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-theme-injected.test.ts b/mobile/src/terminal/terminal-webview-theme-injected.test.ts
 deleted file mode 100644
-index 92e4127..0000000
+index 92e4127b2f..0000000000
 --- a/mobile/src/terminal/terminal-webview-theme-injected.test.ts
 +++ /dev/null
 @@ -1,79 +0,0 @@
@@ -51106,7 +51190,7 @@ index 92e4127..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-theme-injected.ts b/mobile/src/terminal/terminal-webview-theme-injected.ts
 deleted file mode 100644
-index c2d9beb..0000000
+index c2d9beb478..0000000000
 --- a/mobile/src/terminal/terminal-webview-theme-injected.ts
 +++ /dev/null
 @@ -1,109 +0,0 @@
@@ -51221,7 +51305,7 @@ index c2d9beb..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-url-tap.test.ts b/mobile/src/terminal/terminal-webview-url-tap.test.ts
 deleted file mode 100644
-index bd7ff4b..0000000
+index bd7ff4bf06..0000000000
 --- a/mobile/src/terminal/terminal-webview-url-tap.test.ts
 +++ /dev/null
 @@ -1,209 +0,0 @@
@@ -51436,7 +51520,7 @@ index bd7ff4b..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-webview-url-tap.ts b/mobile/src/terminal/terminal-webview-url-tap.ts
 deleted file mode 100644
-index f5d416d..0000000
+index f5d416d579..0000000000
 --- a/mobile/src/terminal/terminal-webview-url-tap.ts
 +++ /dev/null
 @@ -1,254 +0,0 @@
@@ -51696,7 +51780,7 @@ index f5d416d..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-webgl-recovery-injected.ts b/mobile/src/terminal/terminal-webview-webgl-recovery-injected.ts
 deleted file mode 100644
-index 8e4d27c..0000000
+index 8e4d27c234..0000000000
 --- a/mobile/src/terminal/terminal-webview-webgl-recovery-injected.ts
 +++ /dev/null
 @@ -1,62 +0,0 @@
@@ -51764,7 +51848,7 @@ index 8e4d27c..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-wheel-scroll-injected.ts b/mobile/src/terminal/terminal-webview-wheel-scroll-injected.ts
 deleted file mode 100644
-index 8d2321e..0000000
+index 8d2321e7c2..0000000000
 --- a/mobile/src/terminal/terminal-webview-wheel-scroll-injected.ts
 +++ /dev/null
 @@ -1,53 +0,0 @@
@@ -51823,7 +51907,7 @@ index 8d2321e..0000000
 -`
 diff --git a/mobile/src/terminal/terminal-webview-wheel-scroll.test.ts b/mobile/src/terminal/terminal-webview-wheel-scroll.test.ts
 deleted file mode 100644
-index 463b621..0000000
+index 463b6218bb..0000000000
 --- a/mobile/src/terminal/terminal-webview-wheel-scroll.test.ts
 +++ /dev/null
 @@ -1,292 +0,0 @@
@@ -52121,7 +52205,7 @@ index 463b621..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-write-coalescer-boundaries.test.ts b/mobile/src/terminal/terminal-write-coalescer-boundaries.test.ts
 deleted file mode 100644
-index eb7f19b..0000000
+index eb7f19b550..0000000000
 --- a/mobile/src/terminal/terminal-write-coalescer-boundaries.test.ts
 +++ /dev/null
 @@ -1,164 +0,0 @@
@@ -52291,7 +52375,7 @@ index eb7f19b..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-write-coalescer.test.ts b/mobile/src/terminal/terminal-write-coalescer.test.ts
 deleted file mode 100644
-index 1279bbe..0000000
+index 1279bbeb7d..0000000000
 --- a/mobile/src/terminal/terminal-write-coalescer.test.ts
 +++ /dev/null
 @@ -1,200 +0,0 @@
@@ -52497,7 +52581,7 @@ index 1279bbe..0000000
 -})
 diff --git a/mobile/src/terminal/terminal-write-coalescer.ts b/mobile/src/terminal/terminal-write-coalescer.ts
 deleted file mode 100644
-index b27f6c3..0000000
+index b27f6c37fb..0000000000
 --- a/mobile/src/terminal/terminal-write-coalescer.ts
 +++ /dev/null
 @@ -1,73 +0,0 @@
@@ -52575,7 +52659,7 @@ index b27f6c3..0000000
 -  return { clear, flushNow, write }
 -}
 diff --git a/mobile/src/terminal/use-terminal-live-input-focus.test.ts b/mobile/src/terminal/use-terminal-live-input-focus.test.ts
-index 92ce4e2..d5b0971 100644
+index 92ce4e2c45..d5b0971d2a 100644
 --- a/mobile/src/terminal/use-terminal-live-input-focus.test.ts
 +++ b/mobile/src/terminal/use-terminal-live-input-focus.test.ts
 @@ -101,7 +101,7 @@ describe('terminal live input focus hook', () => {
@@ -52597,7 +52681,7 @@ index 92ce4e2..d5b0971 100644
      const harness = createHarness(connectedProps({ current: input }))
  
 diff --git a/mobile/src/terminal/use-terminal-live-input-focus.ts b/mobile/src/terminal/use-terminal-live-input-focus.ts
-index b0ab456..40f40ef 100644
+index b0ab456b72..40f40efe11 100644
 --- a/mobile/src/terminal/use-terminal-live-input-focus.ts
 +++ b/mobile/src/terminal/use-terminal-live-input-focus.ts
 @@ -72,7 +72,7 @@ export function useTerminalLiveInputFocus<T extends TerminalLiveInputFocusTarget
@@ -52610,7 +52694,7 @@ index b0ab456..40f40ef 100644
          if (activeHandleRef.current === handle) {
            focusLiveInput()
 diff --git a/mobile/src/transport/pairing.test.ts b/mobile/src/transport/pairing.test.ts
-index 9b7b751..75d1f77 100644
+index 9b7b751436..75d1f77586 100644
 --- a/mobile/src/transport/pairing.test.ts
 +++ b/mobile/src/transport/pairing.test.ts
 @@ -24,6 +24,7 @@ describe('pairing deep links', () => {
@@ -52630,7 +52714,7 @@ index 9b7b751..75d1f77 100644
    })
  
 diff --git a/mobile/src/transport/pairing.ts b/mobile/src/transport/pairing.ts
-index d330f18..d5e50cf 100644
+index d330f1834f..d5e50cfb50 100644
 --- a/mobile/src/transport/pairing.ts
 +++ b/mobile/src/transport/pairing.ts
 @@ -22,7 +22,7 @@ export function decodePairingUrl(url: string): PairingOffer | null {
@@ -52661,7 +52745,7 @@ index d330f18..d5e50cf 100644
      }
      return decodePairingBase64(trimmed)
 diff --git a/mobile/tsconfig.json b/mobile/tsconfig.json
-index 55e1adc..99eead7 100644
+index 55e1adc660..99eead7228 100644
 --- a/mobile/tsconfig.json
 +++ b/mobile/tsconfig.json
 @@ -8,6 +8,7 @@
