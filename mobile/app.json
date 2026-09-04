@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rudironsoni.horca.mobile",
+      "bundleIdentifier": "com.stably.orca.mobile",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Orca connects to the desktop app on your LAN.",
