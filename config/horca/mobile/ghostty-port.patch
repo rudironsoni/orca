@@ -148,7 +148,7 @@ index d5a420cc74..5824914fdb 100644
      "ios": {
        "supportsTablet": true,
 -      "bundleIdentifier": "com.stably.orca.mobile",
-+      "bundleIdentifier": "com.rudironsoni.horca",
++      "bundleIdentifier": "com.rudironsoni.horca.mobile",
        "buildNumber": "1",
        "infoPlist": {
 -        "NSLocalNetworkUsageDescription": "Orca connects to the desktop app on your LAN.",
@@ -216,7 +216,7 @@ index 318a617681..23bf0d1cff 100644
 +++ b/mobile/fastlane/Appfile
 @@ -1,2 +1,2 @@
 -app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.stably.orca.mobile")
-+app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.rudironsoni.horca")
++app_identifier(ENV["IOS_BUNDLE_IDENTIFIER"] || "com.rudironsoni.horca.mobile")
  team_id(ENV["APPLE_TEAM_ID"])
 diff --git a/mobile/fastlane/Fastfile b/mobile/fastlane/Fastfile
 index bcca6026b8..eda02c256a 100644
@@ -238,7 +238,7 @@ index bcca6026b8..eda02c256a 100644
 -SCHEME = "Orca"
 -BUNDLE_ID = "com.stably.orca.mobile"
 +SCHEME = "Horca"
-+BUNDLE_ID = "com.rudironsoni.horca"
++BUNDLE_ID = "com.rudironsoni.horca.mobile"
  TESTFLIGHT_GROUPS = ["peeps"].freeze
 -DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Mobile updates and fixes.".freeze
 +DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Horca Mobile updates and fixes.".freeze
@@ -40482,7 +40482,7 @@ index 5fc0e05cc6..c98eb58e2f 100755
  PORT="${2:?port of the paired host, from the [net] logs}"
  LOG="${3:-/tmp/orca-emulator-boot.log}"
 -BUNDLE_ID=com.stably.orca.mobile
-+BUNDLE_ID=com.rudironsoni.horca
++BUNDLE_ID=com.rudironsoni.horca.mobile
  # Long enough for the tiered backoff to reach its 30s/60s tail.
  ESCALATE_SECONDS=200
  
