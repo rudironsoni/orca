@@ -35,7 +35,7 @@ if (
   expoConfig?.slug !== 'horca-mobile' ||
   expoConfig?.scheme !== 'horca' ||
   expoConfig?.ios?.bundleIdentifier !== 'com.rudironsoni.horca.mobile' ||
-  expoConfig?.android?.package !== 'com.rudironsoni.horca'
+  expoConfig?.android?.package !== 'com.rudironsoni.horca.mobile'
 ) {
   throw new Error('Materialized Horca mobile app identity is incorrect')
 }
