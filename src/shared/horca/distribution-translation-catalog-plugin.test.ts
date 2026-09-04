@@ -23,7 +23,9 @@ describe('distribution translation catalog plugin', () => {
     const plugin = createDistributionTranslationCatalogPlugin('horca')
     const localeFiles = readdirSync(LOCALES_DIRECTORY).filter((file) => file.endsWith('.json'))
 
-    expect(localeFiles).toHaveLength(5)
+    expect(localeFiles).toEqual(
+      expect.arrayContaining(['en.json', 'es.json', 'ja.json', 'ko.json', 'zh.json'])
+    )
     for (const file of localeFiles) {
       const source = readFileSync(join(LOCALES_DIRECTORY, file), 'utf8')
       const transformed = transform(plugin, source, join(LOCALES_DIRECTORY, file))
