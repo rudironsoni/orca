@@ -174,7 +174,20 @@ try {
     throw new Error(`Packaged renderer title is not Horca: ${await page.title()}`)
   }
   await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByText('Terminal', { exact: true }).first().click()
+  await page.locator('.settings-view-shell').waitFor({ state: 'visible', timeout: 15_000 })
+  // Why: first-run modals (tips, tours, setup) render a dialog overlay above
+  // Settings and intercept sidebar clicks. Dismiss before navigating.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if ((await page.locator('[data-slot="dialog-overlay"]').count()) === 0) {
+      break
+    }
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(500)
+  }
+  await page
+    .locator('.settings-view-shell aside')
+    .getByRole('button', { name: 'Terminal', exact: true })
+    .click()
   await page.locator('[data-horca-settings="terminal-backend"]').waitFor({ state: 'visible' })
   await page.getByLabel('Shared Herdr session name').waitFor({ state: 'visible' })
   const defaults = await page.evaluate(() =>
