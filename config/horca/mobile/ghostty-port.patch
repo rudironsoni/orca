@@ -42130,7 +42130,7 @@ index 356bf11952..e74234e846 100644
          triggerError()
          const err = e as { name?: string; message?: string }
 diff --git a/mobile/src/session/use-mobile-session-attachments.ts b/mobile/src/session/use-mobile-session-attachments.ts
-index 6669154511..5365580118 100644
+index 841d3984b8..b2f3070e05 100644
 --- a/mobile/src/session/use-mobile-session-attachments.ts
 +++ b/mobile/src/session/use-mobile-session-attachments.ts
 @@ -1,4 +1,4 @@
@@ -42149,9 +42149,9 @@ index 6669154511..5365580118 100644
      deviceTokenRef,
      clientRef,
      connStateRef,
-@@ -38,6 +36,21 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
-     getActiveWorktreeConnectionId,
-     refreshCanPaste
+@@ -39,6 +37,21 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
+     refreshCanPaste,
+     activeSessionTab
    } = scope
 +  const pasteTerminalText = useCallback(async (handle: string, text: string) => {
 +    if (
@@ -42171,7 +42171,7 @@ index 6669154511..5365580118 100644
    const handlePaste = useMobileTerminalPaste({
      client,
      activeHandle,
-@@ -47,12 +60,11 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
+@@ -48,12 +61,11 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
      connState,
      connStateRef,
      clientRef,
@@ -42185,7 +42185,7 @@ index 6669154511..5365580118 100644
      refreshCanPaste,
      showToast
    })
-@@ -104,15 +116,13 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
+@@ -106,15 +118,13 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
      const sub = AppState.addEventListener('change', (s: AppStateStatus) => {
        if (s === 'active') {
          refresh()
@@ -42291,10 +42291,10 @@ index 41b453bada..ff7188270b 100644
      handleDeleteCustomKey,
      handleManageShortcuts
 diff --git a/mobile/src/session/use-mobile-session-lifecycle.ts b/mobile/src/session/use-mobile-session-lifecycle.ts
-index 912ebdb492..8821e48f2b 100644
+index 7c58e84a3e..b33945e606 100644
 --- a/mobile/src/session/use-mobile-session-lifecycle.ts
 +++ b/mobile/src/session/use-mobile-session-lifecycle.ts
-@@ -1,31 +1,13 @@
+@@ -1,30 +1,13 @@
 -import { useEffect, useRef, useCallback } from 'react'
 -import { AppState, type AppStateStatus, Platform } from 'react-native'
 +import { useEffect, useCallback } from 'react'
@@ -42315,7 +42315,6 @@ index 912ebdb492..8821e48f2b 100644
 -    connState,
 -    setCustomKeys,
 -    setVisibleBuiltInIds,
--    deviceTokenRef,
 -    setHostEndpoint,
 -    connStateRef,
 -    terminalRefs,
@@ -42325,11 +42324,11 @@ index 912ebdb492..8821e48f2b 100644
 -    unsubscribeTerminal,
 -    subscribeToTerminal
 -  } = scope
-+  const { hostId, setCustomKeys, setVisibleBuiltInIds, deviceTokenRef, setHostEndpoint } = scope
-   // Why: read deviceToken from host record so code can pass client.id on subscribe/send for driver-state-machine identity.
++  const { hostId, setCustomKeys, setVisibleBuiltInIds, setHostEndpoint } = scope
+   // Why: the shared client owns authenticated identity; this host read only supplies connection-hint metadata.
    useEffect(() => {
      if (!hostId) {
-@@ -85,61 +67,7 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
+@@ -83,61 +66,7 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
      }
    }, [])
  
@@ -42669,7 +42668,7 @@ index 76d8229b28..0f9b84a7d9 100644
  }
  
 diff --git a/mobile/src/session/use-mobile-session-terminal-subscription.ts b/mobile/src/session/use-mobile-session-terminal-subscription.ts
-index 8ad0bb7383..66450e29f4 100644
+index 333d472a30..e2c45b32fa 100644
 --- a/mobile/src/session/use-mobile-session-terminal-subscription.ts
 +++ b/mobile/src/session/use-mobile-session-terminal-subscription.ts
 @@ -1,11 +1,6 @@
@@ -42700,7 +42699,7 @@ index 8ad0bb7383..66450e29f4 100644
      markNativeChatInputLeaseReady,
      showNativeChatRef,
      getTerminalRef,
-@@ -62,14 +53,13 @@ export function useMobileSessionTerminalSubscription(
+@@ -66,14 +57,13 @@ export function useMobileSessionTerminalSubscription(
          activeHandleRef.current,
          handle
        )
@@ -42718,7 +42717,7 @@ index 8ad0bb7383..66450e29f4 100644
            return
          }
        }
-@@ -111,7 +101,7 @@ export function useMobileSessionTerminalSubscription(
+@@ -115,7 +105,7 @@ export function useMobileSessionTerminalSubscription(
              markNativeChatInputLeaseReady(handle)
              return
            }
@@ -42727,7 +42726,7 @@ index 8ad0bb7383..66450e29f4 100644
            if (
              nativeChatTerminalStream.isTerminalCoveredByNativeChat(
                showNativeChatRef.current,
-@@ -147,59 +137,25 @@ export function useMobileSessionTerminalSubscription(
+@@ -151,59 +141,25 @@ export function useMobileSessionTerminalSubscription(
                return
              }
              updateTerminalCwdFromStreamEvent(handle, data, terminalCwdRef.current)
@@ -42790,7 +42789,7 @@ index 8ad0bb7383..66450e29f4 100644
            } else if (data.type === 'metadata') {
              updateTerminalCwdFromStreamEvent(handle, data, terminalCwdRef.current)
            } else if (data.type === 'data') {
-@@ -220,32 +176,20 @@ export function useMobileSessionTerminalSubscription(
+@@ -224,32 +180,20 @@ export function useMobileSessionTerminalSubscription(
                  chunkLen: typeof data.chunk === 'string' ? data.chunk.length : 0
                })
              }
@@ -42825,19 +42824,20 @@ index 8ad0bb7383..66450e29f4 100644
            }
          },
          () => {
-@@ -261,14 +205,7 @@ export function useMobileSessionTerminalSubscription(
+@@ -265,15 +209,7 @@ export function useMobileSessionTerminalSubscription(
        }
        subscribingHandlesRef.current.delete(handle)
      },
 -    [
 -      client,
+-      clientId,
 -      getTerminalRef,
 -      markNativeChatInputLeaseReady,
 -      scheduleDelayedAction,
 -      showToast,
 -      signalTerminalInventoryRecovery
 -    ]
-+    [client, getTerminalRef, markNativeChatInputLeaseReady, signalTerminalInventoryRecovery]
++    [client, clientId, getTerminalRef, markNativeChatInputLeaseReady, signalTerminalInventoryRecovery]
    )
    return {
      subscribeToTerminal
