@@ -168,7 +168,7 @@ index d5a420cc74..5824914fdb 100644
        "allowBackup": false,
        "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
 -      "package": "com.stably.orca.mobile",
-+      "package": "com.rudironsoni.horca",
++      "package": "com.rudironsoni.horca.mobile",
        "versionCode": 15
      },
      "plugins": [
