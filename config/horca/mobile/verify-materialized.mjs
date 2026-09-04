@@ -34,7 +34,7 @@ if (
   expoConfig?.name !== 'Horca' ||
   expoConfig?.slug !== 'horca-mobile' ||
   expoConfig?.scheme !== 'horca' ||
-  expoConfig?.ios?.bundleIdentifier !== 'com.rudironsoni.horca' ||
+  expoConfig?.ios?.bundleIdentifier !== 'com.rudironsoni.horca.mobile' ||
   expoConfig?.android?.package !== 'com.rudironsoni.horca'
 ) {
   throw new Error('Materialized Horca mobile app identity is incorrect')
@@ -48,9 +48,9 @@ if (!expoConfig.plugins?.includes('./plugins/ios-scene-lifecycle.js')) {
 const releaseAppfile = readFileSync(resolve(mobileRoot, 'fastlane/Appfile'), 'utf8')
 const releaseFastfile = readFileSync(resolve(mobileRoot, 'fastlane/Fastfile'), 'utf8')
 if (
-  !releaseAppfile.includes('com.rudironsoni.horca') ||
+  !releaseAppfile.includes('com.rudironsoni.horca.mobile') ||
   !releaseFastfile.includes('Horca.xcworkspace') ||
-  !releaseFastfile.includes('BUNDLE_ID = "com.rudironsoni.horca"')
+  !releaseFastfile.includes('BUNDLE_ID = "com.rudironsoni.horca.mobile"')
 ) {
   throw new Error('Materialized Horca mobile release identity is incorrect')
 }
