@@ -123,7 +123,7 @@ index 860f906e77..2bdbdc32ac 100644
    { value: 'smallest', label: 'Smallest (50%)', scale: 0.5 },
    { value: 'smaller', label: 'Smaller (75%)', scale: 0.75 },
 diff --git a/mobile/app.json b/mobile/app.json
-index d5a420cc74..5824914fdb 100644
+index 131e389939..47164857e8 100644
 --- a/mobile/app.json
 +++ b/mobile/app.json
 @@ -1,26 +1,20 @@
@@ -133,7 +133,7 @@ index d5a420cc74..5824914fdb 100644
 -    "slug": "orca-mobile",
 +    "name": "Horca",
 +    "slug": "horca-mobile",
-     "version": "0.0.47",
+     "version": "0.0.48",
      "orientation": "default",
      "icon": "./assets/icon.png",
      "userInterfaceStyle": "automatic",
