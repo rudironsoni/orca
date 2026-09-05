@@ -49,7 +49,14 @@ for (const file of downstreamFiles) {
 for (const patch of downstreamPatches) {
   execFileSync(
     'git',
-    ['apply', '--binary', '-p1', `--directory=${relative(repoRoot, outputRoot)}`, patch],
+    [
+      'apply',
+      '--binary',
+      '--unidiff-zero',
+      '-p1',
+      `--directory=${relative(repoRoot, outputRoot)}`,
+      patch
+    ],
     { cwd: repoRoot, stdio: 'inherit', maxBuffer: 64 * 1024 * 1024 }
   )
 }
