@@ -5,10 +5,11 @@
 ; Sharing the official include would make uninstalling Horca destroy an
 ; installed Orca's live daemon (and vice versa), breaking side-by-side installs.
 ;
-; The image name and the LOCALAPPDATA folder name must stay in sync with
-; src/shared/distribution-identity.json (windowsTerminalDaemonImageName /
-; windowsDaemonHostRootName) and daemon-host-relocation.ts. See the official
-; include for the full relocation rationale and the ${isUpdated} guard.
+; The LOCALAPPDATA folder name must stay in sync with windowsDaemonHostRootName
+; in src/shared/distribution-identity.json and LOCAL_HOST_ROOT_NAME in
+; daemon-host-relocation.ts. The host exe is a verbatim copy of the app exe;
+; horca-terminal-daemon.exe stays only to reap hosts left by older builds.
+; See the official include for the relocation rationale and the ${isUpdated} guard.
 ;
 ; Why APP_FILENAME is redefined: electron-builder's oneClick per-user NSIS
 ; sets APP_FILENAME from package.json name (`orca`), so Horca would install
@@ -30,7 +31,22 @@
 !macroend
 !macro customUnInstall
   ${ifNot} ${isUpdated}
-    nsExec::Exec 'taskkill /F /IM horca-terminal-daemon.exe'
+    Push $0
+    Push $1
+    Push $2
+    ReadEnvStr $1 USERNAME
+    ${if} $1 == ""
+      StrCpy $2 ""
+    ${else}
+      StrCpy $2 '/FI "USERNAME eq $1"'
+    ${endIf}
+    nsExec::Exec 'taskkill /F /IM "${APP_EXECUTABLE_FILENAME}" $2'
+    Pop $0
+    nsExec::Exec 'taskkill /F /IM "horca-terminal-daemon.exe" $2'
+    Pop $0
+    Pop $2
+    Pop $1
+    Pop $0
     ; Give the OS a moment to release the image lock before removing the tree.
     Sleep 500
     RMDir /r "$LOCALAPPDATA\Horca\daemon-host"
