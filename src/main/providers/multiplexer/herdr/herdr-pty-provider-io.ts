@@ -29,6 +29,12 @@ import {
   terminalLogicalInputFromBytes
 } from '../../../../shared/horca/terminal-logical-key'
 import {
+  WRITE_ACCEPTED,
+  writeRefused,
+  writeUnverifiable,
+  type WriteSettlement
+} from '../../../../shared/pty-write-settlement'
+import {
   isHerdrWriteEndpointGone,
   isOrcaFallbackId,
   writeFallbackLogical
@@ -136,13 +142,23 @@ export class HerdrPtyProviderIo {
     return { cols: binding.cols, rows: binding.rows }
   }
 
-  writeWithSettlement(id: string, data: string): Promise<boolean> {
-    if (isOrcaFallbackId(this.bindings, id, this.fallback) && this.fallback.writeWithSettlement) {
+  async writeWithSettlement(id: string, data: string): Promise<WriteSettlement> {
+    if (isOrcaFallbackId(this.bindings, id, this.fallback)) {
       return this.fallback.writeWithSettlement(id, data)
     }
-    this.write(id, data)
-    const pending = this.writeQueues.get(id)
-    return pending ? pending.then(() => true) : Promise.resolve(true)
+    const binding = this.bindings.get(id)
+    if (!binding) {
+      return writeRefused('provider_unavailable')
+    }
+    try {
+      await this.sendInput(id, () => writeSharedHerdrInput(binding, data))
+      return WRITE_ACCEPTED
+    } catch (error) {
+      if (isHerdrWriteEndpointGone(error)) {
+        return writeRefused('endpoint_disconnected')
+      }
+      return writeUnverifiable('endpoint_write_threw', true)
+    }
   }
 
   async getCwd(id: string): Promise<string> {

@@ -53,6 +53,13 @@
       "dropWhen": "Generic provider capabilities land upstream"
     },
     {
+      "path": "src/main/providers/settled-pty-writer-census.test.ts",
+      "subsystem": "terminal-backend-seam",
+      "reason": "Count the downstream Herdr provider in the settled-writer census",
+      "upstreamPr": null,
+      "dropWhen": "The generic terminal backend registry lands upstream"
+    },
+    {
       "path": "src/main/ssh/ssh-relay-session.ts",
       "subsystem": "terminal-backend-seam",
       "reason": "Compose registered terminal backend adapters for SSH sessions",
