@@ -29,7 +29,8 @@ const SETTLED_PTY_WRITER_FILES = [
   'src/main/providers/ssh-pty-provider.ts',
   'src/main/daemon/daemon-pty-router.ts',
   'src/main/daemon/degraded-daemon-pty-provider.ts',
-  'src/main/daemon/daemon-pty-adapter.ts'
+  'src/main/daemon/daemon-pty-adapter.ts',
+  'src/main/providers/multiplexer/herdr/herdr-pty-provider.ts'
 ]
 
 /** Where the provider-side settlement is actually decided; the adapter inherits its own. */
@@ -39,7 +40,8 @@ const SETTLED_WRITER_DECLARATIONS = [
   'src/main/providers/ssh-pty-provider-rpc-operations.ts',
   'src/main/daemon/daemon-pty-router.ts',
   'src/main/daemon/degraded-daemon-pty-provider.ts',
-  'src/main/daemon/daemon-pty-session-input.ts'
+  'src/main/daemon/daemon-pty-session-input.ts',
+  'src/main/providers/multiplexer/herdr/herdr-pty-provider-io.ts'
 ]
 
 function declaredProviderFiles(): string[] {
