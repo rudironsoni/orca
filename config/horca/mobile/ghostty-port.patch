@@ -159,7 +159,7 @@ index d5a420cc74..6709c5923a 100644
          "NSAppTransportSecurity": {
            "NSAllowsLocalNetworking": true,
            "NSExceptionDomains": {
-@@ -71,14 +65,14 @@
+@@ -71,7 +65,6 @@
          "foregroundImage": "./assets/adaptive-icon.png",
          "backgroundColor": "#111111"
        },
@@ -168,14 +168,11 @@ index d5a420cc74..6709c5923a 100644
        "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
 -      "package": "com.stably.orca.mobile",
 +      "package": "com.rudironsoni.horca.mobile",
-       "versionCode": 15
-     },
+@@ -80,3 +73,4 @@
      "plugins": [
        "expo-router",
 +      "./plugins/ios-scene-lifecycle.js",
        "./plugins/android-respect-rotation-lock.js",
-       [
-         "expo-splash-screen",
 @@ -90,25 +84,27 @@
        [
          "expo-camera",
